@@ -52,7 +52,7 @@ Usage is the same as the Python version:
 - If you move the EXE to another folder, copy `kill.bat` into that same folder.
 - `app_settings.json` is created next to the EXE when **GO** succeeds.
 
-## Install
+## Install with Python
 
 ```powershell
 python -m venv venv
