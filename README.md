@@ -29,15 +29,15 @@ Python dependencies:
 ## No Python Needed
 
 ```powershell
-.\dist\main.exe
+.\main.exe
 ```
 
 The packaged executable is located at `dist\main.exe`.
 
 Launch options:
 
-- In File Explorer: double-click `dist\main.exe`.
-- In PowerShell (from project root): run `.\dist\main.exe`.
+- In File Explorer: double-click `main.exe`.
+- In PowerShell (from project root): run `.\main.exe`.
 
 Usage is the same as the Python version:
 
