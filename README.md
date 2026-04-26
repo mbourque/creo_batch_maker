@@ -26,6 +26,32 @@ Python dependencies:
 - `customtkinter`
 - `Pillow`
 
+## No Python Needed
+
+```powershell
+.\dist\main.exe
+```
+
+The packaged executable is located at `dist\main.exe`.
+
+Launch options:
+
+- In File Explorer: double-click `dist\main.exe`.
+- In PowerShell (from project root): run `.\dist\main.exe`.
+
+Usage is the same as the Python version:
+
+- Fill in the required folders and batch name.
+- Click **GO** to generate the `.dxc`.
+- Click **Open Batch** to launch Creo distributed batch.
+
+### Distribution notes
+
+- Move `dist\main.exe` to the project main folder before running it.
+- `main.exe` must be in the same folder as `kill.bat` for the app to work correctly.
+- If you move the EXE to another folder, copy `kill.bat` into that same folder.
+- `app_settings.json` is created next to the EXE when **GO** succeeds.
+
 ## Install
 
 ```powershell
@@ -93,19 +119,6 @@ python .\main.py
 ## Settings persistence
 
 On successful **GO**, app settings are saved to `app_settings.json` in the project directory, including the selected task filename.
-
-## Build executable (optional)
-
-This project includes a PyInstaller spec (`main.spec`).
-
-Example:
-
-```powershell
-pip install pyinstaller
-pyinstaller .\main.spec
-```
-
-The built executable is produced under `dist\`.
 
 ## Process kill script
 
