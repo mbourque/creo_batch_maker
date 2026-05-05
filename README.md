@@ -84,9 +84,8 @@ python .\main.py
   Source folder scanned for model files:
   - `*.prt` / `*.prt.<n>`
   - `*.asm` / `*.asm.<n>`
-  - `*.drw` / `*.drw.<n>` 
-    
-   For each base filename, only the latest version is included in the batch.
+  - `*.drw` / `*.drw.<n>`  
+  For each base filename, only the latest version is included in the batch.
 6. **Distributed Batch File**
   Base output name. `.dxc` is automatically enforced.
 7. **Buttons**
