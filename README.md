@@ -68,19 +68,3 @@ python .\main.py
 ## Documentation
 
 See the [documentation wiki page](https://github.com/mbourque/creo_batch_maker/wiki/Documentation) for how to use.
-
-## Output details
-
-- The app chunks model objects into groups of up to 10 objects per `<Group>`.
-- Group name is derived from the selected task description.
-- Generated XML structure:
-
-```xml
-<DXC>
-    <Windchill/>
-    <Group ...>
-        <Object>...</Object>
-        <ConfigFile>...</ConfigFile>
-    </Group>
-</DXC>
-```
