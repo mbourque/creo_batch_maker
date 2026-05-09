@@ -11,7 +11,6 @@ Windows desktop utility for creating Creo distributed batch (`.dxc`) files and l
   - model objects (`.prt`, `.asm`, `.drw`, including versioned files),
   - optional modelcheck config files.
 - Launches Creo's `ptcdbatch.bat` for the generated `.dxc`.
-- Includes a `Kill` action that runs `kill.bat` to stop common distributed batch related processes.
 
 ## Requirements
 
