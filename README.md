@@ -11,7 +11,6 @@ Windows desktop utility for creating Creo distributed batch (`.dxc`) files and l
   - model objects (`.prt`, `.asm`, `.drw`, including versioned files),
   - optional modelcheck config files.
 - Launches Creo's `ptcdbatch.bat` for the generated `.dxc`.
-- Includes a `Kill` action that runs `kill.bat` to stop common distributed batch related processes.
 
 ## Requirements
 
@@ -66,61 +65,6 @@ pip install -r requirements.txt
 python .\main.py
 ```
 
-## GUI workflow
+## Documentation
 
-1. **Working Directory**
-  Folder where the output `.dxc` file is written.
-2. **Creo Loadpoint**
-  Root Creo install/loadpoint. The app uses this to:
-  - discover tasks from `Common Files\text\ttds`,
-  - locate `Parametric\bin\ptcdbatch.bat`.
-3. **Task**
-  Select a discovered `.ttd` task.  
-   The dropdown label uses the task description parsed from the `.ttd` file.
-4. **Modelcheck Config Folder**
-  Required only when the selected task is `modelcheck.ttd`.  
-   All files in this folder are added as `<ConfigFile>` entries. You can use the folder provided named **configs**.
-5. **Creo Models Folder**
-  Source folder scanned for model files:
-  - `*.prt` / `*.prt.<n>`
-  - `*.asm` / `*.asm.<n>`
-  - `*.drw` / `*.drw.<n>`  
-  For each base filename, only the latest version is included in the batch.
-6. **Distributed Batch File**
-  Base output name. `.dxc` is automatically enforced.
-7. **Buttons**
-  - **GO**: creates the `.dxc` file.
-  - **Open Batch**: opens a new PowerShell console and runs `ptcdbatch.bat <your-file>.dxc`.
-  - **Kill**: executes `kill.bat` to force-close common batch processes.
-
-## Output details
-
-- The app chunks model objects into groups of up to 10 objects per `<Group>`.
-- Group name is derived from the selected task description.
-- Generated XML structure:
-
-```xml
-<DXC>
-    <Windchill/>
-    <Group ...>
-        <Object>...</Object>
-        <ConfigFile>...</ConfigFile>
-    </Group>
-</DXC>
-```
-
-## Settings persistence
-
-On successful **GO**, app settings are saved to `app_settings.json` in the project directory, including the selected task filename.
-
-## Process kill script
-
-`kill.bat` attempts to stop these processes:
-
-- `pro_comm_msg.exe`
-- `nmsd.exe`
-- `dbatchs.exe`
-- `dsq.exe`
-- `xtop.exe`
-
-Use with care, since it force-terminates (`taskkill /F`) those processes.
+See the [documentation wiki page](https://github.com/mbourque/creo_batch_maker/wiki/Documentation) for how to use.
