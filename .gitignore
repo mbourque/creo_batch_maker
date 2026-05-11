@@ -1,0 +1,2 @@
+# Per-user / per-machine; app creates this on first run or save
+app_settings.json
