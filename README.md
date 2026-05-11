@@ -20,18 +20,11 @@ Windows desktop utility for creating Creo distributed batch (`.dxc`) files and l
   - `Common Files\text\ttds\*.ttd`
   - `Parametric\bin\ptcdbatch.bat`
 
-Python dependencies:
-
-- `customtkinter`
-- `Pillow`
-
 ## No Python Needed
 
 ```powershell
 .\main.exe
 ```
-
-The packaged executable is located at `dist\main.exe`.
 
 Launch options:
 
@@ -44,13 +37,6 @@ Usage is the same as the Python version:
 - Click **GO** to generate the `.dxc`.
 - Click **Open Batch** to launch Creo distributed batch.
 
-### Distribution notes
-
-- Move `dist\main.exe` to the project main folder before running it.
-- `main.exe` must be in the same folder as `kill.bat` for the app to work correctly.
-- If you move the EXE to another folder, copy `kill.bat` into that same folder.
-- `app_settings.json` is created next to the EXE when **GO** succeeds.
-
 ## Install with Python
 
 ```powershell
@@ -59,6 +45,11 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
+Python dependencies:
+
+- `customtkinter`
+- `Pillow`
+  
 ## Run
 
 ```powershell
