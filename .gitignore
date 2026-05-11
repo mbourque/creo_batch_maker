@@ -4,5 +4,6 @@ venv/
 *.json
 .cursorrules
 build/
+dist/
 main.spec
 .gitignore
