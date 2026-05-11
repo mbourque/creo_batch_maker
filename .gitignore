@@ -7,3 +7,4 @@ build/
 dist/
 main.spec
 .gitignore
+developer_notes.md
