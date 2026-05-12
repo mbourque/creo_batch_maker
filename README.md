@@ -32,7 +32,7 @@ Usage:
 
 - Use Browse… to set the working directory (models live there; outputs go there), Creo loadpoint, and task.
 - GO generates the chunk `.dxc` files and `creo-batch-run.ps1` (and updates `app_settings.json` when all GO checks pass).
-- Open Batch starts the runner in PowerShell so you can follow the log output.
+- Open Batch starts the runner in PowerShell when `creo-batch-run.ps1` and at least one `creo-batch-*.dxc` are in the working folder (run GO again after a finished run, because the runner deletes the chunk `.dxc` files).
 
 ## Install with Python
 

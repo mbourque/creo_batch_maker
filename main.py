@@ -752,6 +752,16 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         kill = _app_bundle_dir() / "kill.bat"
         return ptc.is_file() and kill.is_file()
 
+    @staticmethod
+    def _open_batch_artifacts_present(wdir: Path) -> bool:
+        """True when the runner script and at least one chunk .dxc exist (same state as after a successful GO)."""
+        try:
+            if not (wdir / CREO_BATCH_RUNNER_BASENAME).is_file():
+                return False
+            return any(p.is_file() for p in wdir.glob(f"{CREO_BATCH_BASE}-*.dxc"))
+        except OSError:
+            return False
+
     def _open_batch_fields_valid(self) -> bool:
         wd = (self.working_directory.get() or "").strip()
         lp = (self.creo_loadpoint.get() or "").strip().rstrip("\\/")
@@ -761,7 +771,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return False
         try:
             wdir = Path(wd).expanduser().resolve()
-            if not (wdir / CREO_BATCH_RUNNER_BASENAME).is_file():
+            if not self._open_batch_artifacts_present(wdir):
                 return False
         except OSError:
             return False
@@ -1272,13 +1282,21 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             messagebox.showerror("File Not Found", f"Could not find:\n{bat_path}")
             return
 
-        working_dir = Path(working_dir_raw).resolve()
+        working_dir = Path(working_dir_raw).expanduser().resolve()
         runner_ps1 = working_dir / CREO_BATCH_RUNNER_BASENAME
-        if not runner_ps1.is_file():
-            messagebox.showerror(
-                "File Not Found",
-                f"Could not find:\n{runner_ps1}\n\nRun GO first to create chunk .dxc files and the runner script.",
-            )
+        if not self._open_batch_artifacts_present(working_dir):
+            if not runner_ps1.is_file():
+                messagebox.showerror(
+                    "File Not Found",
+                    f"Could not find:\n{runner_ps1}\n\nRun GO first to create chunk .dxc files and the runner script.",
+                )
+            else:
+                messagebox.showerror(
+                    "Chunk .dxc files missing",
+                    f"No {CREO_BATCH_BASE}-*.dxc files were found in:\n{working_dir}\n\n"
+                    "Run GO to generate chunk files. If you already finished a batch run, the runner removed the "
+                    "chunk .dxc files — run GO again before using Open Batch.",
+                )
             return
 
         ps_exe = self._resolve_powershell_exe()
