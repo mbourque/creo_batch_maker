@@ -23,6 +23,8 @@ DESCRIPTION_BLOCK_RE = re.compile(
     re.DOTALL | re.IGNORECASE,
 )
 XML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+# Top-level Creo model filenames (same patterns as ``_scan_models_non_recursive``).
+_CREO_MODEL_TOPLEVEL_RE = re.compile(r".*\.(prt|asm|drw)(\.\d+)?$", re.IGNORECASE)
 
 # Chunk .dxc files: working_dir / f"{CREO_BATCH_BASE}-1.dxc", "-2.dxc", ...
 CREO_BATCH_BASE = "creo-batch"
@@ -55,6 +57,41 @@ def _xml_attr_escape(value: str) -> str:
     )
 
 
+def _creo_loadpoint_has_parametric_dir(loadpoint: str) -> bool:
+    """True if ``loadpoint`` looks like a Creo install root (contains ``Parametric`` as a directory)."""
+    s = (loadpoint or "").strip().rstrip("\\/")
+    if not s:
+        return False
+    return (Path(s) / "Parametric").is_dir()
+
+
+def _working_directory_exists_as_dir(working_directory: str) -> bool:
+    """True if the path resolves to an existing directory (for Save / Open Batch / settings file)."""
+    s = (working_directory or "").strip()
+    if not s:
+        return False
+    try:
+        return Path(s).expanduser().resolve().is_dir()
+    except OSError:
+        return False
+
+
+def _working_directory_ok_for_go(working_directory: str) -> bool:
+    """Existing folder, or a missing leaf whose parent is an existing folder (GO will mkdir the leaf)."""
+    s = (working_directory or "").strip()
+    if not s:
+        return False
+    try:
+        p = Path(s).expanduser()
+        if p.is_dir():
+            return True
+        if p.exists():
+            return False
+        return p.parent.is_dir()
+    except OSError:
+        return False
+
+
 class CreoDistributedBatchMakerApp(ctk.CTk):
     def __init__(self) -> None:
         super().__init__()
@@ -85,6 +122,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "Metric Settings...",
             "Sheetmetal Thickness...",
         ]
+        self._refresh_action_buttons_job: str | None = None
         self._settings_config_relative: dict[str, str] = {
             "Model Checks...": "default_checks.mch",
             "Config.pro...": "config.pro",
@@ -280,13 +318,18 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             font=("Segoe UI", 11),
         )
         self.task_select.pack(fill="x", expand=True)
-        self.task_select.bind("<<ComboboxSelected>>", lambda _e: self._refresh_settings_menu())
+
+        def _on_task_selected(_e=None):
+            self._refresh_settings_menu()
+            self._refresh_action_buttons()
+
+        self.task_select.bind("<<ComboboxSelected>>", _on_task_selected)
 
         btn_row = ctk.CTkFrame(container, fg_color="transparent")
         btn_row.pack(fill="x", padx=32, pady=(29, 6))
         btn_bar = ctk.CTkFrame(btn_row, fg_color="transparent")
         btn_bar.pack(side="right")
-        go_button = ctk.CTkButton(
+        self.go_button = ctk.CTkButton(
             btn_bar,
             text="GO",
             width=120,
@@ -299,7 +342,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             font=ctk.CTkFont(size=14, weight="bold"),
             command=self._on_go,
         )
-        launch_button = ctk.CTkButton(
+        self.open_batch_button = ctk.CTkButton(
             btn_bar,
             text="Open Batch",
             width=120,
@@ -312,8 +355,17 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             font=ctk.CTkFont(size=14, weight="bold"),
             command=self._launch_ptcdbatch,
         )
-        go_button.pack(side="right", padx=(8, 0))
-        launch_button.pack(side="right", padx=(0, 0))
+        self.go_button.pack(side="right", padx=(8, 0))
+        self.open_batch_button.pack(side="right", padx=(0, 0))
+
+        def _on_path_var_changed(*_args: object) -> None:
+            self._refresh_action_buttons()
+
+        self.working_directory.trace_add("write", _on_path_var_changed)
+        self.creo_loadpoint.trace_add("write", _on_path_var_changed)
+        self.task.trace_add("write", _on_path_var_changed)
+
+        self._refresh_action_buttons()
 
     def _build_path_row(
         self,
@@ -364,14 +416,38 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         )
         entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
         if variable is self.creo_loadpoint:
-            entry.bind("<FocusOut>", lambda _e: self._refresh_task_options())
-            entry.bind("<Return>", lambda _e: self._refresh_task_options())
+            self.creo_loadpoint_entry = entry
+            entry.configure(state="disabled")
+        elif variable is self.working_directory:
+            self.working_directory_entry = entry
+            entry.configure(state="disabled")
+
+    def _set_working_directory_value(self, value: str) -> None:
+        """Set working directory text; entry is disabled so we briefly enable to refresh the display."""
+        text = (value or "").strip()
+        e = getattr(self, "working_directory_entry", None)
+        if e is not None:
+            e.configure(state="normal")
+        self.working_directory.set(text)
+        if e is not None:
+            e.configure(state="disabled")
+
+    def _set_creo_loadpoint_value(self, value: str) -> None:
+        """Set Creo loadpoint text; entry is disabled so we briefly enable to refresh the display."""
+        text = (value or "").strip().rstrip("\\/")
+        e = getattr(self, "creo_loadpoint_entry", None)
+        if e is not None:
+            e.configure(state="normal")
+        self.creo_loadpoint.set(text)
+        if e is not None:
+            e.configure(state="disabled")
 
     def _build_menu_bar(self) -> None:
         menubar = tk.Menu(self)
         self._menubar = menubar
 
         file_menu = tk.Menu(menubar, tearoff=0)
+        self._file_menu = file_menu
         file_menu.add_command(label="New", command=self._on_file_menu_new)
         file_menu.add_command(label="Open...", command=self._on_file_menu_open)
         file_menu.add_command(label="Save", command=self._on_file_menu_save)
@@ -389,6 +465,20 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
         self.configure(menu=menubar)
         self._refresh_settings_menu()
+        self._refresh_file_menu_save_state()
+
+    def _refresh_file_menu_save_state(self) -> None:
+        """Disable File → Save / Save as when settings are not in a savable state."""
+        fm = getattr(self, "_file_menu", None)
+        if fm is None:
+            return
+        ok, _ = self._settings_fields_ready()
+        st = tk.NORMAL if ok else tk.DISABLED
+        try:
+            fm.entryconfigure(2, state=st)
+            fm.entryconfigure(3, state=st)
+        except tk.TclError:
+            pass
 
     @staticmethod
     def _menubar_cascade_index(menubar: tk.Menu, label: str) -> int | None:
@@ -430,23 +520,81 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 self._menubar.delete(settings_idx)
 
     def _settings_fields_ready(self) -> tuple[bool, str]:
-        if not (self.working_directory.get() or "").strip():
+        wd = (self.working_directory.get() or "").strip()
+        if not wd:
             return False, "Working directory cannot be empty."
+        if not _working_directory_exists_as_dir(wd):
+            return (
+                False,
+                "Working directory must be an existing folder (use Browse or a path that exists on disk).",
+            )
+        if not self._working_directory_has_creo_models(wd):
+            return (
+                False,
+                "Working directory must contain at least one Creo model file "
+                "(.prt, .asm, or .drw) in that folder itself (subfolders are not used).",
+            )
         if not (self.creo_loadpoint.get() or "").strip():
             return False, "Creo loadpoint cannot be empty."
+        if not _creo_loadpoint_has_parametric_dir(self.creo_loadpoint.get()):
+            return (
+                False,
+                'Creo loadpoint must be a Creo install folder that contains a "Parametric" subfolder.',
+            )
         if not self._task_filename_from_ui(self.task.get() or ""):
             return False, "Task cannot be empty. Set Creo loadpoint to list TTDs, or use File → New."
         return True, ""
 
+    def _warn_if_working_directory_invalid(self) -> None:
+        wd = (self.working_directory.get() or "").strip()
+        if not wd or _working_directory_exists_as_dir(wd):
+            return
+        messagebox.showwarning(
+            "Working directory",
+            "This path is not an existing folder.\n\n"
+            "Use Browse to pick a folder, or type a path that already exists on disk.",
+        )
+
+    def _warn_if_working_directory_has_no_creo_models(self) -> None:
+        wd = (self.working_directory.get() or "").strip()
+        if not wd or not _working_directory_exists_as_dir(wd):
+            return
+        if self._working_directory_has_creo_models(wd):
+            return
+        messagebox.showwarning(
+            "Working directory",
+            "No Creo models found in this folder.\n\n"
+            "Add at least one .prt, .asm, or .drw file directly in this directory "
+            "(the app does not look inside subfolders).",
+        )
+
+    def _warn_if_creo_loadpoint_missing_parametric(self) -> None:
+        raw = (self.creo_loadpoint.get() or "").strip().rstrip("\\/")
+        if not raw or _creo_loadpoint_has_parametric_dir(raw):
+            return
+        messagebox.showwarning(
+            "Creo loadpoint",
+            "This folder does not look like a Creo loadpoint.\n\n"
+            'It should be the Creo install folder that contains a "Parametric" subfolder '
+            r"(where Parametric\bin\ptcdbatch.bat lives)." "\n\n"
+            r"Example: C:\PTC\Creo 12.4.3.0",
+        )
+
     def _on_exit(self) -> None:
-        """Save settings to the active JSON when the form is complete, then close."""
-        self._write_current_settings_to_disk()
+        """Save settings when valid; warn if the form was partly filled but could not be saved."""
+        ok, err = self._write_current_settings_to_disk()
+        if not ok and (
+            (self.working_directory.get() or "").strip()
+            or (self.creo_loadpoint.get() or "").strip()
+            or self._task_filename_from_ui(self.task.get() or "")
+        ):
+            messagebox.showwarning("Settings not saved", err)
         self.destroy()
 
     def _on_file_menu_new(self) -> None:
         self._settings_path = _default_app_settings_path()
-        self.working_directory.set("")
-        self.creo_loadpoint.set("")
+        self._set_working_directory_value("")
+        self._set_creo_loadpoint_value("")
         self._refresh_task_options()
 
     def _write_current_settings_to_disk(self) -> tuple[bool, str]:
@@ -566,9 +714,14 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             selected_path = fd.askopenfilename(initialdir=initial)
 
         if selected_path:
-            target_variable.set(selected_path)
             if target_variable is self.creo_loadpoint:
+                self._set_creo_loadpoint_value(selected_path)
+                self._warn_if_creo_loadpoint_missing_parametric()
                 self._refresh_task_options()
+            elif target_variable is self.working_directory:
+                self._set_working_directory_value(selected_path)
+                self._warn_if_working_directory_invalid()
+                self._warn_if_working_directory_has_no_creo_models()
 
     @staticmethod
     def _task_allowed_for_dropdown(filename: str, display_label: str) -> bool:
@@ -583,51 +736,126 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return True
         return False
 
-    def _refresh_task_options(self) -> None:
-        loadpoint = (self.creo_loadpoint.get() or "").strip().rstrip("\\/")
-        ttd_folder = Path(loadpoint) / "Common Files" / "text" / "ttds" if loadpoint else None
+    def _go_fields_valid(self) -> bool:
+        wd = (self.working_directory.get() or "").strip()
+        lp = (self.creo_loadpoint.get() or "").strip().rstrip("\\/")
+        task_fn = self._task_filename_from_ui((self.task.get() or "").strip())
+        if not wd or not _working_directory_ok_for_go(wd):
+            return False
+        if not self._working_directory_has_creo_models(wd):
+            return False
+        if not lp or not _creo_loadpoint_has_parametric_dir(lp):
+            return False
+        if not task_fn:
+            return False
+        ptc = Path(lp) / "Parametric" / "bin" / "ptcdbatch.bat"
+        kill = _app_bundle_dir() / "kill.bat"
+        return ptc.is_file() and kill.is_file()
 
-        filenames: list[str] = []
-        if ttd_folder and ttd_folder.exists() and ttd_folder.is_dir():
-            filenames = sorted(
-                [p.name for p in ttd_folder.iterdir() if p.is_file() and p.suffix.lower() == ".ttd"],
-                key=str.lower,
-            )
+    def _open_batch_fields_valid(self) -> bool:
+        wd = (self.working_directory.get() or "").strip()
+        lp = (self.creo_loadpoint.get() or "").strip().rstrip("\\/")
+        if not wd or not _working_directory_exists_as_dir(wd):
+            return False
+        if not lp or not _creo_loadpoint_has_parametric_dir(lp):
+            return False
+        try:
+            wdir = Path(wd).expanduser().resolve()
+            if not (wdir / CREO_BATCH_RUNNER_BASENAME).is_file():
+                return False
+        except OSError:
+            return False
+        ptc = Path(lp) / "Parametric" / "bin" / "ptcdbatch.bat"
+        return ptc.is_file()
 
-        pairs: list[tuple[str, str]] = []
-        for name in filenames:
-            desc = self._read_ttd_description(ttd_folder / name) if ttd_folder else name
-            pairs.append((name, desc))
+    def _refresh_action_buttons(self, *_args: object) -> None:
+        """Coalesce many StringVar writes into one UI update (faster startup / settings load)."""
+        jid = self._refresh_action_buttons_job
+        if jid is not None:
+            try:
+                self.after_cancel(jid)
+            except tk.TclError:
+                pass
+        self._refresh_action_buttons_job = self.after(0, self._refresh_action_buttons_run)
 
-        self._task_filename_to_description = {name: desc for name, desc in pairs}
-
-        labeled = self._unique_task_labels(pairs)
-        allowed = [(fn, lab) for fn, lab in labeled if self._task_allowed_for_dropdown(fn, lab)]
-        preferred = "modelcheck.ttd"
-        preferred_rows = [(fn, lab) for fn, lab in allowed if fn.lower() == preferred]
-        other_rows = [(fn, lab) for fn, lab in allowed if fn.lower() != preferred]
-        other_rows.sort(key=lambda row: row[1].casefold())
-        ordered = (preferred_rows[:1] + other_rows) if preferred_rows else other_rows
-
-        self._task_display_to_filename = {lab: fn for fn, lab in ordered}
-        display_values = [lab for _fn, lab in ordered]
-
-        if not display_values:
-            self._task_display_to_filename = {DEFAULT_MODELCHECK_DISPLAY: DEFAULT_MODELCHECK_TTD}
-            self._task_filename_to_description = {DEFAULT_MODELCHECK_TTD: DEFAULT_MODELCHECK_DISPLAY}
-            self.task_select.configure(values=(DEFAULT_MODELCHECK_DISPLAY,))
-            self.task.set(DEFAULT_MODELCHECK_DISPLAY)
-            self._refresh_settings_menu()
+    def _refresh_action_buttons_run(self) -> None:
+        self._refresh_action_buttons_job = None
+        try:
+            if not self.winfo_exists():
+                return
+        except tk.TclError:
             return
+        if getattr(self, "go_button", None) is not None:
+            self.go_button.configure(state="normal" if self._go_fields_valid() else "disabled")
+            self.open_batch_button.configure(
+                state="normal" if self._open_batch_fields_valid() else "disabled"
+            )
+        self._refresh_file_menu_save_state()
 
-        self.task_select.configure(values=tuple(display_values))
-        self.task.set(display_values[0])
-        self._refresh_settings_menu()
+    def _refresh_task_options(self) -> None:
+        try:
+            loadpoint = (self.creo_loadpoint.get() or "").strip().rstrip("\\/")
+            if not loadpoint or not _creo_loadpoint_has_parametric_dir(loadpoint):
+                self._task_display_to_filename = {}
+                self._task_filename_to_description = {}
+                self.task_select.configure(values=("",))
+                self.task.set("")
+                self._refresh_settings_menu()
+                return
+
+            ttd_folder = Path(loadpoint) / "Common Files" / "text" / "ttds"
+
+            filenames: list[str] = []
+            if ttd_folder.is_dir():
+                filenames = sorted(
+                    [p.name for p in ttd_folder.iterdir() if p.is_file() and p.suffix.lower() == ".ttd"],
+                    key=str.lower,
+                )
+
+            pairs: list[tuple[str, str]] = []
+            fn_mc = next((f for f in filenames if f.lower() == "modelcheck.ttd"), None)
+            if fn_mc:
+                pairs.append((fn_mc, self._read_ttd_description(ttd_folder / fn_mc)))
+            fn_jpg = next((f for f in filenames if f.lower() == "solid-raster_write_jpg.ttd"), None)
+            if fn_jpg:
+                desc_j = self._read_ttd_description(ttd_folder / fn_jpg)
+                if self._task_allowed_for_dropdown(fn_jpg, desc_j):
+                    pairs.append((fn_jpg, desc_j))
+
+            self._task_filename_to_description = {name: desc for name, desc in pairs}
+
+            labeled = self._unique_task_labels(pairs)
+            allowed = [(fn, lab) for fn, lab in labeled if self._task_allowed_for_dropdown(fn, lab)]
+            preferred = "modelcheck.ttd"
+            preferred_rows = [(fn, lab) for fn, lab in allowed if fn.lower() == preferred]
+            other_rows = [(fn, lab) for fn, lab in allowed if fn.lower() != preferred]
+            other_rows.sort(key=lambda row: row[1].casefold())
+            ordered = (preferred_rows[:1] + other_rows) if preferred_rows else other_rows
+
+            self._task_display_to_filename = {lab: fn for fn, lab in ordered}
+            display_values = [lab for _fn, lab in ordered]
+
+            if not display_values:
+                self._task_display_to_filename = {DEFAULT_MODELCHECK_DISPLAY: DEFAULT_MODELCHECK_TTD}
+                self._task_filename_to_description = {DEFAULT_MODELCHECK_TTD: DEFAULT_MODELCHECK_DISPLAY}
+                self.task_select.configure(values=(DEFAULT_MODELCHECK_DISPLAY,))
+                self.task.set(DEFAULT_MODELCHECK_DISPLAY)
+                self._refresh_settings_menu()
+                return
+
+            self.task_select.configure(values=tuple(display_values))
+            self.task.set(display_values[0])
+            self._refresh_settings_menu()
+        finally:
+            self._refresh_action_buttons()
 
     def _apply_settings_data(self, data: dict[str, object]) -> None:
         """Apply settings from a dict (same keys as app_settings.json). Refreshes task list and menu."""
-        self.working_directory.set(str(data.get("working_directory") or "").strip())
-        self.creo_loadpoint.set(str(data.get("creo_loadpoint") or "").strip())
+        self._set_working_directory_value(str(data.get("working_directory") or ""))
+        self._warn_if_working_directory_invalid()
+        self._warn_if_working_directory_has_no_creo_models()
+        self._set_creo_loadpoint_value(str(data.get("creo_loadpoint") or ""))
+        self._warn_if_creo_loadpoint_missing_parametric()
 
         self._refresh_task_options()
 
@@ -638,6 +866,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     self.task.set(display)
                     break
         self._refresh_settings_menu()
+        self._refresh_action_buttons()
 
     def _load_settings(self) -> None:
         """Load working directory, Creo loadpoint, and task from self._settings_path (JSON)."""
@@ -667,10 +896,13 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._apply_settings_data(data)
 
     def _save_settings(self, task_filename: str) -> None:
+        ok, _ = self._settings_fields_ready()
+        if not ok:
+            return
         working_directory = self.working_directory.get().strip()
         creo_loadpoint = self.creo_loadpoint.get().strip()
         task_fn = task_filename.strip()
-        if not working_directory or not creo_loadpoint or not task_fn:
+        if not task_fn:
             return
         payload = {
             "working_directory": working_directory,
@@ -730,6 +962,22 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
         return sorted(latest_files, key=model_sort_key)
 
+    def _working_directory_has_creo_models(self, working_dir_str: str | None = None) -> bool:
+        """True if the path is a directory with at least one .prt / .asm / .drw at top level (same rules as GO)."""
+        s = (working_dir_str if working_dir_str is not None else self.working_directory.get()).strip()
+        if not s:
+            return False
+        try:
+            d = Path(s).expanduser()
+            if not d.is_dir():
+                return False
+            for entry in d.iterdir():
+                if entry.is_file() and _CREO_MODEL_TOPLEVEL_RE.match(entry.name):
+                    return True
+            return False
+        except OSError:
+            return False
+
     def _scan_files_recursive(self, directory: Path) -> list[Path]:
         files: list[Path] = []
         for entry in directory.rglob("*"):
@@ -741,6 +989,27 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if chunk_size <= 0:
             return [items]
         return [items[i : i + chunk_size] for i in range(0, len(items), chunk_size)]
+
+    @staticmethod
+    def _cleanup_leftover_batch_files(working_dir: Path) -> None:
+        """Remove chunk .dxc files and the PowerShell runner from a prior GO before writing new ones."""
+        try:
+            if not working_dir.is_dir():
+                return
+            for p in working_dir.glob(f"{CREO_BATCH_BASE}-*.dxc"):
+                if p.is_file():
+                    try:
+                        p.unlink()
+                    except OSError:
+                        pass
+            runner = working_dir / CREO_BATCH_RUNNER_BASENAME
+            if runner.is_file():
+                try:
+                    runner.unlink()
+                except OSError:
+                    pass
+        except OSError:
+            pass
 
     @staticmethod
     def _ps_single_quoted_literal(path: Path) -> str:
@@ -756,7 +1025,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         kill_bat: Path,
         num_chunks: int,
     ) -> str:
-        """PowerShell: each chunk runs ptcdbatch -nographics -process, waits on xtop.exe, runs kill.bat."""
+        """PowerShell: each chunk runs ptcdbatch -nographics -process, waits on xtop.exe, runs kill.bat; then removes chunk .dxc files in the working directory."""
         ptc = cls._ps_single_quoted_literal(ptcdbatch_bat)
         wd = cls._ps_single_quoted_literal(working_dir)
         kb = cls._ps_single_quoted_literal(kill_bat)
@@ -860,6 +1129,15 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "}",
             "",
             r'Write-ChLog "Runner finished all chunks."',
+            "",
+            r'Write-ChLog "Cleaning up leftover chunk .dxc files in the working directory."',
+            "try {",
+            "    Get-ChildItem -LiteralPath $WorkDir -Filter ($ChunkBase + '-*.dxc') -File -ErrorAction SilentlyContinue | ForEach-Object {",
+            "        Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue",
+            "    }",
+            "} catch {",
+            r'    Write-ChLog ("Cleanup note: " + $_.Exception.Message)',
+            "}",
         ]
         return "\n".join(lines) + "\n"
 
@@ -872,6 +1150,20 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if not working_dir_raw:
             messagebox.showwarning("Missing Working Directory", "Please enter a working directory.")
             return
+        if not _working_directory_ok_for_go(working_dir_raw):
+            messagebox.showwarning(
+                "Working directory",
+                "Working directory must be an existing folder, or a new folder name under an existing folder.\n\n"
+                "If the folder does not exist yet, its parent must exist so the app can create it.",
+            )
+            return
+        if not self._working_directory_has_creo_models(working_dir_raw):
+            messagebox.showwarning(
+                "Working directory",
+                "GO needs at least one Creo model file (.prt, .asm, or .drw) directly in the working directory "
+                "(not in subfolders). If the folder does not exist yet, create it and add models first.",
+            )
+            return
         use_modelcheck_config = self._is_modelcheck_task(task_display_raw)
         if use_modelcheck_config and not self._configs_dir.is_dir():
             messagebox.showerror(
@@ -881,6 +1173,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return
         if not loadpoint_raw:
             messagebox.showwarning("Missing Creo Loadpoint", "Please enter a Creo loadpoint.")
+            return
+        if not _creo_loadpoint_has_parametric_dir(loadpoint_raw):
+            self._warn_if_creo_loadpoint_missing_parametric()
             return
         if not task_display_raw or not task_filename:
             messagebox.showwarning("Missing Task", "Please select a task.")
@@ -919,6 +1214,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 model_chunks = [[]]
 
             working_dir.mkdir(parents=True, exist_ok=True)
+            self._cleanup_leftover_batch_files(working_dir)
             for idx, chunk in enumerate(model_chunks, start=1):
                 chunk_path = working_dir / f"{CREO_BATCH_BASE}-{idx}.dxc"
                 group_lines = [
@@ -961,8 +1257,14 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if not loadpoint_raw:
             messagebox.showwarning("Missing Creo Loadpoint", "Please enter a Creo loadpoint.")
             return
+        if not _creo_loadpoint_has_parametric_dir(loadpoint_raw):
+            self._warn_if_creo_loadpoint_missing_parametric()
+            return
         if not working_dir_raw:
             messagebox.showwarning("Missing Working Directory", "Please enter a working directory.")
+            return
+        if not _working_directory_exists_as_dir(working_dir_raw):
+            self._warn_if_working_directory_invalid()
             return
 
         bat_path = Path(loadpoint_raw) / "Parametric" / "bin" / "ptcdbatch.bat"
