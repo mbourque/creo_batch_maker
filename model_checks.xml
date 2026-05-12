@@ -1,0 +1,2513 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ModelChecks>
+    <!-- CATEGORY DEFINITIONS -->
+    <Categories>
+        <Category>
+            <Name>Consistency</Name>
+            <Description>Ensures the model adheres to company standards, maintains accuracy across various checks, and minimizes inconsistencies in feature usage and parameter definitions.</Description>
+        </Category>
+        <Category>
+            <Name>Model Complexity</Name>
+            <Description>A high, medium, or low complexity score indicates the overall intricacy of the model. Complexity can stem from the number of features, dependencies, or design decisions. While not inherently good or bad, complex models may present maintenance challenges and inefficiencies. Opportunities to simplify models should be evaluated to streamline processes.</Description>
+        </Category>
+        <Category>
+            <Name>Model Integrity</Name>
+            <Description>Assesses the structural soundness of the model, ensuring that all features are well-formed, without errors, and that relationships between parts and assemblies are robust.</Description>
+        </Category>
+        <Category>
+            <Name>Design Intent Strength</Name>
+            <Description>Measures how effectively the model captures design intent, ensuring that relationships between dimensions, constraints, and features are robust and can handle modifications without failure. Proper design intent facilitates model changes and reduces future engineering costs.</Description>
+        </Category>
+        <Category>
+            <Name>Geometry Quality</Name>
+            <Description>Evaluates the mathematical accuracy and validity of the model's geometry, ensuring that it is reliable for downstream processes such as manufacturing, verification, or simulation. Good geometry quality prevents errors from cascading into subsequent stages of product development.</Description>
+        </Category>
+    </Categories>
+
+    <!-- PART REPORT CONFIGURATION -->
+    <Check>
+        <Name>Accuracy Information</Name>
+        <Category>Consistency</Category>
+        <Description>Checks the accuracy information of the model. Maintaining high accuracy is essential for ensuring that the model performs well in simulations and manufacturing processes. Proper accuracy management helps prevent errors and ensures the model meets design specifications. This check ensures that the specified accuracy is appropriate for the model's intended use.</Description>
+        <ModelCheckName>ACCURACY_INFO</ModelCheckName>
+        <ModelCheckOptions>YNEW W W W W Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <why>Relative accuracy puts your models at risk for both geometry and regeneration issues. Consider switching to absolute accuracy to avoid the potential issues caused by relative accuracy.
+
+Using relative accuracy allows regeneration calculations to execute quickly and use minimal memory. While relative accuracy helps performance, it makes assumptions about
+the size of the geometry in your model that are sometimes invalid. If the assumptions are invalid, your models may have geom checks and/or regeneration issues that can be fixed by switching to absolute accuracy.
+
+This Model Analysis considers relative accuracy a risk because of the strong correlation between relative accuracy and both geometry and regeneration issues.
+If you do not have either geometry or regeneration issues, then using relative accuracy may be acceptable. You must find an accuracy setting that balances acceptable geometry with regeneration performance, regardless of whether you are using relative or absolute accuracy. The lower the accuracy value, the finer the accuracy. Conversely, the higher the accuracy value, the coarser the accuracy. If the accuracy value is too coarse, the calculated geometry may be inaccurate. If the accuracy value is too fine, however, the memory consumption and regeneration time of your models may become unacceptable.
+
+You need to take the geometry factor into account when making your accuracy setting. When your model is regenerated, the accuracy setting you provide gets multiplied by a geometry factor. The geometry factor is typically 3, but can grow to 10 depending on the features of your model.
+If you are using relative accuracy, you must consider the bounding box diagonal length when making your accuracy settings.
+
+**Note** that coarse accuracy settings often lead to inaccurate calculations, but this is not always the case. If you have reviewed the geometry and do not observe geom checks or regeneration issues, then the coarse accuracy setting may be acceptable.
+        </why>
+    </Check>
+    <Check>
+        <Name>Additional Check Parameters</Name>
+        <Category>Model Complexity</Category>
+        <Description>Ensures that additional check parameters are included. Proper management of check parameters helps in maintaining model integrity and ensuring that all necessary checks are performed. This is crucial for maintaining the overall quality of the model and preventing potential issues during downstream processes.</Description>
+        <ModelCheckName>ADD_CHK_PARAM</ModelCheckName>
+        <ModelCheckOptions>YN N N N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Buried Features</Name>
+        <Category>Model Integrity</Category>
+        <Description>Identifies features that are buried within other geometry, making them inaccessible. Ensuring all features are accessible is important for both manufacturing and maintenance processes, preventing potential errors and rework. This check helps to identify and correct buried features to ensure proper model functionality.</Description>
+        <ModelCheckName>BURIED_FEAT</ModelCheckName>
+        <ModelCheckOptions>YNEW E E E E Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <why>A buried feature has geometry that is entirely surrounded (or enclosed) by another feature’s geometry. For example, a cut feature may be completely filled by one or more features. Or a solid feature, such as a protrusion, may be completely surrounded by geometry from one or more other features.
+
+The design intent of a buried feature should be questioned since it is being replaced by geometry from other features.
+
+Often buried features indicate a model that was modified when undesired geometry was cut away or an undesired region was filled in to start over. This may feel like a pragmatic solution, but it is only a short term solution. When the undesired design intent is left behind (or buried by geometry from new features), it makes the model unnecessarily complex. Good design intent should be understandable and the designer should make changes by modifying and redesigning the existing design intent. Leaving features that do not contribute to the design intent is confusing for new designers.
+### Cuts outside the model:
+A cut outside the model is a cut feature that does not remove any material. The design intent of a cut that does not remove material should be questioned.
+Cuts outside the model are often caused by over-built sketches for cuts that intersect and contribute to the model’s geometry. In the current model state these sketches have no effect. You should express the design intent in a way that satisfies all potential input cases, since this ensures each feature has a purpose and that it creates the desired geometry based on the design intent.
+### Unattached features:
+An unattached feature creates solid material that is not connected to the main solid. All parts should have no more than one solid body. If more than one solid body is present, this may indicate that you need an assembly.
+
+Note that sometimes unattached features are acceptable, because later features connect the solids so the part has a single solid volume. Similar to cuts outside the model, unattached features are often caused by over-built geometry that sometimes intersects the main solid, although in the current state it does not. Consider redesigning the feature with references such asup to surfaceso the solid material always intersects the model. Or perhaps you can add a sketch reference that ensures the sketch is attached to the main solid.
+        </why>
+    </Check>
+    <Check>
+        <Name>Chamfer Child Features</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks for chamfer features that are children of other features. Proper organization of chamfer features helps maintain model clarity and prevents errors during modifications. This check ensures that chamfers are appropriately placed and referenced within the model structure.</Description>
+        <ModelCheckName>CHAMFER_CHILD</ModelCheckName>
+        <ModelCheckOptions>YNEW W W E E Y</ModelCheckOptions>
+        <why>Creating child features that reference chamfered features is problematic because it can lead to unstable models and complicate future design changes. Chamfers should be added later in the model tree to maintain the integrity and flexibility of the design, ensuring that primary features remain robust and modifications are easier to manage. </why>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Child Features Existence</Name>
+        <Category>Consistency</Category>
+        <Description>Verifies that all child features exist and are correctly referenced. Properly managing child features ensures the stability and integrity of the model, reducing the risk of errors during design changes. This check helps maintain the hierarchical structure of the model.</Description>
+        <ModelCheckName>CHILDREN_EXIST</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y E E Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Cosmetic Features</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks for the presence of cosmetic features in the model. Managing cosmetic features effectively ensures that the model remains visually accurate and functional without unnecessary complexity. This check helps to identify and manage cosmetic features to maintain model clarity.</Description>
+        <ModelCheckName>COSMETIC_FEAT</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Cylindrical Cut Slots</Name>
+        <Category>Model Integrity</Category>
+        <Description>Identifies cylindrical cut slots in the model. Ensuring the correct use of cylindrical cut slots helps maintain design intent and manufacturing feasibility. This check verifies that cylindrical cut slots are correctly defined and used in the model.</Description>
+        <ModelCheckName>CYL_CUT_SLOTS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Cylindrical Diameters</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks the diameters of cylindrical features. Properly managing cylindrical diameters ensures that the model meets design specifications and is manufacturable. This check verifies that all cylindrical diameters are correctly defined and within specified tolerances.</Description>
+        <ModelCheckName>CYL_DIAMS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Datum Feature Renaming</Name>
+        <Category>Consistency</Category>
+        <Description>Verifies that datum features are correctly renamed. Consistent and descriptive naming of datum features aids in model clarity and communication among design team members. This check ensures that datum features are appropriately named according to company standards.</Description>
+        <ModelCheckName>DATUM_RENAME</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Material Density Definition</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Checks for the definition of material density in the model. Ensuring that material density is properly defined is crucial for accurate mass calculations and simulations. This check verifies that the material density is specified and correct for all materials used in the model.</Description>
+        <ModelCheckName>DEF_DENSITY</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <why>The model density is necessary to evaluate the mass properties of a solid model. The default density is often 1.0, and it is highly unlikely this is
+            valid for a real material. If your model’s mass properties are important, then the density should be set to the appropriate value of the intended material.
+        </why>
+    </Check>
+    <Check>
+        <Name>Default Child Features</Name>
+        <Category>Consistency</Category>
+        <Description>Verifies that default child features are present and correctly referenced. Properly managing default child features helps maintain model stability and prevents errors during design changes. This check ensures that all necessary default child features are included in the model.</Description>
+        <ModelCheckName>DEFAULT_CHILD</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Draft Angles</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Checks the draft angles of features. Ensuring correct draft angles is important for manufacturability, especially for molded or cast parts. This check verifies that all draft angles are correctly defined and meet manufacturing requirements.</Description>
+        <ModelCheckName>DRAFT_ANGLES</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <why>Draft angles are crucial in injection molded parts to facilitate easy ejection, reduce mold wear, improve surface finish, maintain part integrity, simplify mold design, lower production costs, enhance part appearance and functionality, and ensure efficient manufacturing with typical angles ranging from 1 to 3 degrees depending on material and part geometry.</why>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Draft Child Features</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Verifies that draft features are correctly referenced as child features. Proper organization of draft features helps maintain model clarity and functionality. This check ensures that draft features are appropriately placed and referenced within the model structure.</Description>
+        <ModelCheckName>DRAFT_CHILD</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <why>Draft features can vary significantly as both their dimensions and their parent’s dimensions change. Because of the potentially significant changes in their geometry, it is unwise to reference their edges or surfaces. Since the internal structure and nature of the draft’s geometry can vary significantly with small changes, referencing the draft’s geometry is unreliable if changes are anticipated. Drafts are similarly complex features whose resulting geometry can vary significantly with small changes.</why>
+    </Check>
+    <Check>
+        <Name>Datum Axes Information</Name>
+        <Category>Consistency</Category>
+        <Description>Checks the information of datum axes. Properly managing datum axes ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check verifies that all datum axes are correctly defined and used in the model.</Description>
+        <ModelCheckName>DTM_AXES_INFO</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Coordinate Systems Information</Name>
+        <Category>Consistency</Category>
+        <Description>Verifies the information of coordinate systems. Proper management of coordinate systems is essential for accurate assembly and manufacturing processes. This check ensures that all coordinate systems are correctly defined and used in the model.</Description>
+        <ModelCheckName>DTM_CSYS_INFO</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Datum Curves Information</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Checks the information of datum curves. Proper management of datum curves ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check verifies that all datum curves are correctly defined and used in the model.</Description>
+        <ModelCheckName>DTM_CURVE_INFO</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Datum Planes Information</Name>
+        <Category>Consistency</Category>
+        <Description>Verifies the information of datum planes. Proper management of datum planes is essential for accurate assembly and manufacturing processes. This check ensures that all datum planes are correctly defined and used in the model.</Description>
+        <ModelCheckName>DTM_PLANE_INFO</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Datum Points Information</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Checks the information of datum points. Properly managing datum points ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check verifies that all datum points are correctly defined and used in the model.</Description>
+        <ModelCheckName>DTM_POINT_INFO</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Duplicate Models</Name>
+        <Category>Consistency</Category>
+        <Description>Identifies duplicate models in the database. Managing duplicate models helps maintain the integrity of the database and prevents confusion during design processes. This check helps to identify and manage duplicates to ensure database consistency.</Description>
+        <ModelCheckName>DUPLICATE_MODELS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Early Chamfer Features</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks for chamfer features created early in the model history. Ensuring chamfers are added at the correct stage of design helps maintain model integrity and functionality. This check verifies that chamfers are appropriately timed in the design process.</Description>
+        <ModelCheckName>EARLY_CHAMFER</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <why>Using chamfers too early in the design model tree can lead to significant problems, particularly if they are used as references for constructing other features, because this practice can compromise the integrity of the model, complicate future design modifications, and create dependencies that make the design less flexible and more difficult to manage.
+        </why>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Early Cosmetic Features</Name>
+        <Category>Model Integrity</Category>
+        <Description>Verifies that cosmetic features are added at the correct stage of design. Proper management of cosmetic features helps maintain model integrity and functionality. This check ensures that cosmetic features are appropriately timed in the design process.</Description>
+        <ModelCheckName>EARLY_COSMETIC</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Early Draft Features</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks for draft features created early in the model history. Ensuring drafts are added at the correct stage of design helps maintain model integrity and functionality. This check verifies that drafts are appropriately timed in the design process.</Description>
+        <ModelCheckName>EARLY_DRAFT</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <why>Using drafts too early in the design model tree can lead to significant problems, particularly if they are used as references for constructing other features, because this practice can compromise the integrity of the model, complicate future design modifications, and create dependencies that make the design less flexible and more difficult to manage.
+        </why>
+    </Check>
+    <Check>
+        <Name>Early Round Features</Name>
+        <Category>Model Integrity</Category>
+        <Description>Verifies that round features are added at the correct stage of design. Proper management of round features helps maintain model integrity and functionality. This check ensures that rounds are appropriately timed in the design process.</Description>
+        <ModelCheckName>EARLY_ROUND</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Edge References</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks for references to edges. Proper management of edge references ensures model stability and reduces the risk of errors during design changes. This check verifies that edge references are appropriately managed within the model.</Description>
+        <ModelCheckName>EDGE_REFERENCES</ModelCheckName>
+        <ModelCheckOptions>YNEW W W E E Y</ModelCheckOptions>
+        <why>Using edge references in a model can lead to significant problems, such as increased susceptibility to errors when geometry changes, difficulty in maintaining
+            design intent, and challenges in updating the model, as edge references can create unstable dependencies that compromise the robustness of the design.
+
+Edge references are not recommended since future changes to the design intent may cause the edge to disappear and in turn, the feature that references the now non-existant edge will likely fail. An edge is one type of geometric entity that represents the boundary of an internal surface or face on a solid, or the boundary of a surface or a surface’s internal patch. If an edge disappears, then features that referenced the edge will fail to regenerate. Because of the risk of an edge disappearing, edges are usually considered unstable and weak choices for references.
+
+Always consider alternate reference types before selecting an edge. Usually an alternate reference such as a surface or an intent object are more robust. Ensure you do not accidentally select an edge when another type of reference would be more robust under change. It is a good practice to use the Query Select option when selecting a reference and to carefully observe the selection. Fortunately, beginning with Pro/ENGINEER Wildfire 4.0 surfaces are selected by default, reducing the chance of accidentally selecting an edge.
+
+If you feel an edge reference is appropriate and necessary:
+
+- Understand that it may be unstable under change and you risk experiencing regeneration errors about missing references after making a change.
+- Limit 1by1 edge selections and instead prefer intent objects or rule based selection such as tangent chain, boundary chain, surface loop, or from-to chain. Intent objects and rule based selections minimize the number of references and can be more robust under change.
+- Use care when sequencing the order of features in the model tree. For example, round features that reference edges should occur before any feature that may consume edges it references.
+- When changes are required to a sketch that creates edges that are referenced downstream, ensure you replace the sketched entities rather than simply deleting and adding entities. When the Replace operation is used, downstream references are rerouted automatically.
+        </why>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Extra Layers</Name>
+        <Category>Consistency</Category>
+        <Description>Identifies extra layers in the model.</Description>
+        <ModelCheckName>EXTRA_LAYERS</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <why>Layers are used in models and drawings to control which view items are displayed. Models and drawings with many pieces of information can be difficult to work with if all of the information is turned on at the same time.
+
+By organizing view items into different layers, you can select which layers are displayed, hidden, or isolated so you can focus on the desired information.
+Understanding the number of layers in your models and the occurrence of layers without entities is a good starting point for assessing how effectively you are using layers. A high level view of how layers are being used is also helpful for very specialized types of CAD data conversion projects.
+
+**Note:**
+Layers can only organize view items such as datums, surface quilts, and components. The hiding or isolation of specific features within a part’s solid or within a surface’s quilt is not possible with layers. Instead, simplified representations should be created to control the presence of specific features.
+        </why>
+    </Check>
+    <Check>
+        <Name>Extra Parameters</Name>
+        <Category>Consistency</Category>
+        <Description>Checks for extra parameters in the model.</Description>
+        <ModelCheckName>EXTRA_PARAMS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <why>Including extra parameters in a model can lead to significant problems, such as increased complexity, potential for errors, confusion during modifications, and difficulties in maintaining the model, all of which can hinder efficient design and development.</why>
+        <display>Y</display>
+        <enabled>Y</enabled>             
+    </Check>
+    <Check>
+        <Name>Family Table Information</Name>
+        <Category>Model Integrity</Category>
+        <Description>Verifies the information of family tables.</Description>
+        <ModelCheckName>FAMILY_INFO</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Feature Information</Name>
+        <Category>Consistency</Category>
+        <Description>Checks the information of features. Proper management of features ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check verifies that all features are correctly defined and used in the model.</Description>
+        <ModelCheckName>FEATURE_INFO</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>File Size</Name>
+        <Category>Model Complexity</Category>
+        <Description>Verifies the file size of the model. Managing file size helps ensure that the model is optimized for performance and storage. This check ensures that the model file size is within acceptable limits for performance and storage.</Description>
+        <ModelCheckName>FILE_SIZE</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Freeform Features</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Checks for the presence of freeform features.</Description>
+        <ModelCheckName>FREEFORM</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Feature Template Default Values</Name>
+        <Category>Consistency</Category>
+        <Description>Verifies the default values of feature templates.</Description>
+        <ModelCheckName>FT_DEF_VALS</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Feature Template Standard Parameters</Name>
+        <Category>Consistency</Category>
+        <Description>Checks the standard parameters of feature templates.</Description>
+        <ModelCheckName>FT_STD_PARMS</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Geometric Checks</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Performs geometric checks on the model. Ensuring geometric integrity is crucial for accurate manufacturing and simulation results. This check verifies that all geometric features are correctly defined and meet design specifications.</Description>
+        <ModelCheckName>GEOM_CHECKS</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N E Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <why>Geom checks should be removed from all models that will be reused or referenced in downstream work. Sometimes resolving geom checks causes new geom checks or regeneration issues to appear. This occurs when the original geom check masked or cloaked downstream problems. If this is the case, it can be difficult and potentially impractical to fix the geom checks if they went unnoticed or were ignored for a long time. This is why it is important to resolve geom checks sooner rather than later.
+
+Geom checks may propagate through the dependency chain
+Models or drawings that reference models with geom checks risk inheriting a similar geometry issue that can become more serious. Even if the model with a geom check is a distant ancestor and not an immediate parent, it may be possible for the geom check to skip a generation and propagate to the child or grandchild.
+
+### Geom checks are often caused by:
+- Regeneration issues
+- Inappropriate model accuracy settings
+- Import features
+- Merge or cutout features
+- External copy geometry features
+- Copy geometry features
+
+### Resolving geom checks
+Since an issue may propagate through the associative chain of references between models, first focus on the models at the top of the dependency chain. Beginning with the isolated occurrences is a good strategy because fixing them may also resolve the geom checks in their downstream models.
+        </why>
+    </Check>
+    <Check>
+        <Name>Geometric Tolerances</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks the geometric tolerances of features. Properly managing geometric tolerances ensures that the model meets design specifications and is manufacturable. This check verifies that all geometric tolerances are correctly defined and within specified limits.</Description>
+        <ModelCheckName>GEOMETRIC_TOL</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Hole Diameters</Name>
+        <Category>Consistency</Category>
+        <Description>Verifies the diameters of hole features. Properly managing hole diameters ensures that the model meets design specifications and is manufacturable. This check ensures that all hole diameters are correctly defined and within specified limits.</Description>
+        <ModelCheckName>HOLE_DIAMS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Ignored Features</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks for features marked to be ignored in the model. Properly managing ignored features ensures model clarity and prevents unnecessary complexity. This check helps to identify and manage ignored features to maintain model clarity.</Description>
+        <ModelCheckName>IGNORE_FEAT</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Imported Features</Name>
+        <Category>Model Integrity</Category>
+        <Description>Verifies the presence of imported features. Properly managing imported features ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all imported features are correctly defined and used in the model.</Description>
+        <ModelCheckName>IMPORT_FEAT</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Incomplete Features</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks for incomplete features in the model. Ensuring all features are complete is crucial for maintaining model integrity and preventing errors during manufacturing and simulation. This check helps to identify and correct incomplete features in the model.</Description>
+        <ModelCheckName>INCOMPLETE_FEAT</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Insert Mode Usage</Name>
+        <Category>Model Integrity</Category>
+        <Description>Verifies the use of insert mode in the model. Properly managing insert mode helps maintain model integrity and functionality during design changes. This check ensures that insert mode is used appropriately within the model.</Description>
+        <ModelCheckName>INSERT_MODE</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Instance Naming</Name>
+        <Category>Consistency</Category>
+        <Description>Checks the naming of instances in the model. Properly naming instances helps maintain model clarity and prevents confusion during design processes. This check ensures that all instances are correctly named according to company standards.</Description>
+        <ModelCheckName>INSTANCE_NAME</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Layer Display Status</Name>
+        <Category>Consistency</Category>
+        <Description>Verifies the display status of layers. Properly managing layer display status helps maintain model clarity and prevents unnecessary complexity. This check ensures that all layers have appropriate display settings.</Description>
+        <ModelCheckName>LAYER_DISPSTAT</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y W W Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Multiple Layer Items</Name>
+        <Category>Consistency</Category>
+        <Description>Ensures that specific items or features (such as dimensions, annotations, datums, etc.) are placed on designated layers in your model. This is useful for maintaining organized and standardized models where items are systematically managed and easily accessible through layers.</Description>
+        <ModelCheckName>LAYER_ITEMS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W W W Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <why>Layers are used in models and drawings to control which view items are displayed. Models and drawings with many pieces of information can be difficult to work with if all of the information is turned on at the same time. By organizing view items into different layers, you can select which layers are displayed, hidden, or isolated so you can focus on the desired information.
+            Understanding the number of layers in your models and the occurrence of layers without entities is a good starting point for assessing how effectively you are using layers. A high level view of how layers are being used is also helpful for very specialized types of CAD data conversion projects.
+            Note: Layers can only organize view items such as datums, surface quilts, and components. The hiding or isolation of specific features within a part’s solid or within a surface’s quilt is not possible with layers. Instead, simplified representations should be created to control the presence of specific features.
+        </why>
+    </Check>
+    <Check>
+        <Name>Blank Datum Layers</Name>
+        <Category>Consistency</Category>
+        <Description>Checks for blank datum layers. Properly managing datum layers ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all datum layers are correctly defined and used in the model.</Description>
+        <ModelCheckName>LAYER_DTM_BLANK</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y W W Y</ModelCheckOptions>
+        <why>Blank datum layers in a model can lead to significant problems, including difficulty in understanding the model structure, challenges in making accurate modifications, and potential errors in downstream processes, as hidden datums can obscure the true design intent and dependencies.</why>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <why>Layers are used in models and drawings to control which view items are displayed. Models and drawings with many pieces of information can be difficult to work with if all of the information is turned on at the same time. By organizing view items into different layers, you can select which layers are displayed, hidden, or isolated so you can focus on the desired information.
+            Understanding the number of layers in your models and the occurrence of layers without entities is a good starting point for assessing how effectively you are using layers. A high level view of how layers are being used is also helpful for very specialized types of CAD data conversion projects.
+            Note: Layers can only organize view items such as datums, surface quilts, and components. The hiding or isolation of specific features within a part’s solid or within a surface’s quilt is not possible with layers. Instead, simplified representations should be created to control the presence of specific features.
+        </why>
+    </Check>
+    <Check>
+        <Name>External Items in Layers</Name>
+        <Category>Consistency</Category>
+        <Description>Verifies the presence of external items in layers. Properly managing external items helps maintain model clarity and prevents unnecessary complexity. This check ensures that all external items in layers are correctly managed.</Description>
+        <ModelCheckName>LAYER_EXT_ITEMS</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y W W Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <why>Layers are used in models and drawings to control which view items are displayed. Models and drawings with many pieces of information can be difficult to work with if all of the information is turned on at the same time. By organizing view items into different layers, you can select which layers are displayed, hidden, or isolated so you can focus on the desired information.
+            Understanding the number of layers in your models and the occurrence of layers without entities is a good starting point for assessing how effectively you are using layers. A high level view of how layers are being used is also helpful for very specialized types of CAD data conversion projects.
+            Note: Layers can only organize view items such as datums, surface quilts, and components. The hiding or isolation of specific features within a part’s solid or within a surface’s quilt is not possible with layers. Instead, simplified representations should be created to control the presence of specific features.
+        </why>
+    </Check>
+    <Check>
+        <Name>Layer Information</Name>
+        <Category>Consistency</Category>
+        <Description>Checks the information of layers. Properly managing layer information ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check verifies that all layer information is correctly defined and used in the model.</Description>
+        <ModelCheckName>LAYER_INFO</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+        <why>Layers are used in models and drawings to control which view items are displayed. Models and drawings with many pieces of information can be difficult to work with if all of the information is turned on at the same time. By organizing view items into different layers, you can select which layers are displayed, hidden, or isolated so you can focus on the desired information.
+            Understanding the number of layers in your models and the occurrence of layers without entities is a good starting point for assessing how effectively you are using layers. A high level view of how layers are being used is also helpful for very specialized types of CAD data conversion projects.
+            Note: Layers can only organize view items such as datums, surface quilts, and components. The hiding or isolation of specific features within a part’s solid or within a surface’s quilt is not possible with layers. Instead, simplified representations should be created to control the presence of specific features.
+        </why>
+    </Check>
+    <Check>
+        <Name>Layer Movement</Name>
+        <Category>Model Complexity</Category>
+        <Description>Verifies the movement of layers. Properly managing layer movement helps maintain model clarity and prevents unnecessary complexity. This check ensures that all layer movements are correctly managed within the model.</Description>
+        <ModelCheckName>LAYER_MOVE</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Layer Placement</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks the placement of layers. Properly managing layer placement helps maintain model clarity and prevents unnecessary complexity. This check ensures that all layer placements are correctly managed within the model.</Description>
+        <ModelCheckName>LAYER_PLACE</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y W W Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Layer Status</Name>
+        <Category>Model Complexity</Category>
+        <Description>Verifies the status of layers. Properly managing layer status helps maintain model clarity and prevents unnecessary complexity. This check ensures that all layer statuses are correctly managed within the model.</Description>
+        <ModelCheckName>LAYER_STATUS</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y W W Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+        <why>Layers are used in models and drawings to control which view items are displayed. Models and drawings with many pieces of information can be difficult to work with if all of the information is turned on at the same time. By organizing view items into different layers, you can select which layers are displayed, hidden, or isolated so you can focus on the desired information.
+            Understanding the number of layers in your models and the occurrence of layers without entities is a good starting point for assessing how effectively you are using layers. A high level view of how layers are being used is also helpful for very specialized types of CAD data conversion projects.
+            Note: Layers can only organize view items such as datums, surface quilts, and components. The hiding or isolation of specific features within a part’s solid or within a surface’s quilt is not possible with layers. Instead, simplified representations should be created to control the presence of specific features.
+        </why>
+    </Check>
+    <Check>
+        <Name>Layout Information</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks the information of layouts. Properly managing layout information ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check verifies that all layout information is correctly defined and used in the model.</Description>
+        <ModelCheckName>LAYOUT_INFO</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Lower Tolerance Limits</Name>
+        <Category>Model Integrity</Category>
+        <Description>Verifies the lower tolerance limits of features. Properly managing tolerance limits ensures that the model meets design specifications and is manufacturable. This check ensures that all lower tolerance limits are correctly defined and within specified limits.</Description>
+        <ModelCheckName>LOW_TOLERANCE</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Material Information</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks the information of materials. Properly managing material information ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check verifies that all material information is correctly defined and used in the model.</Description>
+        <ModelCheckName>MATERIAL_INFO</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Memory Space Usage</Name>
+        <Category>Model Complexity</Category>
+        <Description>Verifies the memory space used by the model. Properly managing memory space helps ensure that the model is optimized for performance and storage. This check ensures that the model's memory usage is within acceptable limits for performance and storage.</Description>
+        <ModelCheckName>MEMORY_SPACE</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Merge Features</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks for the presence of merge features in the model. Properly managing merge features ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check verifies that all merge features are correctly defined and used in the model.</Description>
+        <ModelCheckName>MERGE_FEAT</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N E Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Minimum and Maximum Tolerance Information</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Verifies the minimum and maximum tolerance information of features. Properly managing tolerance information ensures that the model meets design specifications and is manufacturable. This check ensures that all tolerance information is correctly defined and within specified limits.</Description>
+        <ModelCheckName>MINMAXTOL_INFO</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Model Naming</Name>
+        <Category>Consistency</Category>
+        <Description>Checks the naming of the model. Properly naming models helps maintain clarity and prevents confusion during design processes. This check ensures that all models are correctly named according to company standards.</Description>
+        <ModelCheckName>MODEL_NAME</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Model Name Structure</Name>
+        <Category>Consistency</Category>
+        <Description>Verifies the structure of model names. Properly structuring model names helps maintain clarity and prevents confusion during design processes. This check ensures that all model names are correctly structured according to company standards.</Description>
+        <ModelCheckName>MODEL_NAME_STR</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Named Features</Name>
+        <Category>Consistency</Category>
+        <Description>Checks the naming of features. Properly naming features helps maintain clarity and prevents confusion during design processes. This check ensures that all features are correctly named according to company standards.</Description>
+        <ModelCheckName>NAMED_FEAT</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Overall Size</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Verifies the overall size of the model. Properly managing overall size helps ensure that the model meets design specifications and is manufacturable. This check ensures that the overall size of the model is within specified limits.</Description>
+        <ModelCheckName>OVERALL_SIZE</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Parameter Information</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Checks the information of parameters. Properly managing parameter information ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check verifies that all parameter information is correctly defined and used in the model.</Description>
+        <ModelCheckName>PARAM_INFO</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Required Parameter Notes</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Verifies the presence of required parameter notes. Properly managing parameter notes ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all required parameter notes are present and correctly defined.</Description>
+        <ModelCheckName>PARAM_NOTE_REQ</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Unacceptable Parameter Notes</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Checks for unacceptable parameter notes. Properly managing parameter notes ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that no unacceptable parameter notes are present in the model.</Description>
+        <ModelCheckName>PARAM_NOTE_UNACC</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Parameter Renaming</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Verifies the renaming of parameters. Properly managing parameter names helps maintain clarity and prevents confusion during design processes. This check ensures that all parameters are correctly renamed according to company standards.</Description>
+        <ModelCheckName>PARAM_RENAME</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Parameter Spelling</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Checks the spelling of parameter names. Properly managing parameter names helps maintain clarity and prevents confusion during design processes. This check ensures that all parameter names are correctly spelled according to company standards.</Description>
+        <ModelCheckName>PARAM_SPELL</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
+        <why>Incorrect parameter spelling in a model can lead to significant problems, such as misinterpretation of design intent, errors in calculations or automated processes, and increased difficulty in maintaining and updating the model, all of which can compromise the overall integrity and functionality of the design.</why>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Unused Parameters</Name>
+        <Category>Model Complexity</Category>
+        <Description>Verifies the presence of unused parameters. Properly managing parameters helps maintain model clarity and prevents unnecessary complexity. This check helps to identify and manage unused parameters to maintain model simplicity and clarity.</Description>
+        <ModelCheckName>PARAM_UNUSED</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions><why>Unused parameters in a model can lead to confusion, increased complexity, and potential errors during the design process. Ensuring that all parameters are necessary and utilized helps maintain model clarity, simplifies modifications, and enhances the overall efficiency and accuracy of the design.</why>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Parameter Checks</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Checks the parameters of the model. Properly managing parameters ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check verifies that all parameters are correctly defined and used in the model.</Description>
+        <ModelCheckName>PARAMCHECK</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y N W Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Plane Child Features</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Verifies that plane features are correctly referenced as child features. Proper organization of plane features helps maintain model clarity and functionality. This check ensures that plane features are appropriately placed and referenced within the model structure.</Description>
+        <ModelCheckName>PLANE_CHILD</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Plane Parent Features</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Checks for plane features referenced as parent features. Properly managing plane features ensures model stability and functionality during design changes. This check ensures that plane features are correctly referenced as parent features within the model.</Description>
+        <ModelCheckName>PLANE_PARENT</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Model Version</Name>
+        <Category>Model Complexity</Category>
+        <Description>Verifies the version of the model. Properly managing model versions helps maintain clarity and prevents confusion during design processes. This check ensures that the model version is correctly managed and up-to-date.</Description>
+        <ModelCheckName>PRO_VERSION</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y W W Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Incomplete References</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks for incomplete references in the model. Properly managing references ensures model stability and prevents errors during design changes. This check helps to identify and correct incomplete references within the model.</Description>
+        <ModelCheckName>RC_INCOMPLETED</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Required Features</Name>
+        <Category>Model Integrity</Category>
+        <Description>Verifies the presence of required features in the model. Properly managing required features ensures model integrity and functionality. This check ensures that all required features are present and correctly defined in the model.</Description>
+        <ModelCheckName>REG_FEATURES</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Regeneration Errors</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks for regeneration errors in the model. Properly managing regeneration errors ensures model stability and prevents errors during design changes. This check helps to identify and correct regeneration errors within the model.</Description>
+        <ModelCheckName>REGEN_ERRS</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N N Y</ModelCheckOptions>
+        <why>Regeneration errors in a model are far more severe than warnings, as they can halt the design process entirely, cause loss of data, create significant errors in the model, and necessitate extensive troubleshooting and corrections, severely impacting the reliability and progress of the design workflow.
+
+Regeneration issues in a model can cause **significant problems**, such as disrupting the design process, introducing errors, reducing model reliability, and complicating troubleshooting efforts, all of which can hinder the efficiency and accuracy of the overall design workflow.
+
+Retrieval and regeneration messages should be reviewed carefully because of their potential impact in downstream use. Note that it is possible for issues to skip a generation and propagate to a model’s grandchildren or more distant descendants, while the model’s direct children appear to have no issues at all.
+
+Some types of retrieval and regeneration issues are more serious than others. Consider how you will use the model in downstream work when deciding whether to fix its retrieval and regeneration issues.
+Retrieval and regeneration issues in models with family tables are more serious than those in non-family table models because will propagate to each instance in the family.
+
+### Types of regeneration issues:
+- Regeneration failed
+- Failed relations
+- Missing and invalid references
+- Circular references
+- Design intent unclear warnings
+- Model changed since mass properties calculated
+- Frozen components
+- Incomplete features or components
+- Missing models
+- Design changes in upstream models and/or features
+- Selection of unstable/unreliable references
+- Geometry issues with referenced geometry
+- General error messages
+        </why>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Regeneration Warnings</Name>
+        <Category>Model Integrity</Category>
+        <Description>Verifies the presence of regeneration warnings in the model. Properly managing regeneration warnings helps maintain model integrity and functionality. This check helps to identify and manage regeneration warnings within the model.</Description>
+        <ModelCheckName>REGEN_WRNS</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <why>Regeneration issues in a model can cause significant problems, such as disrupting the design process, introducing errors, reducing model reliability, and complicating troubleshooting efforts, all of which can hinder the efficiency and accuracy of the overall design workflow.
+
+Retrieval and regeneration messages should be reviewed carefully because of their potential impact in downstream use. Note that it is possible for issues to skip a generation and propagate to a model’s grandchildren or more distant descendants, while the model’s direct children appear to have no issues at all.
+
+Some types of retrieval and regeneration issues are more serious than others. Consider how you will use the model in downstream work when deciding whether to fix its retrieval and regeneration issues.
+Retrieval and regeneration issues in models with family tables are more serious than those in non-family table models because will propagate to each instance in the family.
+
+### Types of regeneration issues:
+- Regeneration failed
+- Failed relations
+- Missing and invalid references
+- Circular references
+- Design intent unclear warnings
+- Model changed since mass properties calculated
+- Frozen components
+- Incomplete features or components
+- General error messages
+        </why>
+    </Check>
+    <Check>
+        <Name>Relation Comments</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Checks for comments in relations. Properly managing relation comments helps maintain clarity and prevents confusion during design processes. This check ensures that all relations have appropriate comments for clarity and documentation.</Description>
+        <ModelCheckName>RELATION_COMM</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Relation Errors</Name>
+        <Category>Model Integrity</Category>
+        <Description>Verifies the presence of errors in relations. Properly managing relation errors ensures model stability and prevents errors during design changes. This check helps to identify and correct errors within relations in the model.</Description>
+        <ModelCheckName>RELATION_ERRS</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Relation Information</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Checks the information of relations. Properly managing relation information ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check verifies that all relation information is correctly defined and used in the model.</Description>
+        <ModelCheckName>RELATION_INFO</ModelCheckName>
+        <ModelCheckOptions>YN W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Missing Relations</Name>
+        <Category>Model Integrity</Category>
+        <Description>Verifies the presence of missing relations. Properly managing relations ensures model stability and prevents errors during design changes. This check helps to identify and correct missing relations within the model.</Description>
+        <ModelCheckName>RELATION_MISS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Multiple Relations</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Checks for multiple instances of relations. Properly managing relations helps maintain clarity and prevents confusion during design processes. This check ensures that multiple instances of relations are correctly managed within the model.</Description>
+        <ModelCheckName>RELATION_MULT</ModelCheckName>
+        <ModelCheckOptions>YNEW W W W W Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <why>Similar to an equation in a spreadsheet, a relation is used to perform calculations and assign the result to a parameter or dimension of the model. Having many relations can lead to poor design intent if not well documented.
+        </why>
+    </Check>
+    <Check>
+        <Name>Renamed Symbols</Name>
+        <Category>Model Integrity</Category>
+        <Description>Verifies the renaming of symbols. Properly managing symbol names helps maintain clarity and prevents confusion during design processes. This check ensures that all symbols are correctly renamed according to company standards.</Description>
+        <ModelCheckName>RENAMED_SYMBOLS</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Round Child Features</Name>
+        <Category>Model Integrity</Category>
+        <Description>Verifies that round features do not have child features.</Description>
+        <ModelCheckName>ROUND_CHILD</ModelCheckName>
+        <ModelCheckOptions>YNEW W W E E Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <why>Round features can vary significantly as both their dimensions and their parent’s dimensions change. Because of the potentially significant changes in their geometry, it is unwise to reference their edges or surfaces. Since the internal structure and nature of the round’s geometry can vary significantly with small changes, referencing the geometry is unreliable if changes are anticipated. Rounds are similarly complex features whose resulting geometry can vary significantly with small changes.</why>
+    </Check>
+    <Check>
+        <Name>Rule Check Information</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Checks the information of rule checks. Properly managing rule checks ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check verifies that all rule check information is correctly defined and used in the model.</Description>
+        <ModelCheckName>RULECHECK_INFO</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Sharp Edges</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Identifies sharp edges in the model. Properly managing sharp edges helps ensure the model meets design specifications and is manufacturable. This check helps to identify and manage sharp edges to maintain model safety and manufacturability.</Description>
+        <ModelCheckName>SHARP_EDGES</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Short Edges</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Checks for short edges in the model. Properly managing short edges ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check helps to identify and manage short edges within the model.</Description>
+        <ModelCheckName>SHORT_EDGES</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N E Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <why>You must be sensitive to accuracy settings when you have small geometry relative to the overall size of the model. If the accuracy is not set appropriately,
+            geom checks could make the geometry unreliable in downstream work, as well as cause regeneration issues.
+
+When a model has small geometry, the equivalent absolute accuracy should be two to three times smaller than the shortest edge. Some features have edges that are short in length. The definition of "short" varies depending on the overall size of the model and the current accuracy settings. If there are edges that are very short given the current accuracy settings, they are identified by this report.
+
+### Short edges can occur in many situations. Some common cases include:
+- Transition geometry for round features.
+- External models that were merged or cut out of the current model.
+- External geometry referenced using copy geom and external copy geom features.
+- Imported geometry
+        </why>
+    </Check>
+    <Check>
+        <Name>Sheet Metal Bend Tables</Name>
+        <Category>Model Integrity</Category>
+        <Description>Verifies the presence of sheet metal bend tables. Properly managing sheet metal features ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all sheet metal bend tables are correctly defined and used in the model.</Description>
+        <ModelCheckName>SHTMTL_BENDTAB</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N E Y</ModelCheckOptions>
+        <why>Missing sheet metal bend tables in sheet metal parts can lead to significant issues, including inaccurate bend allowances, incorrect part dimensions, and manufacturing errors, all of which compromise the part's functionality and increase the risk of costly rework and delays in production. </why>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Sheet Metal Flat Patterns</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks for flat pattern representations in sheet metal parts. Properly managing sheet metal features ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all sheet metal flat patterns are correctly defined and used in the model.</Description>
+        <ModelCheckName>SHTMTL_FLAT</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N E Y</ModelCheckOptions>
+        <why>The absence of sheet metal flat patterns in models can lead to significant problems, such as inaccuracies in the manufacturing process, difficulties in verifying part dimensions, and challenges in ensuring proper fit and function, ultimately compromising the efficiency and accuracy of production. </why>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Sheet Metal Thickness</Name>
+        <Category>Model Integrity</Category>
+        <Description>Verifies the thickness of sheet metal parts. Properly managing sheet metal features ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all sheet metal thicknesses are correctly defined and within specified limits.</Description>
+        <ModelCheckName>SHTMTL_THICK</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <why>Incorrect use of sheet metal thickness can lead to significant problems, such as structural weaknesses, fabrication errors, and improper fit, which can compromise model accuracy and hinder downstream processes like manufacturing and inspection. Ensuring all sheet metal thicknesses are correctly defined and within specified limits is essential for maintaining the integrity and functionality of the design. </why>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Sheet Metal Unbend Features</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks for the presence of unbend features in sheet metal parts. Properly managing sheet metal features ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all unbend features are correctly defined and used in the model.</Description>
+        <ModelCheckName>SHTMTL_UNBENDS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N E Y</ModelCheckOptions>
+        <why>Missing unbend features in sheet metal parts can lead to significant issues, such as inaccuracies in flat pattern development, difficulties in verifying part dimensions, and challenges during manufacturing, all of which compromise the overall quality and functionality of the final product.</why>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Sheet Metal Y-Factor</Name>
+        <Category>Model Integrity</Category>
+        <Description>Verifies the Y-factor for sheet metal parts. Properly managing sheet metal features ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that the Y-factor is correctly defined and used in the model.</Description>
+        <ModelCheckName>SHTMTL_YFACTOR</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <why>Incorrect Y-factor values in sheet metal parts can lead to inaccuracies in bend allowances, resulting in incorrect part dimensions and potential manufacturing errors. Ensuring the Y-factor is correctly defined is crucial for maintaining the precision and functionality of the final product.</why>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Simplified Representation Information</Name>
+        <Category>Consistency</Category>
+        <Description>Checks the information of simplified representations. Properly managing simplified representations ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all simplified representations are correctly defined and used in the model.</Description>
+        <ModelCheckName>SIMPREP_INFO</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <why>Incorrectly defined or unused simplified representations in a model can cause misunderstandings, inaccuracies, and inefficiencies during the design process. Properly managing simplified representations helps organize work in large assemblies, reduces excess regeneration, and ensures clarity, accuracy, and efficiency in the design and review stages.</why>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Simplified Representation Naming</Name>
+        <Category>Model Complexity</Category>
+        <Description>Verifies the naming of simplified representations. Properly managing simplified representations helps maintain clarity and prevents confusion during design processes. This check ensures that all simplified representations are correctly named according to company standards.</Description>
+        <ModelCheckName>SIMPREP_NAME</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Sketch Items</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks for the presence of sketch items in the model. Properly managing sketch items ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all sketch items are correctly defined and used in the model.</Description>
+        <ModelCheckName>SKETCH_ITEMS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+        <why>A sketches geometry is calculated automatically by powerful algorithms that reason about the entities, constraints and dimensions in a sketch.
+            Without Sketcher, the resulting geometry is difficult to determine. You must still perform some level of reasoning about a sketch’s design
+            intent as you create the sketched entities and dimensioning scheme. However, you do not have to perform the actual calculations and
+            you can use Sketcher’s proposed dimensioning scheme to guide you and verify the sketch is fully constrained and dimensioned. Since you still
+            need to reason and verify the design intent, you should strive to make the sketches as simple as possible without compromising the design.
+
+### Simplifying Sketches:
+One way to simplify sketches is to separate the design intent into different features. For example, rounds and draft features are often better than adding their detail into a sketch.
+Another way to simplify sketch geometry is to create the constraints before you create dimensions. Adding a constraint often reduces the total number of constraints and dimensions proposed by Sketcher’s intent manager.
+
+Imported sketch geometry can lead to many sketched entities. Even if you have to import the geometry, you may not need to reconstruct its design intent in Sketcher. If you do need to capture the design intent, you can separate the section’s geometry across multiple features so it is easier to reason about and verify. If you do have to capture design intent with Sketcher, then you can import the geometry as a datum curve. Another common problem with imported sketch geometry is that it may have many small entities that could be merged and/or simplified with a single spline entity. Pre-processing geometry to reduce the number of entities can be helpful before importing it (this is common with imported logo geometry).
+        </why>
+    </Check>
+    <Check>
+        <Name>SLA Features Information</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Verifies the information of SLA features. Properly managing SLA features ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all SLA features are correctly defined and used in the model.</Description>
+        <ModelCheckName>SLA_INFO</ModelCheckName>
+        <ModelCheckOptions>YNEW N N N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Small Cylindrical Surfaces</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Identifies small cylindrical surfaces in the model. Properly managing small surfaces ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check helps to identify and manage small cylindrical surfaces within the model.</Description>
+        <ModelCheckName>SMALL_CYLSRF</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Surface Edges</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Checks for the presence of surface edges in the model. Properly managing surface edges ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all surface edges are correctly defined and used in the model.</Description>
+        <ModelCheckName>SRF_EDGES</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Start Part Checks</Name>
+        <Category>Consistency</Category>
+        <Description>Verifies the presence of start part checks in the model. Properly managing start checks ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all start checks are correctly defined and used in the model.</Description>
+        <ModelCheckName>STARTCHECK</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y N W Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Start Part Layer Check</Name>
+        <Category>Consistency</Category>        
+        <Description>This check is utilized to check for missing layers that should be part of the model, ensuring that the layers conform to the predefined standards or templates used by your organization.</Description>
+        <ModelCheckName>STARTLAYR</ModelCheckName>
+        <ModelCheckOptions>YNEW W W E E Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled> 
+    </Check>    
+    <Check>
+        <Name>Suppressed Features</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks for the presence of suppressed features in the model. Properly managing suppressed features ensures model stability and prevents errors during design changes. This check helps to identify and manage suppressed features within the model.</Description>
+        <ModelCheckName>SUP_FEATURES</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
+        <why>Leaving features suppressed in models can lead to significant problems later, as it can cause confusion, disrupt the model's intended functionality, create errors during regeneration, and complicate future modifications by masking dependencies and design intent.
+
+Suppressed features are appropriate if they are only used by particular instances of the model, or for a simplified representation. Suppressed features in a master representation without a family table, however, indicate a problematic design intent that was suppressed temporarily. If the suppressed features are no longer needed, then they should be removed before you release the model. The presence of suppressed features adds confusion to your models, a well as runs the risk of having the features unintentionally resumed (or unsuppressed) some time in the future.
+        </why>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>User-Defined Features Information</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Verifies the information of user-defined features. Properly managing user-defined features ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all user-defined features are correctly defined and used in the model.</Description>
+        <ModelCheckName>UDF_INFO</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Unit Length</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks the unit length of the model. Properly managing unit length ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that the unit length is correctly defined and used in the model.</Description>
+        <ModelCheckName>UNITS_LENGTH</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Unit Mass</Name>
+        <Category>Model Integrity</Category>
+        <Description>Verifies the unit mass of the model. Properly managing unit mass ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that the unit mass is correctly defined and used in the model.</Description>
+        <ModelCheckName>UNITS_MASS</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>View Information</Name>
+        <Category>Consistency</Category>
+        <Description>Checks the information of views in the model. Properly managing view information ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all view information is correctly defined and used in the model.</Description>
+        <ModelCheckName>VIEW_INFO</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Cross-Section Information</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Verifies the information of cross-sections in the model. Properly managing cross-sections ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all cross-sections are correctly defined and used in the model.</Description>
+        <ModelCheckName>XSEC_INFO</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>External Dependencies</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks for external dependencies in the model. Properly managing external dependencies ensures model stability and functionality during design changes. This check helps to identify and manage external dependencies within the model.</Description>
+        <ModelCheckName>EXTERNAL_DEPS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <why>External dependencies in a model can lead to significant problems, such as increased complexity, reduced model stability, and challenges in maintaining and updating designs. Properly managing external dependencies is crucial for ensuring the integrity and reliability of the model, as well as facilitating efficient collaboration and modification processes. </why>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Dependent Features</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Verifies the presence of dependent features in the model. Properly managing dependent features ensures model stability and functionality during design changes. This check helps to identify and manage dependent features within the model.</Description>
+        <ModelCheckName>DEPENDENT_FEATURE</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
+        <why>Too many dependent features in a model can lead to significant problems, as changes to one feature can inadvertently affect others, complicating design modifications, increasing the risk of errors, and making the model more difficult to manage and maintain. </why>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Designated Attributes</Name>
+        <Category>Consistency</Category>
+        <Description>Checks for designated attributes in the model. Properly managing designated attributes ensures model accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all designated attributes are correctly defined and used in the model.</Description>
+        <ModelCheckName>DESIGNATED_ATTR</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Missing Standard Notes</Name>
+        <Category>Model Integrity</Category>
+        <Description>Verifies the presence of standard notes in the model. Properly managing standard notes ensures model clarity and prevents confusion during design processes. This check ensures that all required standard notes are present and correctly defined.</Description>
+        <ModelCheckName>STD_NOTES_MISSING</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <!-- DRAWING REPORT CONFIGURATION -->
+    <Check>
+        <Name>Boundary Representation Information</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Checks the information of boundary representations in the drawing. Properly managing boundary representations ensures drawing accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all boundary representations are correctly defined and used in the drawing.</Description>
+        <ModelCheckName>BOUND_INFO</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N E Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Overwritten Dimensions</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Verifies the presence of overwritten dimensions in the drawing. Properly managing dimensions ensures drawing accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that no dimensions are overwritten in the drawing.</Description>
+        <ModelCheckName>DIM_OVERWRITE</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N E Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Draft Geometry</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Checks the presence of draft geometry in the drawing. Properly managing draft geometry ensures drawing clarity and accuracy. This check helps to identify and manage draft geometry within the drawing.</Description>
+        <ModelCheckName>DRAFT_GEOM</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N E Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Drawing Layers Information</Name>
+        <Category>Model Complexity</Category>
+        <Description>Verifies the information of drawing layers. Properly managing drawing layers ensures drawing accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all drawing layers are correctly defined and used in the drawing.</Description>
+        <ModelCheckName>DRAWING_LAYERS</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y N E Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Drawing Parameters</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Checks the parameters of the drawing. Properly managing drawing parameters ensures drawing accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all drawing parameters are correctly defined and used in the drawing.</Description>
+        <ModelCheckName>DRAWING_PARAMS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N E Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Drawing Naming</Name>
+        <Category>Model Complexity</Category>
+        <Description>Verifies the naming of the drawing. Properly naming drawings helps maintain clarity and prevents confusion during design processes. This check ensures that the drawing is correctly named according to company standards.</Description>
+        <ModelCheckName>DRAWING_NAME</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Default Views</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks for default views in the drawing. Properly managing views ensures drawing clarity and accuracy. This check ensures that all default views are correctly defined and used in the drawing.</Description>
+        <ModelCheckName>DEFAULT_VIEWS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Surfaces not Annotated</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>This check would ensure that all surfaces in your model are referenced by some annotation. If a surface is not referenced by an annotation, it might indicate that the surface has not been properly documented or that the annotation is missing.</Description>
+        <ModelCheckName>SRF_NOT_REF_BY_ANNTN</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>   
+       <hideFromReport>Y</hideFromReport>                 
+    </Check>
+
+     <Check>
+        <Name>Annotations Missing In Combination State</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>This check ensures that all required annotations are included in the specified combination states. Missing annotations in combination states can lead to incomplete or inaccurate model documentation, which may affect downstream processes and design reviews.</Description>
+        <ModelCheckName>ANNTN_NOT_ON_COMB_STATE</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>            
+    </Check>
+
+    <Check>
+        <Name>Surfaces not referenced by Annotation</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>This check identifies surfaces in the model that are not referenced by any annotations. Surfaces without annotations may indicate undocumented or poorly documented geometry, which can lead to issues in manufacturing or quality control.</Description>
+        <ModelCheckName>SRF_NOT_REF_BY_ANNTN</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+       <hideFromReport>Y</hideFromReport>                    
+    </Check>
+
+    <Check>
+        <Name>Annotations missing a surface reference</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>This check detects annotations that do not reference any surfaces. Annotations without surface references can result in unclear or incomplete model definitions, making it difficult to interpret the design intent accurately.</Description>
+        <ModelCheckName>ANNTN_MISSING_SURF_REF</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>            
+    </Check>
+
+
+
+
+    <Check>
+        <Name>Erased Views</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Verifies the presence of erased views in the drawing. Properly managing views ensures drawing clarity and accuracy. This check helps to identify and manage erased views within the drawing.</Description>
+        <ModelCheckName>ERASED_VIEWS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Format Naming</Name>
+        <Category>Consistency</Category>
+        <Description>Checks the format name of the drawing. Properly managing format names helps maintain clarity and prevents confusion during design processes. This check ensures that the format name is correctly defined and used in the drawing.</Description>
+        <ModelCheckName>FORMAT_NAME</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Ignored Sheets</Name>
+        <Category>Consistency</Category>
+        <Description>Verifies the presence of ignored sheets in the drawing. Properly managing sheets ensures drawing clarity and accuracy. This check helps to identify and manage ignored sheets within the drawing.</Description>
+        <ModelCheckName>IGNORE_SHEETS</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Models Used in Drawing</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks the models used in the drawing. Properly managing models ensures drawing accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all models used in the drawing are correctly defined and used.</Description>
+        <ModelCheckName>MODELS_USED</ModelCheckName>
+        <ModelCheckOptions>YN Y Y Y N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Note Case</Name>
+        <Category>Consistency</Category>
+        <Description>Verifies the case of notes in the drawing. Properly managing notes ensures drawing clarity and accuracy. This check ensures that all notes in the drawing have the correct case according to company standards.</Description>
+        <ModelCheckName>NOTE_CASE</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Note Font</Name>
+        <Category>Consistency</Category>
+        <Description>Checks the font of notes in the drawing. Properly managing notes ensures drawing clarity and accuracy. This check ensures that all notes in the drawing use the correct font according to company standards.</Description>
+        <ModelCheckName>NOTE_FONT</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Note Height</Name>
+        <Category>Consistency</Category>
+        <Description>Verifies the height of notes in the drawing. Properly managing notes ensures drawing clarity and accuracy. This check ensures that all notes in the drawing have the correct height according to company standards.</Description>
+        <ModelCheckName>NOTE_HEIGHT</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Note Information</Name>
+        <Category>Consistency</Category>
+        <Description>Checks the information of notes in the drawing. Properly managing notes ensures drawing accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all notes in the drawing are correctly defined and used.</Description>
+        <ModelCheckName>NOTE_INFO</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Note Spelling</Name>
+        <Category>Consistency</Category>
+        <Description>Verifies the spelling of notes in the drawing. Properly managing notes ensures drawing clarity and accuracy. This check ensures that all notes in the drawing are correctly spelled according to company standards.</Description>
+        <ModelCheckName>NOTE_SPELL</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N E Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Title Spelling</Name>
+        <Category>Consistency</Category>
+        <Description>Checks the spelling of titles in the drawing. Properly managing titles ensures drawing clarity and accuracy. This check ensures that all titles in the drawing are correctly spelled according to company standards.</Description>
+        <ModelCheckName>TITLE_SPELL</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N E Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Symbol Spelling</Name>
+        <Category>Consistency</Category>
+        <Description>Verifies the spelling of symbols in the drawing. Properly managing symbols ensures drawing clarity and accuracy. This check ensures that all symbols in the drawing are correctly spelled according to company standards.</Description>
+        <ModelCheckName>SYMBOL_SPELL</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Unacceptable Notes</Name>
+        <Category>Consistency</Category>
+        <Description>Checks for unacceptable notes in the drawing. Properly managing notes ensures drawing clarity and accuracy. This check helps to identify and manage unacceptable notes within the drawing.</Description>
+        <ModelCheckName>NOTE_UNACCEPT</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Number of Drawing Sheets</Name>
+        <Category>Model Complexity</Category>
+        <Description>Verifies the number of sheets in the drawing. Properly managing sheets ensures drawing clarity and accuracy. This check ensures that the number of sheets in the drawing is within specified limits.</Description>
+        <ModelCheckName>NUM_DRAW_SHEETS</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Overlapping Information</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Checks for overlapping information in the drawing. Properly managing overlaps ensures drawing clarity and accuracy. This check helps to identify and manage overlapping information within the drawing.</Description>
+        <ModelCheckName>OVERLAP_INFO</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N E Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Drawing Parameters Existence</Name>
+        <Category>Model Complexity</Category>
+        <Description>Verifies the existence of parameters in the drawing. Properly managing parameters ensures drawing accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all required parameters are present and correctly defined in the drawing.</Description>
+        <ModelCheckName>PARAMS_EXIST</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Drawing Parameters Usage</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks the usage of parameters in the drawing. Properly managing parameters ensures drawing accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all parameters are correctly used in the drawing.</Description>
+        <ModelCheckName>PARAMS_USED</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Regeneration of Dimensions</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Verifies the regeneration of dimensions in the drawing. Properly managing dimensions ensures drawing clarity and accuracy. This check ensures that all dimensions in the drawing regenerate correctly.</Description>
+        <ModelCheckName>REGEN_DIMS</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N E Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Sheet Size Information</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks the information of sheet sizes in the drawing. Properly managing sheet sizes ensures drawing accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all sheet sizes are correctly defined and used in the drawing.</Description>
+        <ModelCheckName>SHEET_SIZE_INFO</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Standard Detail Setup</Name>
+        <Category>Model Complexity</Category>
+        <Description>Verifies the standard detail setup of the drawing. Properly managing detail setups ensures drawing clarity and accuracy. This check ensures that the drawing follows the standard detail setup according to company standards.</Description>
+        <ModelCheckName>STD_DTL_SETUP</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Symbol Information</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks the information of symbols in the drawing. Properly managing symbols ensures drawing accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that all symbols in the drawing are correctly defined and used.</Description>
+        <ModelCheckName>SYMBOL_INFO</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Table Cell Information</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks the contents and configuration of table cells within a drawing. When enabled, ModelCHECK will verify that the table cells meet predefined standards for formatting, content, and structure, and will report any discrepancies, ensuring that tables in the drawing are correctly set up and adhere to design specifications.</Description>
+        <ModelCheckName>TABLE_CELLS</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Title Information</Name>
+        <Category>Consistency</Category>
+        <Description>Checks the information of titles in the drawing. Properly managing titles ensures drawing clarity and accuracy. This check ensures that all titles in the drawing are correctly defined and used.</Description>
+        <ModelCheckName>TITLE_INFO</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Unused Models</Name>
+        <Category>Model Complexity</Category>
+        <Description>Verifies the presence of unused models in the drawing. Properly managing models ensures drawing clarity and accuracy. This check helps to identify and manage unused models within the drawing.</Description>
+        <ModelCheckName>UNUSED_MODELS</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N E Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Unused Sheets</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks for unused sheets in the drawing. Properly managing sheets ensures drawing clarity and accuracy. This check helps to identify and manage unused sheets within the drawing.</Description>
+        <ModelCheckName>UNUSED_SHEETS</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>View Scale</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Verifies the scale of views in the drawing. Properly managing view scales ensures drawing clarity and accuracy. This check ensures that all view scales in the drawing are correctly defined and used.</Description>
+        <ModelCheckName>VIEW_SCALE</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <!-- ASSEMBLY REPORT CONFIGURATION -->
+    <Check>
+        <Name>Assembly BOM</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks the bill of materials (BOM) for assemblies. Properly managing BOM ensures assembly accuracy and facilitates downstream processes like manufacturing and inspection. This check ensures that the assembly BOM is correctly defined and used.</Description>
+        <ModelCheckName>ASM_BOM</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Assembly Features</Name>
+        <Category>Model Complexity</Category>
+        <Description>Verifies the features of assemblies. Properly managing assembly features ensures assembly accuracy and functionality. This check ensures that all features in the assembly are correctly defined and used.</Description>
+        <ModelCheckName>ASM_FEATURES</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Bulk Items</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Checks for bulk items in the assembly. Properly managing bulk items ensures assembly accuracy and functionality. This check ensures that all bulk items in the assembly are correctly defined and used.</Description>
+        <ModelCheckName>BULK_ITEMS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Frozen Components</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Verifies the presence of frozen components in the assembly. Properly managing frozen components ensures assembly stability and functionality during design changes. This check helps to identify and manage frozen components within the assembly.</Description>
+        <ModelCheckName>FRZ_COMPONENTS</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <why>Freezing a component is useful when debugging retrieval or regeneration issues. However, it is only a temporary solution. If an assembly’s design is to be released, the frozen components should be unfrozen.
+        Components are frozen when the component is missing or could not be retrieved or regenerated successfully. In this case, you can use the component in its last known, successfully regenerated state in order to make progress with your design. Before releasing the model, you should unfreeze the component and resolve the reference issue, otherwise you risk releasing with an out of date component.
+        </why>
+    </Check>
+    <Check>
+        <Name>Generic Components</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks the generic components in the assembly. Properly managing generic components ensures assembly accuracy and functionality. This check ensures that all generic components in the assembly are correctly defined and used.</Description>
+        <ModelCheckName>GEN_COMPONENTS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Global Interfaces</Name>
+        <Category>Model Integrity</Category>
+        <Description>Verifies the global interfaces in the assembly. Properly managing global interfaces ensures assembly accuracy and functionality. This check ensures that all global interfaces in the assembly are correctly defined and used.</Description>
+        <ModelCheckName>GLOBAL_INTF</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Missing Components</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks for missing components in the assembly. Properly managing components ensures assembly accuracy and functionality. This check helps to identify and manage missing components within the assembly.</Description>
+        <ModelCheckName>MIS_COMPONENTS</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Number of Components</Name>
+        <Category>Model Complexity</Category>
+        <Description>Verifies the number of components in the assembly. Properly managing components ensures assembly accuracy and functionality. This check ensures that the number of components in the assembly is within specified limits.</Description>
+        <ModelCheckName>NUM_COMPONENTS</ModelCheckName>
+        <ModelCheckOptions>YN Y Y Y Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Suppressed Components</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks for suppressed components in the assembly. Properly managing suppressed components ensures assembly stability and functionality during design changes. This check helps to identify and manage suppressed components within the assembly.</Description>
+        <ModelCheckName>SUP_COMPONENTS</ModelCheckName>
+        <ModelCheckOptions>YNEW E E W W Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <why>Suppressed components and features are displayed in the model tree but they are not regenerated. If a feature is suppressed, it is essentially turned off.
+
+Suppressed components and features are appropriate if they are only used by particular instances of the model, or for a simplified representation.
+
+Suppressed features in a master representation without a family table, however, indicate a problematic design intent that was suppressed temporarily.
+
+If the suppressed features are no longer needed, then they should be removed before you release the model. The presence of suppressed features adds confusion to your models, a well as runs the risk of having the features unintentionally resumed (or unsuppressed) some time in the future.
+        </why>
+    </Check>
+    <Check>
+        <Name>Packaged Components</Name>
+        <Category>Model Complexity</Category>
+        <Description>Verifies the presence of packaged components in the assembly. Properly managing packaged components ensures assembly stability and functionality during design changes. This check helps to identify and manage packaged components within the assembly.</Description>
+        <ModelCheckName>PACK_COMPONENTS</ModelCheckName>
+        <ModelCheckOptions>YNEW E E W W Y</ModelCheckOptions>
+        <why>Errors with packaged components in an assembly can lead to instability and functionality issues during design changes. Packaged components, which are parts temporarily placed in an assembly without being fully constrained, are valuable because they allow for flexibility during the design process. Ensuring these components are correctly identified and managed is crucial for maintaining assembly stability and functionality, facilitating easier modifications and adjustments.</why>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Unique Components</Name>
+        <Category>Design Intent Strength</Category>
+        <Description>Checks for unique components in the assembly. Properly managing unique components ensures assembly accuracy and functionality. This check ensures that all unique components in the assembly are correctly defined and used.</Description>
+        <ModelCheckName>UNQ_COMPONENTS</ModelCheckName>
+        <ModelCheckOptions>YN Y Y Y Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Circular References</Name>
+        <Category>Model Integrity</Category>
+        <Description>Verifies the presence of circular references in the assembly. Properly managing references ensures assembly stability and functionality during design changes. This check helps to identify and manage circular references within the assembly.</Description>
+        <ModelCheckName>CIRCULAR_REFS</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N N Y</ModelCheckOptions>
+        <why>Circular references occur when a chain of references form a loop. The models in the circular loop cannot be fully regenerated.
+
+Circular references typically occur across different components in an assembly. Individually, the components may appear to retrieve normally and new features can sometimes be added without problems, but attempts to regenerate the complete model fail. Circular references should be removed when they occur.
+
+Best practice methods and standards around reference control can help eliminate the possibility of creating circular references.
+        </why>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Weak Sketcher Dimensions</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks for weak sketcher dimensions in the assembly. Properly managing sketcher dimensions ensures assembly accuracy and functionality. This check helps to identify and manage weak sketcher dimensions within the assembly.</Description>
+        <ModelCheckName>WEAK_SKETCHER_DIMS</ModelCheckName>
+        <ModelCheckOptions>YNEW E E E E Y</ModelCheckOptions>
+        <why>### Why Avoid Weak Sketcher Dimensions?
+Weak sketcher dimensions, also known as non-driving dimensions, are automatically generated by CAD software to define the geometry of a sketch. While they can be convenient during the initial stages of design, relying on them can lead to significant issues later in the design and manufacturing process.</why>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Unattached Feature</Name>
+        <Category>Model Integrity</Category>
+        <Description>Look for unattached features.</Description>
+        <ModelCheckName>UNATTACHED_FEAT</ModelCheckName>
+        <ModelCheckOptions>YNEW W W E N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+    <Check>
+        <Name>Incomplete Features</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks for features that are incomplete.</Description>
+        <ModelCheckName>AF_INCOMPLETE</ModelCheckName>
+        <ModelCheckOptions>YNEW W W E N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>         
+    </Check>
+    <Check>
+        <Name>Assembly Missing References</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks for missing references in the assembly.</Description>
+        <ModelCheckName>AE_MISSINGREFS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W E N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <why>Features can reference design information in the current model or an external model. When this design information is no longer present, your model cannot be properly retrieved or regenerated. Common causes of missing references are missing models that must be located, or a design change that eliminated the original reference.
+        The best way to fix a missing reference is to redefine the feature or component placement constraints. To temporarily fix a missing reference you can suppress the feature, or suppress or freeze the component. While suppressed or frozen, work can continue until the missing references are recovered. This is a risky practice; when the feature or component is resumed or unfrozen, the geometry could be in a different state that makes the following dependent work invalid.
+        </why>
+    </Check>
+    <Check>
+        <Name>Small Curves</Name>
+        <Category>Misc VDA Checks</Category>
+        <Description>Number of tiny elements in curves.</Description>
+        <ModelCheckName>M1_TINY_ELMNT</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Identical Element Curves</Name>
+        <Category>Misc VDA Checks</Category>
+        <Description>Number of identical element curves. Checks for identical elements within a model. When enabled, ModelCHECK will identify and report any duplicate or identical features, such as curves, surfaces, or other geometric entities, ensuring that the model is free from unnecessary redundancies and is optimized for performance and accuracy.</Description>
+        <ModelCheckName>M2_IDENTICAL_ELMNT</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Positional Discontinuity Curves (Gaps)</Name>
+        <Category>Misc VDA Checks</Category>
+        <Description>Checks for positional continuity across connected surfaces or curves within a model. When enabled, ModelCHECK will verify that surfaces or curves are seamlessly connected at their boundaries without gaps or misalignments, ensuring a smooth and continuous transition between them. This helps maintain the geometric integrity and quality of the model.</Description>
+        <ModelCheckName>M3A_POSITION_CONT</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Positional Discontinuity Topologies</Name>
+        <Category>Misc VDA Checks</Category>
+        <Description>Checks for positional continuity across topological boundaries within a model. When enabled, ModelCHECK will verify that surfaces or curves are properly aligned at their topological boundaries, ensuring that there are no gaps or misalignments. This helps maintain the geometric integrity and ensures a smooth connection between adjacent surfaces or features.</Description>
+        <ModelCheckName>M3A_POSITION_CONT_TOP</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Curves Tangential Angle Discontinuity</Name>
+        <Category>Misc VDA Checks</Category>
+        <Description>Checks for tangential continuity across connected surfaces or curves within a model. When enabled, ModelCHECK will verify that the tangency between surfaces or curves is smooth and continuous at their boundaries, ensuring there are no abrupt changes in direction or angle, which is essential for maintaining the quality and smoothness of the model's geometry.</Description>
+        <ModelCheckName>M3B_TANG_CONT</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Tangential Angle Discontinuity Topologies</Name>
+        <Category>Misc VDA Checks</Category>
+        <Description>Checks for tangential continuity across topological boundaries within a model. When enabled, ModelCHECK will ensure that connected surfaces or curves maintain smooth tangency across their topological boundaries, preventing abrupt changes in direction or angle. This helps maintain the surface quality and smoothness in critical areas of the model.</Description>
+        <ModelCheckName>M3B_TANG_CONT_TOP</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Curves with Curvature Discontinuity</Name>
+        <Category>Misc VDA Checks</Category>
+        <Description>Number of curves with curvature discontinuity greater than some delta. Checks for curvature continuity across connected surfaces or curves within a model. When enabled, ModelCHECK will verify that the curvature transitions smoothly across boundaries without abrupt changes, ensuring that the connected surfaces or curves maintain a consistent curvature, which is important for the aesthetic and functional quality of the model.</Description>
+        <ModelCheckName>M3C_CURV_CONT</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Surface Boundaries with Curvature Discontinuity</Name>
+        <Category>Misc VDA Checks</Category>
+        <Description>Checks for curvature continuity across topological boundaries within a model. When enabled, ModelCHECK will verify that the curvature is smoothly continuous across these boundaries, ensuring that there are no abrupt changes in curvature, which is crucial for maintaining high-quality surface transitions and overall model integrity.</Description>
+        <ModelCheckName>M3C_CURV_CONT_TOP</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Number of Curves with Polynomial Degree</Name>
+        <Category>Misc VDA Checks</Category>
+        <Description>Checks the degree of polynomial used in defining curves or surfaces within a model. When enabled, ModelCHECK will verify that the polynomial degree is within the predefined acceptable range and report any deviations, ensuring that the curves or surfaces are appropriately defined for the intended design, analysis, or manufacturing processes.</Description>
+        <ModelCheckName>M4_POLYN_DEG</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Number of Wavy Curves</Name>
+        <Category>Misc VDA Checks</Category>
+        <Description>Checks for waviness in surfaces or curves within a model. When enabled, ModelCHECK will evaluate the smoothness of surfaces or curves, identifying and reporting any irregularities or deviations that cause waviness, ensuring that the model's surfaces are smooth and meet design quality standards.</Description>
+        <ModelCheckName>M5_WAVINESS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Number of Curves with Small Distance between Knot Vectors</Name>
+        <Category>Misc VDA Checks</Category>
+        <Description>Checks the distance between knots in a spline or curve within a model. When enabled, ModelCHECK will verify that the spacing between knots meets predefined criteria and report any instances where the knot distance is too small, ensuring that the curve is smooth and free from issues that could affect the model's geometry or downstream processes.</Description>
+        <ModelCheckName>M6_KNOT_DIST</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Number of Curves that Self Intersect</Name>
+        <Category>Curve Checks</Category>
+        <Description>Checks the distance of a feature or element from itself to ensure it meets predefined minimum criteria. When enabled, ModelCHECK will identify and report any features that are too close to themselves, such as self-intersecting surfaces or curves, helping to prevent geometric issues that could complicate manufacturing or analysis.</Description>
+        <ModelCheckName>C7_SELF_DIST</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Number of Drawing Text (Chars) that aren't IGES Compliant</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks for text elements in a model that may not conform to IGES (Initial Graphics Exchange Specification) standards. When enabled, ModelCHECK will verify that the text in the model is compatible with IGES export requirements and report any issues, ensuring that the model can be correctly translated into IGES format without losing or misrepresenting text information.</Description>
+        <ModelCheckName>D28_IGES_TEXT</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Number of Face Segments with Small Edges</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks for tiny segment edges within a model. When enabled, ModelCHECK will identify and report edges that are excessively short, below a predefined minimum length, helping to ensure that the model does not contain small, potentially problematic edges that could cause issues in manufacturing, analysis, or overall model quality.</Description>
+        <ModelCheckName>SU8_TINY_SEG_EDGE</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Number of Surfaces with Curvature less than Some Number</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks for curvature radii that are too small within a model. When enabled, ModelCHECK will identify and report instances where the curvature radius is below a predefined minimum threshold, helping to ensure that the model does not contain extremely tight curves that could cause issues in manufacturing, analysis, or functionality.</Description>
+        <ModelCheckName>SU9_TINY_CURV_RAD</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Number of Surfaces where the Angle between Adjacent Surfaces is Outside Range</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks the angle between edge curves at their junctions within a model. When enabled, ModelCHECK will verify that the angles between boundary curves meet predefined criteria and report any angles that are too sharp or do not conform to the design standards, helping to ensure smooth transitions and proper geometric relationships in the model.</Description>
+        <ModelCheckName>SU10_BOUND_ANGLE</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Number of Surfaces with Reversed Normals</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks for reversals in surface normals within a model. When enabled, ModelCHECK will identify and report instances where surface normals are oriented in opposite or incorrect directions, helping to ensure that the surfaces are consistently oriented and that the model is free from issues that could affect manufacturing, analysis, or rendering.</Description>
+        <ModelCheckName>SU11_NORM_REVERSAL</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Number of Surfaces with Greater than X Patches</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks the distribution of patches in a surface mesh to ensure they are evenly spaced. When enabled, ModelCHECK will verify that the distance between patches within a surface meets predefined criteria and report any inconsistencies, helping to ensure that the surface mesh is uniform and correctly defined.</Description>
+        <ModelCheckName>SU12_PATCH_DIST</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Surfaces with Unoccupied Patch Rows</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks for unoccupied patch rows in a surface mesh within a model. When enabled, ModelCHECK will identify and report any rows in the surface patch grid that lack patches or are not fully occupied, ensuring that the surface mesh is complete and properly defined. This helps maintain the integrity and accuracy of the surface geometry in the model.</Description>
+        <ModelCheckName>SU13_UNOC_PATCH_ROW</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Surfaces that have Boundary Curves within X of One Another</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks the penetration or distance between boundaries within a model. When enabled, ModelCHECK will verify that the distance between boundary elements (such as surfaces or edges) falls within the predefined acceptable range. It will report any instances where the boundaries are too close, too far apart, or overlapping, helping to ensure that the model's boundaries are properly spaced and do not interfere with each other according to the design intent.</Description>
+        <ModelCheckName>F14_BOUND_DIST</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Surfaces that have Boundary Curves that Extend Greater than X from the Extremity of the Surface</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks the proximity of a boundary curve to its associated surface within a model. When enabled, ModelCHECK will verify that the boundary curve is correctly positioned relative to the surface and report any deviations that exceed predefined criteria. This ensures that the boundary curves are accurately aligned with the surfaces, maintaining the intended design integrity.</Description>
+        <ModelCheckName>F15_SURF_DIST</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>All Surfaces have Similar Orientation</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks for similar orientation of curves or paths within a model. When enabled, ModelCHECK will verify that paths or curves have a consistent orientation relative to each other and report any inconsistencies, ensuring that the model's geometry follows the intended design directions and is free from orientation issues that could impact functionality or aesthetics.</Description>
+        <ModelCheckName>F16_SIM_ORIENT</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Number of Faces with More than X Segments per Face</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks the number of segments in a boundary curve within a model. When enabled, ModelCHECK will verify that the number of segments in the curve meets predefined criteria and report any instances where the segmentation is either too high or too low, helping to ensure smooth and accurate boundary definitions in the model.</Description>
+        <ModelCheckName>F17_NUM_SEG</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Number of Edges with at Least 3 Faces</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks the number of faces connected to an edge within a model. When enabled, ModelCHECK will verify that the number of faces sharing an edge meets the predefined criteria and report any instances where this number is unusual or problematic. This helps ensure the model's geometry is correct and avoids potential issues in manufacturing or structural analysis.</Description>
+        <ModelCheckName>T18_NUM_FACE</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Number of Normals Improperly Oriented</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks the orientation of surface normals to ensure they are consistent and correctly aligned within a model. When enabled, ModelCHECK will verify that similar surfaces have their normals oriented in the same direction and report any inconsistencies. This helps prevent issues related to surface orientation that could affect manufacturing, analysis, or the overall quality of the model.</Description>
+        <ModelCheckName>T19_NORMAL_ORIENT</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Number of Knife Edges</Name>
+        <Category>Model Complexity</Category>
+        <Description>Identifies and reports the presence of knife edges in a model. When enabled, ModelCHECK will check for edges that are extremely sharp, resembling a knife edge, which could lead to manufacturing or structural issues. This check helps ensure that the model does not contain any problematic sharp edges that could compromise the design's integrity or manufacturability.</Description>
+        <ModelCheckName>T20_KNIFE_EDGES</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Number of Vertices Not in Line with Edges</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks the distance between vertices and adjacent edges within a model. When enabled, ModelCHECK will verify that the distance between vertices and their neighboring edges meets the predefined criteria, and it will report any instances where the distance is too small or not as expected. This ensures proper geometric relationships within the model, helping to avoid potential issues in manufacturing or analysis.</Description>
+        <ModelCheckName>SO21_DIST_VERT_EDGE</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Number of Vertices Not in Line with Faces</Name>
+        <Category>Model Complexity</Category>
+        <Description>Checks the distance between vertices and adjacent faces within a model. When enabled, ModelCHECK will verify that the distance between vertices and their neighboring faces meets the predefined criteria, and it will report any instances where the distance is too small or not as expected. This helps ensure proper geometric relationships within the model, avoiding potential issues in manufacturing or analysis.</Description>
+        <ModelCheckName>SO22_DIST_VERT_FACE</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Number of Imported Features</Name>
+        <Category>Model Complexity</Category>
+        <Description>Identifies and reports any deletion of history within a model. When enabled, ModelCHECK will check for instances where feature history has been removed or altered, ensuring that the model's historical data is intact and that any deletions are intentional and compliant with design practices. This helps maintain the integrity of the model's construction history, which is crucial for understanding and modifying the design later on.</Description>
+        <ModelCheckName>SO23_HIST_DELETE</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Extra Geometrical Features</Name>
+        <Category>Model Complexity</Category>
+        <Description>Identifies and reports the presence of extra or unnecessary geometry in a model. When enabled, ModelCHECK will check for and report any additional geometry that is not required for the intended design, helping to ensure that the model remains clean, efficient, and free from redundant elements.</Description>
+        <ModelCheckName>SO24_EXTRA_GEOM</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>        
+    </Check>
+    <Check>
+        <Name>Number of Unintentional Cavities</Name>
+        <Category>Model Complexity</Category>
+        <Description>Identifies and reports the presence of multiple internal cavities or voids (buried features) within a solid body. When enabled, ModelCHECK will check for these cavities and report them, ensuring that they are consistent with the design intent and do not pose any issues in manufacturing or analysis.</Description>
+        <ModelCheckName>SO25_CAVITIES</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <why>A buried feature has geometry that is entirely surrounded (or enclosed) by another feature’s geometry. For example, a cut feature may be completely filled by one or more features. Or a solid feature, such as a protrusion, may be completely surrounded by geometry from one or more other features.
+            The design intent of a buried feature should be questioned since it is being replaced by geometry from other features.
+            Often buried features indicate a model that was modified when undesired geometry was cut away or an undesired region was filled in to start over. This may feel like a pragmatic solution, but it is only a short term solution. When the undesired design intent is left behind (or buried by geometry from new features), it makes the model unnecessarily complex. Good design intent should be understandable and the designer should make changes by modifying and redesigning the existing design intent. Leaving features that do not contribute to the design intent is confusing for new designers.
+        </why>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Number of Multi-Body (Merged) Solids</Name>
+        <Category>Model Complexity</Category>
+        <Description>Identifies and reports the presence of multiple bodies within a part model. When enabled, ModelCHECK will check for and report any part models that contain more than one body, ensuring compliance with design standards that may require specific handling of multiple bodies within a part.</Description>
+        <ModelCheckName>SO26_MULT_BODY</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+    <Check>
+        <Name>Number of Multi-Solid Parts</Name>
+        <Category>Model Complexity</Category>
+        <Description>Identifies and reports the presence of multiple solid bodies within a part model. When enabled, ModelCHECK will check for and report any part models that contain more than one solid body, ensuring that the model adheres to design standards that may require a single solid body per part.</Description>
+        <ModelCheckName>SO27_MULT_SOLID</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+
+    <Check>
+        <Name>Duplicate annotation elements</Name>
+        <Category>Model Integrity</Category>
+        <Description>Identifies and reports duplicate geometric tolerance (GTOL) annotation elements in a model or drawing. When enabled, ModelCHECK will check for multiple instances of the same geometric tolerance annotations and report any duplicates, ensuring that the model or drawing is free from redundant or conflicting GTOL annotations.</Description>
+        <ModelCheckName>AE_GTOL_DUPLICATE</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Duplicate surface-finish annotation elements</Name>
+        <Category>Model Integrity</Category>
+        <Description>Identifies and reports duplicate surface finish annotation elements in a model or drawing. When enabled, ModelCHECK will check for multiple instances of the same surface finish annotations and report any duplicates, helping to ensure that the model or drawing is free from redundant or conflicting annotations.</Description>
+        <ModelCheckName>AE_SF_DUPLICATE</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Inactive annotations</Name>
+        <Category>Model Integrity</Category>
+        <Description>Identifies and reports inactive annotations in a model or drawing. When enabled, ModelCHECK will check for annotations that are not currently active or visible and report them, helping to ensure that all necessary annotations are correctly displayed and functional within the model or drawing.</Description>
+        <ModelCheckName>ANNTN_INACTIVE</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Failed Components</Name>
+        <Category>Model Integrity</Category>
+        <Description>Identifies and reports components in an assembly that have failed to regenerate or function properly. When enabled, ModelCHECK will check for any components that have encountered errors and provide a report, helping to ensure the assembly is free from issues and that all components are operating as intended.</Description>
+        <ModelCheckName>FAILED_COMPONENTS</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Fixed components</Name>
+        <Category>Model Integrity</Category>
+        <Description>Identifies and checks fixed components in an assembly. When enabled, ModelCHECK will verify that fixed components are correctly defined and positioned within the assembly, ensuring that these components meet the required design constraints and do not move relative to other parts.</Description>
+        <ModelCheckName>FIXED_COMPONENTS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Flexible components</Name>
+        <Category>Model Integrity</Category>
+        <Description>Identifies and checks flexible components in an assembly. When enabled, ModelCHECK will verify that flexible components are correctly defined and functioning as intended, reporting any issues to ensure that the assembly meets design requirements for flexibility.</Description>
+        <ModelCheckName>FLEX_COMPONENTS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Mechanism components</Name>
+        <Category>Model Integrity</Category>
+        <Description>Identifies and checks mechanical components in a model or assembly. When enabled, ModelCHECK will verify that these components meet predefined standards and report any issues, ensuring that mechanical parts are correctly defined and compliant with design specifications.</Description>
+        <ModelCheckName>MECH_COMPONENTS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Datum Planes</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Verifies that the model includes the correct datum planes as specified by the template. When enabled, ModelCHECK will check for the presence and correctness of datum planes according to the template's requirements and report any discrepancies, ensuring that the model's foundational references are properly established.</Description>
+        <ModelCheckName>TEMPLATE_DATUM_PLANES</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Children of External Failed components</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Identifies and reports external child components in an assembly that have failed due to issues with their external parent components. When enabled, ModelCHECK will check for any external child components that are not functioning properly because of a failure in their external parent component, helping to diagnose and resolve issues related to dependencies on external references in the assembly.</Description>
+        <ModelCheckName>CHILD_EXT_FAILED_COMPONENTS</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Children of External Failed Features</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Identifies and reports external child features that have failed due to issues with their external parent features. When enabled, ModelCHECK will check for any external child features that are not functioning properly because of a failure in their external parent feature, helping to diagnose and resolve issues involving dependencies on external references in the model.</Description>
+        <ModelCheckName>CHILD_EXT_FAILED_FEATURES</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Children of Failed components</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Identifies and reports components in an assembly that have failed due to issues with their parent components. When enabled, ModelCHECK will check for any child components that are not functioning properly because of a failure in the parent component, helping to diagnose and resolve assembly issues caused by cascading failures.</Description>
+        <ModelCheckName>CHILD_FAILED_COMPONENTS</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Children of Failed Features</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Identifies and reports features that have failed due to issues with their parent features in a model. When enabled, ModelCHECK will check for any (Updatable) child features that are not functioning properly because of a failure in the parent feature, helping to diagnose and resolve cascading errors in the model.</Description>
+        <ModelCheckName>CHILD_FAILED_FEATURES</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Drawing Symbols</Name>
+        <Category>Model Integrity</Category>
+        <Description>Verifies that standard symbols used in a model or drawing adhere to predefined company or project standards. When enabled, ModelCHECK will check the symbols against the standard library and report any discrepancies, ensuring that only approved symbols are used and that they are applied correctly.</Description>
+        <ModelCheckName>STD_SYMBOLS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Failed Features</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Identifies and reports features in a model that have failed to regenerate or execute properly. When enabled, ModelCHECK will check for any failed features and provide a report, helping to ensure that the model is free from errors and that all features function as intended.</Description>
+        <ModelCheckName>FAILED_FEATURES</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Flexible Modeling Features</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Checks for the presence of flexible modeling features in a model. When enabled, ModelCHECK will identify and report any flexible modeling features that are used, ensuring that the model adheres to design standards regarding the use of flexible modeling techniques.</Description>
+        <ModelCheckName>FLEXIBLE_MODELING_FEATURES</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Feature surfaces that may be buried</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Identifies and reports suspect buried features by having no surfaces. When enabled, ModelCHECK will check for features that are potentially buried within the model and may not be visible or accessible, helping to identify problematic features that could cause issues in manufacturing or assembly.</Description>
+        <ModelCheckName>BURIED_SUSPECT</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <why>A buried feature has geometry that is entirely surrounded (or enclosed) by another feature’s geometry. For example, a cut feature may be completely filled by one or more features. Or a solid feature, such as a protrusion, may be completely surrounded by geometry from one or more other features.
+        The design intent of a buried feature should be questioned since it is being replaced by geometry from other features.
+        Often buried features indicate a model that was modified when undesired geometry was cut away or an undesired region was filled in to start over. This may feel like a pragmatic solution, but it is only a short term solution. When the undesired design intent is left behind (or buried by geometry from new features), it makes the model unnecessarily complex. Good design intent should be understandable and the designer should make changes by modifying and redesigning the existing design intent. Leaving features that do not contribute to the design intent is confusing for new designers.
+        </why>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Small Distance between Edges</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Checks the distance between boundaries in a model to ensure they meet predefined criteria. When enabled, ModelCHECK will measure the proximity of boundaries and report any that are too close or too far apart, helping to ensure that the model's boundaries are correctly spaced according to design requirements.</Description>
+        <ModelCheckName>F14_BOUND_DIST</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+
+    <Check>
+        <Name>Small Element for faces</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Identifies and reports tiny facets in a model. When enabled, ModelCHECK will check for extremely small facet elements that could cause issues in rendering, analysis, or manufacturing, and report them, helping to ensure that the model's surface quality is maintained and free from problematic tiny facets.</Description>
+        <ModelCheckName>M1_TINY_ELMNT_FAC</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+
+    <Check>
+        <Name>Small Element for surface</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Identifies and reports tiny surface elements in a model. When enabled, ModelCHECK will check for extremely small surface elements that could cause issues in manufacturing or analysis and report them, helping to ensure that the model is free from problematic tiny surfaces that could affect its performance.</Description>
+        <ModelCheckName>M1_TINY_ELMNT_SRF</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>N</display>
+        <enabled>N</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+
+    <Check>
+        <Name>Interfering Bodies</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Checks for interference between bodies within a multibody part model. When enabled, ModelCHECK will identify and report any instances where bodies intersect or interfere with each other, ensuring that the model is free from internal conflicts and is structurally sound.</Description>
+        <ModelCheckName>BODY_INTF</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Lightweight Holes</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Identifies and checks lightweight holes in a model. When enabled, ModelCHECK will verify that the lightweight holes are correctly defined and report any issues, ensuring that these features meet the design requirements and do not compromise the model's integrity or performance.</Description>
+        <ModelCheckName>HOLE_LIGHTWT</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Material Card Densities</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Verifies that the material density assigned to a model is correct and adheres to predefined standards. When enabled, ModelCHECK will check the material density value and report any discrepancies, ensuring that the model's physical properties are accurate and consistent with design specifications.</Description>
+        <ModelCheckName>MATERIAL_DENSITY</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>Y</hideFromReport>
+    </Check>
+
+    <Check>
+        <Name>Model Detail Setup</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Ensures that the model adheres to a predefined standard detail setup. When enabled, ModelCHECK will verify that the model uses the correct detail settings as per the standard configuration and report any deviations, helping to maintain consistency and adherence to company or project-specific detailing standards.</Description>
+        <ModelCheckName>MDL_STD_DTL_SETUP</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Model has Mutli-bodies</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Checks for the presence of multiple solid bodies within a part model. When enabled, ModelCHECK will identify and report if a model contains more than one solid body, ensuring that the model adheres to the expected single-body design standard, if required.</Description>
+        <ModelCheckName>MULTIBODY_MODEL</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Search for duplicate models</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Searches for duplicate models within a database by comparing model shapes and properties. When enabled, ModelCHECK will identify and report any models that are duplicates or closely match the active model, helping to prevent redundancy and ensuring efficient data management.</Description>
+        <ModelCheckName>SEARCH_DUP_MODELS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Simprep Master</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Ensures that the master representation of a simplified representation (SIMPRep) is correctly defined and used in a model. When enabled, ModelCHECK will check that the master representation adheres to predefined standards and report any discrepancies, ensuring consistency and correctness in the use of simplified representations within the model.</Description>
+        <ModelCheckName>SIMPREP_MASTER</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Validate Dimensions</Name>
+        <Category>Model Integrity</Category>
+        <Description>Validates that dimensions in a model adhere to predefined standards. When enabled, ModelCHECK will check the dimensions for accuracy and compliance with the specified design criteria and report any discrepancies, ensuring that the model dimensions are correct and consistent with design requirements.</Description>
+        <ModelCheckName>VALIDATE_DIMENSIONS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Validate Geometric Tolerance Values</Name>
+        <Category>Model Integrity</Category>
+        <Description>Validates that geometric tolerances (GTOL) in a model adhere to predefined standards. When enabled, ModelCHECK will check the values of all geometric tolerances and report any discrepancies, ensuring that the model's tolerances meet the required specifications and quality standards.</Description>
+        <ModelCheckName>VALIDATE_GTOL_VALUES</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Validate legacy Set datum and Set Datum Tag Annotation</Name>
+        <Category>Model Integrity</Category>
+        <Description>Validates that the set datum and secondary datum target annotations (SDTAs) are correctly applied in a model. When enabled, ModelCHECK will check for compliance with predefined standards for these annotations and report any discrepancies, ensuring that datum features and their associated targets are properly defined and conform to design requirements.</Description>
+        <ModelCheckName>VALIDATE_SET_DATUM_AND_SDTA</ModelCheckName>
+        <ModelCheckOptions>YNEW N N N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Map Parameters</Name>
+        <Category>Model Integrity</Category>
+        <Description>Maps parameters from one name to another in a model. When enabled, ModelCHECK will ensure that specified parameters are correctly renamed according to the predefined mapping rules, helping to standardize parameter naming conventions across models.</Description>
+        <ModelCheckName>PARAM_MAP</ModelCheckName>
+        <ModelCheckOptions>YN N N N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Unwanted Parameters</Name>
+        <Category>Model Integrity</Category>
+        <Description>Identifies and reports unwanted parameters in a model. When enabled, ModelCHECK will check for parameters that are not needed or are outside the predefined standards and report them, helping to maintain a clean and efficient model by removing unnecessary or incorrect parameters.</Description>
+        <ModelCheckName>PARAM_UNWANTED</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Parent Difference</Name>
+        <Category>Consistency</Category>
+        <Description>Identifies features in a model that have different parents than expected. When enabled, ModelCHECK will check for discrepancies in feature parent relationships and report any differences, ensuring that the model's feature structure is correct and consistent with design intent.</Description>
+        <ModelCheckName>PARENT_DIFF</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Missing Parameters</Name>
+        <Category>Model Integrity</Category>
+        <Description>Ensures that specific start parameters are present in the model. When enabled, ModelCHECK will check for the existence of required start parameters and report any that are missing, helping to ensure that all necessary parameters are included from the beginning of the modeling process.</Description>
+        <ModelCheckName>STARTPARM</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Non-regenerating Simplified Reps</Name>
+        <Category>Model Integrity</Category>
+        <Description>Verifies that all simplified representations (SREPs) in a model can regenerate successfully. When enabled, ModelCHECK will check the regeneration status of each simplified representation and report any issues, ensuring that they are correctly defined and functional in the model.</Description>
+        <ModelCheckName>REGEN_SREPS</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N Y Y</ModelCheckOptions>
+        <why>Cross-sections are imaginary cuts through parts and assemblies that aid with visualizing and understanding the geometry inside a model. Each cross-section is associatively linked to the model’s geometry and updates when a change occurs.
+        </why>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+
+    <Check>
+        <Name>Non-regenerating Cross Sections</Name>
+        <Category>Model Integrity</Category>
+        <Description>Verifies that all cross-sections in a model can regenerate successfully. When enabled, ModelCHECK will check the regeneration status of each cross-section and report any issues, helping to ensure that the model's cross-sections are correctly defined and functional.</Description>
+        <ModelCheckName>REGEN_XSEC</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N Y Y</ModelCheckOptions>
+        <why>Cross-sections are imaginary cuts through parts and assemblies that aid with visualizing and understanding the geometry inside a model. Each cross-section is associatively linked to the model’s geometry and updates when a change occurs.
+        </why>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Relation Update</Name>
+        <Category>Model Integrity</Category>
+        <Description>Identifies relations in a model that need to be updated. When enabled, ModelCHECK will check for outdated or incorrect relations and prompt for necessary updates, ensuring that the model maintains accuracy and functions as intended.</Description>
+        <ModelCheckName>RELATION_UPDATE</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Unwanted Relations</Name>
+        <Category>Model Integrity</Category>
+        <Description>Identifies and reports unwanted relations in a model. When enabled, ModelCHECK will check for any relations that are not desired according to the predefined criteria and report them, helping to maintain model integrity and avoid potential issues caused by unnecessary or incorrect relations.</Description>
+        <ModelCheckName>REL_UNWANTED</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Sheetmetal Feature Bend Table</Name>
+        <Category>Model Integrity</Category>
+        <Description>Ensures that the bend table used for flat patterns in sheet metal parts adheres to predefined standards. When enabled, ModelCHECK will verify the bend table settings and report any discrepancies, ensuring that the flat patterns conform to the required specifications.</Description>
+        <ModelCheckName>SHTMTL_FBENDTAB</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Sheetmetal K Factor</Name>
+        <Category>Model Integrity</Category>
+        <Description>Ensures that the K-factor used in sheet metal parts adheres to predefined standards. When enabled, ModelCHECK will check the K-factor value and report any discrepancies, helping to maintain accuracy and consistency in sheet metal design.</Description>
+        <ModelCheckName>SHTMTL_KFACTOR</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Create View</Name>
+        <Category>Model Integrity</Category>
+        <Description>Creates standard views in a model or drawing according to predefined settings. When enabled, ModelCHECK will automatically generate these views if they are missing, ensuring consistency and adherence to design standards.</Description>
+        <ModelCheckName>CREATE_VIEW</ModelCheckName>
+        <ModelCheckOptions>YN N N N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Non standard scaled Drawing Views</Name>
+        <Category>Model Integrity</Category>
+        <Description>Ensures that the scale of views in a drawing adheres to predefined standards. When enabled, ModelCHECK will check that all view scales in the drawing are valid and report any discrepancies. This helps ensure that drawings meet the required specifications and standards for view scaling.</Description>
+        <ModelCheckName>VALIDATE_VIEW_SCALE</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Always Report Layers</Name>
+        <Category>Model Integrity</Category>
+        <Description>This is used to report missing layers. When enabled, it ensures that ModelCHECK always checks and reports if any layers are missing from the model, according to predefined standards. This helps maintain consistency and adherence to specific layer management requirements.</Description>
+        <ModelCheckName>REPT_LAYR_ALWAYS</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N Y Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <!-- NEWLY FOUND -->
+
+    <Check>
+        <Name>Annotation on Multiple Combined States</Name>
+        <Category>Consistency</Category>
+        <Description>Checks for annotations across multiple combined states in the model to ensure consistency and clarity.</Description>
+        <ModelCheckName>ANNTN_ON_MULT_COMB_STATE</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Annotation Semantic Reference Text Verification</Name>
+        <Category>Consistency</Category>
+        <Description>Checks for valid annotation semantic reference text in the model to ensure proper references are maintained.</Description>
+        <ModelCheckName>ANNTN_SEM_REF_TEXT_VERIFY</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Body Information</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks for valid body information in the model, ensuring proper metadata and references are maintained.</Description>
+        <ModelCheckName>BODY_INFO</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Combined State Name</Name>
+        <Category>Consistency</Category>
+        <Description>Checks for the correct naming conventions of combined states in the model to maintain consistency.</Description>
+        <ModelCheckName>COMB_STATE_NAME</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Ignore Annotation</Name>
+        <Category>Consistency</Category>
+        <Description>Allows certain annotations to be ignored during the check process to avoid unnecessary warnings.</Description>
+        <ModelCheckName>IGNORE_ANNTN</ModelCheckName>
+        <ModelCheckOptions>YN N N N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>N</enabled>
+    </Check>
+
+    <Check>
+        <Name>Layer Saved Status</Name>
+        <Category>Consistency</Category>
+        <Description>Checks the saved status of layers in the model, ensuring that all layers are properly saved and up to date.</Description>
+        <ModelCheckName>LAYER_SAVED_STATUS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Unwanted Layers</Name>
+        <Category>Consistency</Category>
+        <Description>Identifies Non-Standard unwanted layers in the model to help keep the model clean and efficient.</Description>
+        <ModelCheckName>LAYER_UNWANTED</ModelCheckName>
+        <ModelCheckOptions>YN Y Y N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Part Density</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks the density of the part, ensuring that the model adheres to the specified material properties.</Description>
+        <ModelCheckName>PRT_DENSITY</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+    <Check>
+        <Name>Template Layers</Name>
+        <Category>Consistency</Category>
+        <Description>Checks that template layers in the model conform to the expected standards and naming conventions.</Description>
+        <ModelCheckName>TEMPLATE_LAYERS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+
+</ModelChecks>

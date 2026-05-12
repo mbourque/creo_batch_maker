@@ -1,5 +1,6 @@
 app_settings.json
 venv/
+__pycache__/
 *.log.*
 *.json
 .cursorrules

@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Model Quality Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 5px; }
+        .container { margin-left: 395px; max-width: calc(100% - 435px); background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
+        .sidebar { position: fixed; top: 5px; left: 5px; width: 365px; padding: 10px; background: #f8f8f8; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); height: 100%; overflow-y: auto; }
+        .sidebar a { display: block; padding: 5px 0; color: #007BFF; text-decoration: none; }
+        .sidebar a:hover { text-decoration: underline; }
+        .sidebar ul { list-style-type: none; padding-left: 0; padding-bottom: 20px }
+        h1 {color: #333; }
+        .check-section-wrapper { margin-bottom: 20px; border: 1px solid #007BFF; border-radius: 8px; padding: 10px; display: flow-root; }
+        .check-section { margin-bottom: 20px; border-top: 1px solid #ccc; }
+        .check-section h2 { color: #007BFF; margin: 0; cursor: pointer; display: inline-block; vertical-align: top; }
+        /* Row shell: border on wrapper + flow-root so floats cannot hide the divider. */
+        .check-section > .file-row {
+            display: flow-root;
+            padding: 10px 0;
+            border-bottom: 1px solid #ccc;
+        }
+        .file-list::after {
+            content: "";
+            display: table;
+            clear: both;
+        }
+        .file-list p { margin: 5px 0; }
+        .hide-button { cursor: pointer; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; padding: 5px 10px; margin-left: 10px; }
+        .check-buttons { text-align: right; margin-bottom: 10px; display: flex; justify-content: flex-end; gap: 10px; }
+        .file-list .check-buttons { clear: both; }
+        .check-header { display: flex; justify-content: space-between; align-items: flex-start; }
+        .check-title { flex-grow: 1; }
+        .summary { background-color: #f0f8ff; padding: 10px; border-radius: 8px; margin-bottom: 20px; }
+        .bold-text { font-weight: bold; }
+        .why img { max-width: 100%; }
+        .button {
+            background-color: #007BFF;
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .flagged {
+            background-color: #ffcccc;
+        }
+        .file-row:has(.file-list.flagged) > .file-list.flagged {
+            background-color: transparent;
+        }
+        .file-row:has(.file-list.flagged) {
+            background-color: #ffcccc;
+        }
+        .hidden {
+            display: none;
+        }
+        .flag-button {
+            background-color: red;
+            color: white;
+        }
+        .dimmed-button {
+            background-color: #ccc; /* Light gray color */
+            color: #666; /* Darker gray for the text */
+        }
+        .model-thumb-wrap {
+            float: left;
+            padding: 10px;
+            margin-right: 8px;
+            box-sizing: border-box;
+        }
+        .model-thumb-wrap img {
+            display: block;
+            width: 300px;
+            height: auto;
+        }
+        .model-name-plain { color: #333; font-weight: normal; }
+        /* Print styles */
+        @media print {
+            .sidebar, .hide-button, .check-buttons, .print-button, .button {
+                display: none;
+            }
+            body {
+                margin: 0;
+            }
+            .container {
+                margin: 0;
+                max-width: none;
+                box-shadow: none;
+            }
+        }
+    </style>
+    <script defer>
+        // Array to keep track of hidden section IDs
+        let hiddenSections = [];
+
+        function openPopup(event, url) {
+            const x = event.screenX;
+            const y = event.screenY;
+            const width = 400;
+            const height = 750;
+            const left = x - (width / 2);
+            const top = y - (height / 2);
+
+            window.open(url, '_named', `width=${width},height=${height},left=${left},top=${top}`);
+        }
+
+        function fileRowFor(el) {
+            return el && el.closest ? el.closest('.file-row') : null;
+        }
+
+        function toggleFlaggedView() {
+            var allFiles = document.getElementsByClassName('file-list');
+            var flaggedFiles = document.getElementsByClassName('flagged');
+            var checkSections = document.getElementsByClassName('check-section-wrapper');
+            var flaggedButton = document.getElementById('flagged-button');
+            var showOnlyFlagged = flaggedButton.classList.toggle('active');
+
+            flaggedButton.classList.toggle('flag-button');
+
+            for (var i = 0; i < allFiles.length; i++) {
+                if (!hiddenSections.includes(allFiles[i].id)) {
+                    var row = fileRowFor(allFiles[i]) || allFiles[i];
+                    row.style.display = showOnlyFlagged ? 'none' : '';
+                }
+            }
+
+            if (showOnlyFlagged) {
+                for (var i = 0; i < flaggedFiles.length; i++) {
+                    if (!hiddenSections.includes(flaggedFiles[i].id)) {
+                        var rowF = fileRowFor(flaggedFiles[i]) || flaggedFiles[i];
+                        rowF.style.display = '';
+                    }
+                }
+            }
+
+            for (var i = 0; i < checkSections.length; i++) {
+                var section = checkSections[i];
+                var hasVisibleFlagged = section.getElementsByClassName('flagged').length > 0;
+                var sectionId = section.id;
+
+                if (!hiddenSections.includes(sectionId)) {
+                    section.style.display = (showOnlyFlagged && !hasVisibleFlagged) ? 'none' : '';
+                }
+
+                var sidebarItem = document.querySelector('.sidebar .' + sectionId);
+                if (sidebarItem && !hiddenSections.includes(sectionId)) {
+                    sidebarItem.style.display = (showOnlyFlagged && !hasVisibleFlagged) ? 'none' : '';
+                }
+            }
+        }
+
+        function toggleFlag(id) {
+            var element = document.getElementById(id);
+            if (!element) {
+                return;
+            }
+            var flagButton = element.querySelector('.flag-button');
+
+            element.classList.toggle('flagged');
+
+            if (flagButton) {
+                flagButton.classList.toggle('dimmed-button');
+            }
+        }
+
+        function escapeCssSelector(selector) {
+            return selector.replace(/([\:\.\[\],=|@!"#$%&'()*+;<>?\\^`{}~])/g, "\\$1");
+        }
+
+        function hideElementById(id) {
+            var element = document.getElementById(id);
+            if (element) {
+                var toRemove = fileRowFor(element) || element;
+                toRemove.parentNode.removeChild(toRemove);
+                // Hide the corresponding sidebar item
+                var escapedId = escapeCssSelector(id);
+                var sidebarItem = document.querySelector('.sidebar .' + escapedId);
+                if (sidebarItem) {
+                    sidebarItem.parentNode.removeChild(sidebarItem); // Remove sidebar item from DOM
+                }
+                hiddenSections = hiddenSections.filter(sec => sec !== id); // Remove element from hidden sections
+            }
+            removeEmptyCheckSections(); // Check if any check sections are now empty and need to be removed
+        }
+
+        function hideElementsByClass(className) {
+            var escapedClass = escapeCssSelector(className);
+            var elements = document.getElementsByClassName(escapedClass);
+            for (var i = elements.length - 1; i >= 0; i--) { // Iterate in reverse order
+                var el = elements[i];
+                var toRemove = fileRowFor(el) || el;
+                toRemove.parentNode.removeChild(toRemove);
+            }
+            // Hide the corresponding sidebar items by class
+            var sidebarItems = document.querySelectorAll('.sidebar .' + escapedClass);
+            sidebarItems.forEach(function(sidebarItem) {
+                sidebarItem.parentNode.removeChild(sidebarItem); // Remove sidebar item from DOM
+            });
+            removeEmptyCheckSections(); // Check if any check sections are now empty and need to be removed
+        }
+
+        function removeEmptyCheckSections() {
+            var checkSections = document.getElementsByClassName('check-section-wrapper');
+            for (var i = 0; i < checkSections.length; i++) {
+                var checkSectionWrapper = checkSections[i];
+                var checkSection = checkSectionWrapper.getElementsByClassName('check-section')[0];
+                var fileLists = checkSection.getElementsByClassName('file-list');
+                var allHidden = true;
+                for (var j = 0; j < fileLists.length; j++) {
+                    if (fileLists[j].parentNode) {
+                        allHidden = false;
+                        break;
+                    }
+                }
+                if (allHidden) {
+                    var sidebarItems = document.querySelectorAll('.sidebar .' + checkSectionWrapper.id);
+                    sidebarItems.forEach(function (sidebarItem) {
+                        sidebarItem.parentNode.removeChild(sidebarItem);
+                    });
+                    hiddenSections.push(checkSectionWrapper.id); // Add section ID to hiddenSections array
+                    checkSectionWrapper.parentNode.removeChild(checkSectionWrapper);
+                    i--;
+                }
+            }
+        }
+
+        function hideCheckSection(id) {
+            var wrapper = document.getElementById(id);
+            if (wrapper) {
+                wrapper.parentNode.removeChild(wrapper);
+                hiddenSections.push(id); // Add section ID to hiddenSections array
+            }
+            var sidebarItems = document.querySelectorAll('.sidebar .' + id);
+            sidebarItems.forEach(function (sidebarItem) {
+                sidebarItem.parentNode.removeChild(sidebarItem);
+            });
+        }
+
+        function openCreoView(filePath) {
+            window.location.href = 'launchcreoview://' + filePath;
+        }
+
+        function printReport() {
+            window.print();
+        }
+    </script>
+</head>
+<body>
+<div class="sidebar">
+    <button class="button print-button" onclick="printReport()">Print This</button>
+    <button class="button" id="flagged-button" onclick="toggleFlaggedView()">Flagged View</button>
+    <ul>
+        <li><a href="report.xlsx">Download Report</a></li>
+        <li><a href="#summary">Summary</a></li>
+        <hr>
+        {% for section in check_sections %}
+        <li title="{{ section.category }}" class="wrapper-{{ section.class }}"><a href="#{{ section.class }}">{{ section.name }} ({{ section.count }})</a></li>
+        {% endfor %}
+    </ul>
+</div>
+
+<a id="summary"></a>
+<div class="container main-content">
+    <h1>Model Quality Report</h1>
+    <div class="summary">
+        <p><strong>Total count of files scanned:</strong> {{ summary['total_files'] }}</p>
+        <p><strong>Count of files that have Warnings:</strong> {{ summary['warning_count'] }}</p>
+        <p><strong>Count of files that have Errors:</strong> {{ summary['error_count'] }}</p>
+        <div id="summary-section">
+            {{ summary_div }}
+        </div>
+
+    </div>
+
+    {% for section in check_sections %}
+    <a id="{{ section.class }}"></a>
+    <div class="check-section-wrapper" id="wrapper-{{ section.class }}">
+        <div class="check-header">
+            <div class="check-title">
+                <h2 id="{{ section.class }}"><span class="bold-text">{{ section.stat_type }}:</span> {{ section.count }} {{ section.name }}</h2>
+                <p><strong>Category:</strong> {{ section.category }}</p>
+                <p>{{ section.description }}</p>
+                <div class="why">{{ section.why | safe }}</div>
+            </div>
+            <div class="check-buttons">
+                <button class="hide-button" onclick="hideCheckSection('wrapper-{{ section.class }}')">Remove&nbsp;this</button>
+            </div>
+        </div>
+        <div class="check-section {{ section.class }}" id="{{ section.class }}">
+            {% for file in section.files %}
+            <div class="file-row">
+            <div class="file-list {{ file.stat }}{{ (file.desc or '').replace(' ', '').replace(':', '\\:').replace('.', '\\.') }}" id="{{ file.file_list_id | escape }}">
+                {% if file.image_url %}
+                    {% if file.model_href %}
+                <a class="model-thumb-wrap" href="{{ file.model_href | safe }}" onclick="alert('To open this file in Creo, Drag the image into a Creo window'); return false;">
+                    <img title="Drag this into Creo" src="{{ file.image_url | e }}" alt="" onerror="this.onerror=null;this.style.display='none';"/></a>
+                    {% else %}
+                <span class="model-thumb-wrap" title="No file link: session-style model name (not used as a file URL).">
+                    <img title="No file link for this model name" src="{{ file.image_url | e }}" alt="" onerror="this.onerror=null;this.style.display='none';"/></span>
+                    {% endif %}
+                {% endif %}
+                <p>{% if file.model_href %}<a href="{{ file.model_href | safe }}" onclick="alert('To open this file in Creo, Drag the image into a Creo window'); return false;">{{ file.display_name | e }}</a>{% else %}<span class="model-name-plain">{{ file.display_name | e }}</span>{% endif %}&nbsp;
+                    {% if file.more_info_link %}
+                    <button type="button" onclick="openPopup(event, '{{ file.more_info_link | safe }}');">More details...</button>
+                    {% else %}
+                    <span class="dimmed-button" title="No matching ModelCHECK detail HTML (*.P.html / *.A.html / *.D.html) found in this folder.">No detail file</span>
+                    {% endif %}
+                </p>
+                <p><strong>{{ file.stat }}:</strong> {{ file.desc | e }}</p>
+                <p>{{ file.condensed_msg | e }}</p>
+                <p><strong>Created by:</strong> {{ file.last_saved }} on {{ file.created }}</p>
+                <p><strong>File Size:</strong> {{ file.file_size }}</p>
+                <p><strong>Number of Features:</strong> {{ file.num_features }}</p>
+                <p><strong>Model Overall Size:</strong> {{ file.overall_size }}</p>
+                <p><strong>Model Units for Length:</strong> {{ file.units_length }}</p>
+                <div class="check-buttons">
+                    <button class="flag-button button" onclick="toggleFlag('{{ file.file_list_id | escape }}')">Flag&nbsp;this&nbsp;file</button>
+                    <button class="hide-button button" onclick="hideElementById('{{ file.file_list_id | escape }}')">Remove&nbsp;only&nbsp;this</button>
+                    <button class="hide-button button" onclick="hideElementsByClass('{{ file.stat }}{{ (file.desc or '').replace(' ', '').replace(':', '\\:').replace('.', '\\.') }}')">Remove&nbsp;all&nbsp;like&nbsp;this</button>
+                </div>
+            </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+</body>
+</html>

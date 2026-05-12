@@ -16,6 +16,9 @@ from tkinter import messagebox, ttk
 import customtkinter as ctk
 from PIL import Image
 
+import build_errors_warnings_report
+import merge_master_xml
+
 # Non-greedy inner; Creo files may contain multiple <DESCRIPTION> blocks — the first
 # is sometimes legacy/comment junk; we pick the best candidate after cleaning.
 DESCRIPTION_BLOCK_RE = re.compile(
@@ -90,6 +93,20 @@ def _working_directory_ok_for_go(working_directory: str) -> bool:
         return p.parent.is_dir()
     except OSError:
         return False
+
+
+def _summary_report_inputs_ok(working_directory: str) -> bool:
+    """True when master.xml exists in the working dir and bundled report assets exist."""
+    if not _working_directory_exists_as_dir(working_directory):
+        return False
+    try:
+        wd = Path(working_directory.strip()).expanduser().resolve()
+    except OSError:
+        return False
+    if not (wd / "master.xml").is_file():
+        return False
+    bundle = _app_bundle_dir()
+    return (bundle / "model_checks.xml").is_file() and (bundle / "report_template.html").is_file()
 
 
 class CreoDistributedBatchMakerApp(ctk.CTk):
@@ -355,8 +372,37 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             font=ctk.CTkFont(size=14, weight="bold"),
             command=self._launch_ptcdbatch,
         )
-        self.go_button.pack(side="right", padx=(8, 0))
-        self.open_batch_button.pack(side="right", padx=(0, 0))
+        self.build_master_button = ctk.CTkButton(
+            btn_bar,
+            text="Build",
+            width=120,
+            height=28,
+            corner_radius=6,
+            border_width=0,
+            fg_color="#3B8ED0",
+            text_color="#FFFFFF",
+            hover_color="#367DB6",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            command=self._on_build_master_xml,
+        )
+        self.summary_report_button = ctk.CTkButton(
+            btn_bar,
+            text="Report",
+            width=120,
+            height=28,
+            corner_radius=6,
+            border_width=0,
+            fg_color="#3B8ED0",
+            text_color="#FFFFFF",
+            hover_color="#367DB6",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            command=self._on_write_summary_report,
+        )
+        _action_btn_gap = 12
+        self.summary_report_button.pack(side="left", padx=(0, _action_btn_gap))
+        self.build_master_button.pack(side="left", padx=(0, _action_btn_gap))
+        self.open_batch_button.pack(side="left", padx=(0, _action_btn_gap))
+        self.go_button.pack(side="left", padx=(0, 0))
 
         def _on_path_var_changed(*_args: object) -> None:
             self._refresh_action_buttons()
@@ -799,6 +845,16 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             self.go_button.configure(state="normal" if self._go_fields_valid() else "disabled")
             self.open_batch_button.configure(
                 state="normal" if self._open_batch_fields_valid() else "disabled"
+            )
+        if getattr(self, "build_master_button", None) is not None:
+            wd = (self.working_directory.get() or "").strip()
+            self.build_master_button.configure(
+                state="normal" if _working_directory_exists_as_dir(wd) else "disabled"
+            )
+        if getattr(self, "summary_report_button", None) is not None:
+            wd = (self.working_directory.get() or "").strip()
+            self.summary_report_button.configure(
+                state="normal" if _summary_report_inputs_ok(wd) else "disabled"
             )
         self._refresh_file_menu_save_state()
 
@@ -1260,6 +1316,79 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             f"(.prt/.asm/.drw in working directory).",
         )
         self._save_settings(task_filename)
+
+    def _on_build_master_xml(self) -> None:
+        wd = (self.working_directory.get() or "").strip()
+        if not wd:
+            messagebox.showwarning("Missing Working Directory", "Please enter a working directory.")
+            return
+        if not _working_directory_exists_as_dir(wd):
+            self._warn_if_working_directory_invalid()
+            return
+        working_dir = Path(wd).expanduser().resolve()
+        out_path = str(working_dir / "master.xml")
+        try:
+            written = merge_master_xml.build_master_xml(
+                working_directory=str(working_dir),
+                output_file=out_path,
+            )
+        except OSError as exc:
+            messagebox.showerror("Build Failed", f"Could not write master.xml.\n\n{exc}")
+            return
+        except Exception as exc:
+            messagebox.showerror("Build Failed", f"An error occurred while building master.xml.\n\n{exc}")
+            return
+        messagebox.showinfo(
+            "Build",
+            f"Scanned:\n{working_dir}\n\nWrote:\n{written}",
+        )
+
+    def _on_write_summary_report(self) -> None:
+        wd = (self.working_directory.get() or "").strip()
+        if not wd:
+            messagebox.showwarning("Missing Working Directory", "Please enter a working directory.")
+            return
+        if not _working_directory_exists_as_dir(wd):
+            self._warn_if_working_directory_invalid()
+            return
+        working_dir = Path(wd).expanduser().resolve()
+        master_xml = working_dir / "master.xml"
+        if not master_xml.is_file():
+            messagebox.showwarning(
+                "Missing master.xml",
+                "Run Build first to create master.xml in the working directory.",
+            )
+            return
+        bundle = _app_bundle_dir()
+        model_checks = bundle / "model_checks.xml"
+        template = bundle / "report_template.html"
+        if not model_checks.is_file():
+            messagebox.showerror(
+                "Missing model_checks.xml",
+                f"Expected next to the application:\n{model_checks}",
+            )
+            return
+        if not template.is_file():
+            messagebox.showerror(
+                "Missing report_template.html",
+                f"Expected next to the application:\n{template}",
+            )
+            return
+        try:
+            written = build_errors_warnings_report.build_errors_warnings_html(str(working_dir))
+        except FileNotFoundError as exc:
+            messagebox.showerror("Report Failed", str(exc))
+            return
+        except OSError as exc:
+            messagebox.showerror("Report Failed", f"Could not write report HTML.\n\n{exc}")
+            return
+        except Exception as exc:
+            messagebox.showerror("Report Failed", f"An error occurred while building the report.\n\n{exc}")
+            return
+        messagebox.showinfo(
+            "Report",
+            f"Wrote full report (with sidebar):\n{written}",
+        )
 
     def _launch_ptcdbatch(self) -> None:
         loadpoint_raw = (self.creo_loadpoint.get() or "").strip().rstrip("\\/")
