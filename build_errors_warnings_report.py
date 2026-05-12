@@ -1,7 +1,7 @@
 """
 Build an HTML errors/warnings report from master.xml and model_checks.xml.
 
-Uses ``report_template.html`` and ``model_checks.xml`` from the same folder as
+Uses ``report_template.html.j2`` and ``model_checks.xml`` from the same folder as
 this script (the project / app bundle). Only ``master.xml`` is read from the
 working directory you pass in.
 """
@@ -382,7 +382,7 @@ def create_html_report(
     summary_div = generate_summary_div(master_xml_path, model_checks_path)
 
     env = Environment(loader=FileSystemLoader(bundle_dir))
-    template = env.get_template("report_template.html")
+    template = env.get_template("report_template.html.j2")
 
     report_assets_dir = os.path.dirname(os.path.abspath(output_file))
     if not report_assets_dir:
@@ -474,7 +474,7 @@ def build_errors_warnings_html(
     """
     Build the full Model Quality Report HTML (sidebar, sections, embedded summary).
 
-    Uses ``model_checks.xml`` and ``report_template.html`` next to this module.
+    Uses ``model_checks.xml`` and ``report_template.html.j2`` next to this module.
     Reads ``master.xml`` from the given working folder (or a custom name via
     ``master_basename`` if relative).
 
@@ -489,7 +489,7 @@ def build_errors_warnings_html(
         else os.path.join(working_dir, master_basename)
     )
     model_checks_file = os.path.join(bundle_dir, "model_checks.xml")
-    template_path = os.path.join(bundle_dir, "report_template.html")
+    template_path = os.path.join(bundle_dir, "report_template.html.j2")
 
     if not os.path.isfile(master_xml_file):
         raise FileNotFoundError(f"master XML not found:\n{master_xml_file}")

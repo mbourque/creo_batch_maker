@@ -106,7 +106,7 @@ def _summary_report_inputs_ok(working_directory: str) -> bool:
     if not (wd / "master.xml").is_file():
         return False
     bundle = _app_bundle_dir()
-    return (bundle / "model_checks.xml").is_file() and (bundle / "report_template.html").is_file()
+    return (bundle / "model_checks.xml").is_file() and (bundle / "report_template.html.j2").is_file()
 
 
 class CreoDistributedBatchMakerApp(ctk.CTk):
@@ -1361,7 +1361,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return
         bundle = _app_bundle_dir()
         model_checks = bundle / "model_checks.xml"
-        template = bundle / "report_template.html"
+        template = bundle / "report_template.html.j2"
         if not model_checks.is_file():
             messagebox.showerror(
                 "Missing model_checks.xml",
@@ -1370,7 +1370,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return
         if not template.is_file():
             messagebox.showerror(
-                "Missing report_template.html",
+                "Missing report_template.html.j2",
                 f"Expected next to the application:\n{template}",
             )
             return
