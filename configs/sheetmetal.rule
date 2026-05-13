@@ -1,0 +1,36 @@
+# Rand Technologies RuleCHECK Rule File
+#           
+# Note:  The name of this file should be the same as the model
+#        type that the rules apply to with the suffix '.rule'
+#
+# Lines in this file which begin with '#' are considered 
+# comments.  The format of the rules in this file is:
+#
+# <Name>
+# <Type>          (Hard or Soft)
+# <Version>
+# <Description>
+# EndOfRule
+#
+# The 'EndOfRule' indicates the end of the description, and
+# description lines should be no more than 80 characters long
+#
+Flat_Patterns
+Soft    
+1.0
+All Sheet Metal models must have suppressed flat patterns in order
+to create drawings from.
+EndOfRule
+#
+Distance_Between_Holes
+Hard
+1.0
+The minumum distance between any two holes in a sheet metal part
+is 1/2".
+EndOfRule
+#
+EndOfRule
+#
+EndOfRule
+#
+EndOfRule

@@ -140,6 +140,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "Sheetmetal Thickness...",
         ]
         self._refresh_action_buttons_job: str | None = None
+        self._post_map_refresh_done = False
         self._settings_config_relative: dict[str, str] = {
             "Model Checks...": "default_checks.mch",
             "Config.pro...": "config.pro",
@@ -157,6 +158,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._build_menu_bar()
         # Load last saved app_settings.json after the window exists.
         self.after(0, self._load_settings)
+        # CTkButton.configure(state=...) can be invoked during _load_settings before
+        # the toplevel has been mapped, in which case the visual state does not
+        # repaint until the user interacts. Force one more refresh once the window
+        # is actually on screen so action buttons reflect the loaded settings.
+        self.bind("<Map>", self._on_first_window_map, add="+")
         self.protocol("WM_DELETE_WINDOW", self._on_exit)
 
     def _is_modelcheck_task(self, task_display: str) -> bool:
@@ -399,10 +405,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             command=self._on_write_summary_report,
         )
         _action_btn_gap = 12
-        self.summary_report_button.pack(side="left", padx=(0, _action_btn_gap))
-        self.build_master_button.pack(side="left", padx=(0, _action_btn_gap))
+        self.go_button.pack(side="left", padx=(0, _action_btn_gap))
         self.open_batch_button.pack(side="left", padx=(0, _action_btn_gap))
-        self.go_button.pack(side="left", padx=(0, 0))
+        self.build_master_button.pack(side="left", padx=(0, _action_btn_gap))
+        self.summary_report_button.pack(side="left", padx=(0, 0))
 
         def _on_path_var_changed(*_args: object) -> None:
             self._refresh_action_buttons()
@@ -834,6 +840,18 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 pass
         self._refresh_action_buttons_job = self.after(0, self._refresh_action_buttons_run)
 
+    def _on_first_window_map(self, _event: object = None) -> None:
+        """First time the window is actually shown, force one button-state refresh.
+
+        Without this, refreshes triggered during ``_load_settings`` can configure
+        CTkButton state before the toplevel is mapped, and the buttons keep the
+        disabled look until the user interacts (e.g., toggles the Task combobox).
+        """
+        if self._post_map_refresh_done:
+            return
+        self._post_map_refresh_done = True
+        self._refresh_action_buttons()
+
     def _refresh_action_buttons_run(self) -> None:
         self._refresh_action_buttons_job = None
         try:
@@ -848,9 +866,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             )
         if getattr(self, "build_master_button", None) is not None:
             wd = (self.working_directory.get() or "").strip()
-            self.build_master_button.configure(
-                state="normal" if _working_directory_exists_as_dir(wd) else "disabled"
+            build_ok = (
+                _working_directory_exists_as_dir(wd)
+                and self._working_directory_has_modelcheck_xml(wd)
             )
+            self.build_master_button.configure(state="normal" if build_ok else "disabled")
         if getattr(self, "summary_report_button", None) is not None:
             wd = (self.working_directory.get() or "").strip()
             self.summary_report_button.configure(
@@ -1039,6 +1059,22 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 return False
             for entry in d.iterdir():
                 if entry.is_file() and _CREO_MODEL_TOPLEVEL_RE.match(entry.name):
+                    return True
+            return False
+        except OSError:
+            return False
+
+    def _working_directory_has_modelcheck_xml(self, working_dir_str: str | None = None) -> bool:
+        """True if at least one ``*.p.xml`` / ``*.a.xml`` / ``*.d.xml`` exists (recursive, same scan as Build)."""
+        s = (working_dir_str if working_dir_str is not None else self.working_directory.get()).strip()
+        if not s:
+            return False
+        try:
+            d = Path(s).expanduser()
+            if not d.is_dir():
+                return False
+            for pattern in ("*.p.xml", "*.a.xml", "*.d.xml"):
+                if next(d.rglob(pattern), None) is not None:
                     return True
             return False
         except OSError:

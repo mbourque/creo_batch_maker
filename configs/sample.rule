@@ -1,0 +1,49 @@
+# Rand Technologies RuleCHECK Rule File
+#           
+# Note:  The name of this file should be the same as the model
+#        type that the rules apply to with the suffix '.rule'
+#
+# Lines in this file which begin with '#' are considered 
+# comments.  The format of the rules in this file is:
+#
+# <Name>
+# <Type>          (Hard or Soft)
+# <Version>
+# <Description>
+# EndOfRule
+#
+# The 'EndOfRule' indicates the end of the description, and
+# description lines should be no more than 80 characters long
+#
+SmallAnimals
+Soft    
+1.0
+Be kind to.
+EndOfRule
+#
+Driving
+Hard     
+v1
+In North America, drive on the right 
+side of the road.
+EndOfRule
+#
+Eggs        
+Hard    
+Oct-31-1997
+Do not put 
+all in one
+basket. 
+EndOfRule
+#
+OldDogs        
+Soft    
+1.1
+Do not teach new tricks.
+EndOfRule
+#
+Carrots        
+Hard    
+2.0.1
+Eat for good eyesight.
+EndOfRule
