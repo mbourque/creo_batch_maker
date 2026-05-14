@@ -314,14 +314,14 @@
             <div class="file-list {{ file.stat }}{{ (file.desc or '').replace(' ', '').replace(':', '\\:').replace('.', '\\.') }}" id="{{ file.file_list_id | escape }}">
                 {% if file.image_url %}
                     {% if file.model_href %}
-                <a class="model-thumb-wrap" href="{{ file.model_href | safe }}" onclick="alert('To open this file in Creo, Drag the image into a Creo window'); return false;">
+                <a class="model-thumb-wrap" href="{{ file.model_href | safe }}" onclick="void(0); return false;">
                     <img title="Drag this into Creo" src="{{ file.image_url | e }}" alt="" onerror="this.onerror=null;this.style.display='none';"/></a>
                     {% else %}
                 <span class="model-thumb-wrap" title="No file link: session-style model name (not used as a file URL).">
                     <img title="No file link for this model name" src="{{ file.image_url | e }}" alt="" onerror="this.onerror=null;this.style.display='none';"/></span>
                     {% endif %}
                 {% endif %}
-                <p>{% if file.model_href %}<a href="{{ file.model_href | safe }}" onclick="alert('To open this file in Creo, Drag the image into a Creo window'); return false;">{{ file.display_name | e }}</a>{% else %}<span class="model-name-plain">{{ file.display_name | e }}</span>{% endif %}&nbsp;
+                <p>{% if file.model_href %}<a href="{{ file.model_href | safe }}" onclick="void(0); return false;">{{ file.display_name | e }}</a>{% else %}<span class="model-name-plain">{{ file.display_name | e }}</span>{% endif %}&nbsp;
                     {% if file.more_info_link %}
                     <button type="button" onclick="openPopup(event, '{{ file.more_info_link | safe }}');">More details...</button>
                     {% else %}
