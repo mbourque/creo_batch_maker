@@ -320,26 +320,29 @@ def ensure_shared_placeholder_jpeg(assets_folder: str) -> str:
     return _SHARED_PLACEHOLDER_JPEG
 
 
-def thumbnail_src_for_report(report_assets_dir: str, working_dir: str, display_name: str) -> str | None:
+def thumbnail_src_for_report(report_assets_dir: str, working_dir: str, display_name: str) -> str:
     """
-    Return a value suitable for ``<img src="…">`` (relative to the report HTML), or
-    ``None`` to skip the thumbnail.
+    Return a value suitable for ``<img src="…">`` (relative to the report HTML).
 
     - Models with Creo session refs (``<<`` / ``>>``) use the shared placeholder (Windows-safe).
     - Other models use an existing ``.jpg`` next to the report or in ``working_dir`` if found.
+    - If no ``.jpg`` exists, use the same shared placeholder so the report always shows a thumb.
     """
     report_assets_dir = os.path.abspath(report_assets_dir)
     working_dir = os.path.normpath(os.path.abspath(working_dir))
 
-    if name_has_creo_path_ref(display_name):
+    def _placeholder_src() -> str:
         ensure_shared_placeholder_jpeg(report_assets_dir)
-        return "./" + _SHARED_PLACEHOLDER_JPEG
+        return "./" + quote(_SHARED_PLACEHOLDER_JPEG)
+
+    if name_has_creo_path_ref(display_name):
+        return _placeholder_src()
 
     jpg_base = os.path.basename(
         re.sub(r"\.(prt|asm|drw)$", ".jpg", display_name, flags=re.IGNORECASE)
     )
     if not jpg_base or not jpg_base.lower().endswith(".jpg"):
-        return None
+        return _placeholder_src()
 
     for folder in (report_assets_dir, working_dir):
         full = os.path.join(folder, jpg_base)
@@ -350,7 +353,7 @@ def thumbnail_src_for_report(report_assets_dir: str, working_dir: str, display_n
         rel = os.path.relpath(full, report_assets_dir).replace("\\", "/")
         return "./" + quote(rel, safe="/")
 
-    return None
+    return _placeholder_src()
 
 
 def _remove_legacy_hash_placeholders(assets_folder: str) -> None:
