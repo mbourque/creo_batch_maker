@@ -468,7 +468,6 @@ def build_errors_warnings_html(
     working_directory: str,
     *,
     master_basename: str = "master.xml",
-    scan_name: str | None = None,
     output_html: str | None = None,
 ) -> str:
     """
@@ -498,14 +497,12 @@ def build_errors_warnings_html(
     if not os.path.isfile(template_path):
         raise FileNotFoundError(f"report template not found:\n{template_path}")
 
-    sn = scan_name or os.path.basename(working_dir.rstrip(os.sep)) or "report"
-    sn = sn.replace(" ", "")
     if output_html:
         output_file = (
             output_html if os.path.isabs(output_html) else os.path.join(working_dir, output_html)
         )
     else:
-        output_file = os.path.join(working_dir, f"{sn}_errors_warnings_report.html")
+        output_file = os.path.join(working_dir, "index.html")
 
     files_info = read_master_xml(master_xml_file)
     descriptions = get_check_descriptions(model_checks_file)
@@ -555,16 +552,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Master XML file name or absolute path (default: master.xml in directory)",
     )
     parser.add_argument(
-        "--scan-name",
-        default=None,
-        help="Short name for default output file (default: directory name)",
-    )
-    parser.add_argument(
         "-o",
         "--output",
         default=None,
         metavar="FILE",
-        help="Output HTML path (default: <scan-name>_errors_warnings_report.html in directory)",
+        help="Output HTML path (default: index.html in directory)",
     )
     args = parser.parse_args(argv)
 
@@ -573,7 +565,6 @@ def main(argv: list[str] | None = None) -> int:
         build_errors_warnings_html(
             working_dir,
             master_basename=args.master,
-            scan_name=args.scan_name,
             output_html=args.output,
         )
     except FileNotFoundError as exc:

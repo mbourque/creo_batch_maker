@@ -48,7 +48,7 @@ def _app_bundle_dir() -> Path:
 
 
 def _default_app_settings_path() -> Path:
-    """Sibling ``app_settings.json`` next to the app (dev: script; frozen: executable)."""
+    """``app_settings.json`` next to the app: only used to persist current form fields for the next run."""
     return _app_bundle_dir() / "app_settings.json"
 
 
@@ -112,6 +112,7 @@ def _summary_report_inputs_ok(working_directory: str) -> bool:
 class CreoDistributedBatchMakerApp(ctk.CTk):
     def __init__(self) -> None:
         super().__init__()
+        self._install_dialog_parent()
 
         self.title("Creo Distributed Batch Maker")
         self.geometry("584x310")
@@ -124,6 +125,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         # and provide an easy place to swap in a real icon later.
         self._placeholder_image = Image.new("RGBA", (1, 1), (255, 255, 255, 0))
         self._settings_path = _default_app_settings_path()
+        # After Save As or Open: File → Save / Exit also update this path (same JSON as app_settings).
+        self._paired_settings_json_path: Path | None = None
         self._configs_dir = _app_bundle_dir() / "configs"
         self._settings_menu: tk.Menu | None = None
         self._menubar: tk.Menu | None = None
@@ -163,6 +166,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         # repaint until the user interacts. Force one more refresh once the window
         # is actually on screen so action buttons reflect the loaded settings.
         self.bind("<Map>", self._on_first_window_map, add="+")
+        # Re-evaluate GO / Open Batch / Build / Report when returning to this app
+        # (e.g. batch runner deleted chunk .dxc, or files changed in Explorer).
+        self.bind("<Activate>", self._on_app_activate, add="+")
         self.protocol("WM_DELETE_WINDOW", self._on_exit)
 
     def _is_modelcheck_task(self, task_display: str) -> bool:
@@ -597,6 +603,43 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return False, "Task cannot be empty. Set Creo loadpoint to list TTDs, or use File → New."
         return True, ""
 
+    def _validated_settings_payload(self) -> tuple[dict[str, str] | None, str]:
+        """Return ``(payload, \"\")`` when the form is savable, else ``(None, error)``."""
+        ok, err = self._settings_fields_ready()
+        if not ok:
+            return None, err
+        task_fn = self._task_filename_from_ui(self.task.get() or "").strip()
+        if not task_fn:
+            return None, "Task cannot be empty. Set Creo loadpoint to list TTDs, or use File → New."
+        return (
+            {
+                "working_directory": self.working_directory.get().strip(),
+                "creo_loadpoint": self.creo_loadpoint.get().strip(),
+                "task_filename": task_fn,
+            },
+            "",
+        )
+
+    def _write_paired_settings_json(self, payload: dict[str, str]) -> str | None:
+        """If Save As / Open set a paired path, write the same JSON there. Returns error text or None."""
+        paired = self._paired_settings_json_path
+        if paired is None:
+            return None
+        try:
+            p = paired.resolve()
+        except OSError:
+            self._paired_settings_json_path = None
+            return None
+        if p == _default_app_settings_path().resolve():
+            return None
+        try:
+            p.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        except OSError as exc:
+            return (
+                f"Wrote app_settings.json but could not update paired file:\n{p}\n\n{exc}"
+            )
+        return None
+
     def _warn_if_working_directory_invalid(self) -> None:
         wd = (self.working_directory.get() or "").strip()
         if not wd or _working_directory_exists_as_dir(wd):
@@ -634,6 +677,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
     def _on_exit(self) -> None:
         """Save settings when valid; warn if the form was partly filled but could not be saved."""
+        self._settings_path = _default_app_settings_path()
         ok, err = self._write_current_settings_to_disk()
         if not ok and (
             (self.working_directory.get() or "").strip()
@@ -645,17 +689,24 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
     def _on_file_menu_new(self) -> None:
         self._settings_path = _default_app_settings_path()
+        self._paired_settings_json_path = None
         self._set_working_directory_value("")
         self._set_creo_loadpoint_value("")
         self._refresh_task_options()
 
     def _write_current_settings_to_disk(self) -> tuple[bool, str]:
-        """Validate fields and write JSON to ``self._settings_path``. Returns (ok, error message)."""
-        ok, err = self._settings_fields_ready()
-        if not ok:
+        """If valid, persist current form to ``app_settings.json`` and paired JSON (if any)."""
+        self._settings_path = _default_app_settings_path()
+        payload, err = self._validated_settings_payload()
+        if payload is None:
             return False, err
-        task_filename = self._task_filename_from_ui(self.task.get() or "")
-        self._save_settings(task_filename)
+        try:
+            self._settings_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        except OSError as exc:
+            return False, f"Could not write app_settings.json:\n{self._settings_path.resolve()}\n\n{exc}"
+        err2 = self._write_paired_settings_json(payload)
+        if err2:
+            return False, err2
         return True, ""
 
     def _on_file_menu_save(self) -> None:
@@ -663,17 +714,25 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if not ok:
             messagebox.showwarning("Save", err)
             return
-        messagebox.showinfo("Save", f"Settings saved to:\n{self._settings_path.resolve()}")
+        msg = f"Settings saved to:\n{self._settings_path.resolve()}"
+        paired = self._paired_settings_json_path
+        if paired is not None:
+            try:
+                if paired.resolve() != self._settings_path.resolve():
+                    msg += f"\n\nAlso updated:\n{paired.resolve()}"
+            except OSError:
+                pass
+        messagebox.showinfo("Save", msg)
 
     def _on_file_menu_save_as(self) -> None:
-        ok, err = self._settings_fields_ready()
-        if not ok:
+        payload, err = self._validated_settings_payload()
+        if payload is None:
             messagebox.showwarning("Save As", err)
             return
         initial_dir = str(self._settings_path.parent)
         if not Path(initial_dir).is_dir():
             initial_dir = str(_app_bundle_dir())
-        initial_file = self._settings_path.name
+        initial_file = "settings_export.json"
         path = fd.asksaveasfilename(
             title="Save settings as (JSON)",
             initialdir=initial_dir,
@@ -686,19 +745,29 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         p = Path(path).resolve()
         if p.suffix.lower() != ".json":
             p = p.with_suffix(".json")
-        self._settings_path = p
-        ok2, err2 = self._write_current_settings_to_disk()
-        if not ok2:
+        payload2, err2 = self._validated_settings_payload()
+        if payload2 is None:
             messagebox.showwarning("Save As", err2)
             return
-        messagebox.showinfo("Save As", f"Settings saved to:\n{self._settings_path.resolve()}")
+        try:
+            p.write_text(json.dumps(payload2, indent=2), encoding="utf-8")
+        except OSError as exc:
+            messagebox.showerror("Save As", f"Could not write:\n{p}\n\n{exc}")
+            return
+        self._paired_settings_json_path = p.resolve()
+        messagebox.showinfo(
+            "Save As",
+            f"Exported settings to:\n{p}\n\n"
+            "File → Save and Exit will update this file and app_settings.json.",
+        )
 
     def _on_file_menu_open(self) -> None:
+        """Load fields from a chosen JSON file; File → Save / Exit keep that file in sync too."""
         initial_dir = str(self._settings_path.parent)
         if not Path(initial_dir).is_dir():
             initial_dir = str(_app_bundle_dir())
         path = fd.askopenfilename(
-            title="Open settings (JSON)",
+            title="Load settings from JSON",
             initialdir=initial_dir,
             filetypes=[("JSON settings", "*.json"), ("All files", "*.*")],
         )
@@ -718,7 +787,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if not isinstance(data, dict):
             messagebox.showerror("Open", "Settings file must contain a JSON object at the top level.")
             return
-        self._settings_path = p
+        self._settings_path = _default_app_settings_path()
+        self._paired_settings_json_path = p.resolve()
         self._apply_settings_data(data)
         # Success case is intentionally quiet; errors are still shown.
 
@@ -852,6 +922,34 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._post_map_refresh_done = True
         self._refresh_action_buttons()
 
+    def _on_app_activate(self, _event: object = None) -> None:
+        """Refresh action buttons when this window becomes active (alt-tab back, dialog closed)."""
+        self._refresh_action_buttons()
+
+    def _install_dialog_parent(self) -> None:
+        """Make ``tkinter.messagebox`` / ``tkinter.filedialog`` calls default to
+        ``parent=self`` so dialogs center on the main window instead of the screen.
+        Existing explicit ``parent=`` arguments are still honored.
+        """
+        def _ensure_parent(orig_fn):
+            def wrapped(*args, **kwargs):
+                kwargs.setdefault("parent", self)
+                return orig_fn(*args, **kwargs)
+            return wrapped
+
+        for module, names in (
+            (messagebox, (
+                "showinfo", "showwarning", "showerror",
+                "askyesno", "askokcancel", "askyesnocancel",
+                "askquestion", "askretrycancel",
+            )),
+            (fd, ("askdirectory", "askopenfilename", "asksaveasfilename")),
+        ):
+            for name in names:
+                fn = getattr(module, name, None)
+                if fn is not None:
+                    setattr(module, name, _ensure_parent(fn))
+
     def _refresh_action_buttons_run(self) -> None:
         self._refresh_action_buttons_job = None
         try:
@@ -955,17 +1053,13 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._refresh_action_buttons()
 
     def _load_settings(self) -> None:
-        """Load working directory, Creo loadpoint, and task from self._settings_path (JSON)."""
+        """On startup, restore form from ``app_settings.json`` (create empty file if missing)."""
+        self._settings_path = _default_app_settings_path()
         if not self._settings_path.exists():
-            # Create default app_settings.json next to the app when missing (empty fields).
-            if self._settings_path.resolve() == _default_app_settings_path().resolve():
-                empty = {"working_directory": "", "creo_loadpoint": "", "task_filename": ""}
-                try:
-                    self._settings_path.write_text(json.dumps(empty, indent=2), encoding="utf-8")
-                except OSError:
-                    self._refresh_task_options()
-                    return
-            else:
+            empty = {"working_directory": "", "creo_loadpoint": "", "task_filename": ""}
+            try:
+                self._settings_path.write_text(json.dumps(empty, indent=2), encoding="utf-8")
+            except OSError:
                 self._refresh_task_options()
                 return
 
@@ -982,6 +1076,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._apply_settings_data(data)
 
     def _save_settings(self, task_filename: str) -> None:
+        """Persist current form to ``app_settings.json`` (called after a successful GO)."""
+        self._settings_path = _default_app_settings_path()
         ok, _ = self._settings_fields_ready()
         if not ok:
             return
@@ -1352,6 +1448,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             f"(.prt/.asm/.drw in working directory).",
         )
         self._save_settings(task_filename)
+        # Open Batch depends on chunk .dxc files on disk; no StringVar changes here.
+        self._refresh_action_buttons()
 
     def _on_build_master_xml(self) -> None:
         wd = (self.working_directory.get() or "").strip()
@@ -1378,6 +1476,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "Build",
             f"Scanned:\n{working_dir}\n\nWrote:\n{written}",
         )
+        # Report depends on master.xml on disk; no StringVar changes here.
+        self._refresh_action_buttons()
 
     def _on_write_summary_report(self) -> None:
         wd = (self.working_directory.get() or "").strip()
@@ -1421,10 +1521,18 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         except Exception as exc:
             messagebox.showerror("Report Failed", f"An error occurred while building the report.\n\n{exc}")
             return
-        messagebox.showinfo(
+        if messagebox.askyesno(
             "Report",
-            f"Wrote full report (with sidebar):\n{written}",
-        )
+            f"Wrote full report (with sidebar):\n{written}\n\nOpen in browser?",
+        ):
+            try:
+                webbrowser.open(Path(written).as_uri())
+            except OSError as exc:
+                messagebox.showerror(
+                    "Open Failed",
+                    f"Could not open report in browser.\n\n{exc}",
+                )
+        self._refresh_action_buttons()
 
     def _launch_ptcdbatch(self) -> None:
         loadpoint_raw = (self.creo_loadpoint.get() or "").strip().rstrip("\\/")
