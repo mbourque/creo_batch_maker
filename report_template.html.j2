@@ -5,17 +5,48 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Model Quality Report</title>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 5px; }
-        .container { margin-left: 395px; max-width: calc(100% - 435px); background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
-        .sidebar { position: fixed; top: 5px; left: 5px; width: 365px; padding: 10px; background: #f8f8f8; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); height: 100%; overflow-y: auto; }
+        body {
+            font-family: "Segoe UI", Arial, sans-serif;
+            color: #1a1a1a;
+            background-color: #e8eaed;
+            margin: 0;
+            padding: 5px;
+        }
+        .container {
+            margin-left: 395px;
+            max-width: calc(100% - 435px);
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            color: #1a1a1a;
+            font-size: 0.95rem;
+        }
+        .container > h1 { font-size: 1.75rem; }
+        .sidebar {
+            position: fixed;
+            top: 5px;
+            left: 5px;
+            width: 365px;
+            padding: 10px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            height: 100%;
+            overflow-y: auto;
+            color: #1a1a1a;
+        }
         .sidebar a { display: block; padding: 5px 0; color: #007BFF; text-decoration: none; }
         .sidebar a:hover { text-decoration: underline; }
         .sidebar ul { list-style-type: none; padding-left: 0; padding-bottom: 20px }
-        h1 {color: #333; }
+        .sidebar ul li.sidebar-nav-active {
+            background-color: #e8ecf1;
+            border-radius: 4px;
+        }
+        h1 { color: #0f172a; font-weight: 700; }
         .check-section-wrapper { margin-bottom: 20px; border: 1px solid #007BFF; border-radius: 8px; padding: 10px; display: flow-root; }
         .check-section { margin-bottom: 20px; border-top: 1px solid #ccc; }
-        .check-section h2 { color: #007BFF; margin: 0; cursor: pointer; display: inline-block; vertical-align: top; }
-        /* Row shell: border on wrapper + flow-root so floats cannot hide the divider. */
+        .check-section h2 { color: #0f172a; margin: 0; cursor: pointer; display: inline-block; vertical-align: top; font-weight: 700; font-size: 1.25rem; }
         .check-section > .file-row {
             display: flow-root;
             padding: 10px 0;
@@ -31,7 +62,7 @@
         .check-buttons { text-align: right; margin-bottom: 10px; display: flex; justify-content: flex-end; gap: 10px; }
         .file-list .check-buttons { clear: both; }
         .check-header { display: flex; justify-content: space-between; align-items: flex-start; }
-        .check-title { flex-grow: 1; }
+        .check-title { flex-grow: 1; color: #1a1a1a; }
         .summary { background-color: #f0f8ff; padding: 10px; border-radius: 8px; margin-bottom: 20px; }
         .bold-text { font-weight: bold; }
         .why img { max-width: 100%; }
@@ -48,55 +79,23 @@
             cursor: pointer;
             border-radius: 4px;
         }
-        .flagged {
-            background-color: #ffcccc;
-        }
-        .file-row:has(.file-list.flagged) > .file-list.flagged {
-            background-color: transparent;
-        }
-        .file-row:has(.file-list.flagged) {
-            background-color: #ffcccc;
-        }
-        .hidden {
-            display: none;
-        }
-        .flag-button {
-            background-color: red;
-            color: white;
-        }
-        .dimmed-button {
-            background-color: #ccc; /* Light gray color */
-            color: #666; /* Darker gray for the text */
-        }
-        .model-thumb-wrap {
-            float: left;
-            padding: 10px;
-            margin-right: 8px;
-            box-sizing: border-box;
-        }
-        .model-thumb-wrap img {
-            display: block;
-            width: 300px;
-            height: auto;
-        }
-        .model-name-plain { color: #333; font-weight: normal; }
-        /* Print styles */
+        .container .button { font-size: inherit; }
+        .flagged { background-color: #ffcccc; }
+        .file-row:has(.file-list.flagged) > .file-list.flagged { background-color: transparent; }
+        .file-row:has(.file-list.flagged) { background-color: #ffcccc; }
+        .hidden { display: none; }
+        .flag-button { background-color: red; color: white; }
+        .dimmed-button { background-color: #e2e8f0; color: #475569; }
+        .model-thumb-wrap { float: left; padding: 10px; margin-right: 8px; box-sizing: border-box; }
+        .model-thumb-wrap img { display: block; width: 300px; height: auto; }
+        .model-name-plain { color: #1a1a1a; font-weight: normal; }
         @media print {
-            .sidebar, .hide-button, .check-buttons, .print-button, .button {
-                display: none;
-            }
-            body {
-                margin: 0;
-            }
-            .container {
-                margin: 0;
-                max-width: none;
-                box-shadow: none;
-            }
+            .sidebar, .hide-button, .check-buttons, .print-button, .button { display: none; }
+            body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: #1a1a1a; }
+            .container { margin: 0; max-width: none; box-shadow: none; font-size: 0.95rem; }
         }
     </style>
     <script defer>
-        // Array to keep track of hidden section IDs
         let hiddenSections = [];
 
         function openPopup(event, url) {
@@ -106,7 +105,6 @@
             const height = 750;
             const left = x - (width / 2);
             const top = y - (height / 2);
-
             window.open(url, '_named', `width=${width},height=${height},left=${left},top=${top}`);
         }
 
@@ -120,16 +118,13 @@
             var checkSections = document.getElementsByClassName('check-section-wrapper');
             var flaggedButton = document.getElementById('flagged-button');
             var showOnlyFlagged = flaggedButton.classList.toggle('active');
-
             flaggedButton.classList.toggle('flag-button');
-
             for (var i = 0; i < allFiles.length; i++) {
                 if (!hiddenSections.includes(allFiles[i].id)) {
                     var row = fileRowFor(allFiles[i]) || allFiles[i];
                     row.style.display = showOnlyFlagged ? 'none' : '';
                 }
             }
-
             if (showOnlyFlagged) {
                 for (var i = 0; i < flaggedFiles.length; i++) {
                     if (!hiddenSections.includes(flaggedFiles[i].id)) {
@@ -138,16 +133,13 @@
                     }
                 }
             }
-
             for (var i = 0; i < checkSections.length; i++) {
                 var section = checkSections[i];
                 var hasVisibleFlagged = section.getElementsByClassName('flagged').length > 0;
                 var sectionId = section.id;
-
                 if (!hiddenSections.includes(sectionId)) {
                     section.style.display = (showOnlyFlagged && !hasVisibleFlagged) ? 'none' : '';
                 }
-
                 var sidebarItem = document.querySelector('.sidebar .' + sectionId);
                 if (sidebarItem && !hiddenSections.includes(sectionId)) {
                     sidebarItem.style.display = (showOnlyFlagged && !hasVisibleFlagged) ? 'none' : '';
@@ -157,16 +149,10 @@
 
         function toggleFlag(id) {
             var element = document.getElementById(id);
-            if (!element) {
-                return;
-            }
+            if (!element) { return; }
             var flagButton = element.querySelector('.flag-button');
-
             element.classList.toggle('flagged');
-
-            if (flagButton) {
-                flagButton.classList.toggle('dimmed-button');
-            }
+            if (flagButton) { flagButton.classList.toggle('dimmed-button'); }
         }
 
         function escapeCssSelector(selector) {
@@ -178,31 +164,27 @@
             if (element) {
                 var toRemove = fileRowFor(element) || element;
                 toRemove.parentNode.removeChild(toRemove);
-                // Hide the corresponding sidebar item
                 var escapedId = escapeCssSelector(id);
                 var sidebarItem = document.querySelector('.sidebar .' + escapedId);
-                if (sidebarItem) {
-                    sidebarItem.parentNode.removeChild(sidebarItem); // Remove sidebar item from DOM
-                }
-                hiddenSections = hiddenSections.filter(sec => sec !== id); // Remove element from hidden sections
+                if (sidebarItem) { sidebarItem.parentNode.removeChild(sidebarItem); }
+                hiddenSections = hiddenSections.filter(sec => sec !== id);
             }
-            removeEmptyCheckSections(); // Check if any check sections are now empty and need to be removed
+            removeEmptyCheckSections();
         }
 
         function hideElementsByClass(className) {
             var escapedClass = escapeCssSelector(className);
             var elements = document.getElementsByClassName(escapedClass);
-            for (var i = elements.length - 1; i >= 0; i--) { // Iterate in reverse order
+            for (var i = elements.length - 1; i >= 0; i--) {
                 var el = elements[i];
                 var toRemove = fileRowFor(el) || el;
                 toRemove.parentNode.removeChild(toRemove);
             }
-            // Hide the corresponding sidebar items by class
             var sidebarItems = document.querySelectorAll('.sidebar .' + escapedClass);
             sidebarItems.forEach(function(sidebarItem) {
-                sidebarItem.parentNode.removeChild(sidebarItem); // Remove sidebar item from DOM
+                sidebarItem.parentNode.removeChild(sidebarItem);
             });
-            removeEmptyCheckSections(); // Check if any check sections are now empty and need to be removed
+            removeEmptyCheckSections();
         }
 
         function removeEmptyCheckSections() {
@@ -213,17 +195,14 @@
                 var fileLists = checkSection.getElementsByClassName('file-list');
                 var allHidden = true;
                 for (var j = 0; j < fileLists.length; j++) {
-                    if (fileLists[j].parentNode) {
-                        allHidden = false;
-                        break;
-                    }
+                    if (fileLists[j].parentNode) { allHidden = false; break; }
                 }
                 if (allHidden) {
                     var sidebarItems = document.querySelectorAll('.sidebar .' + checkSectionWrapper.id);
                     sidebarItems.forEach(function (sidebarItem) {
                         sidebarItem.parentNode.removeChild(sidebarItem);
                     });
-                    hiddenSections.push(checkSectionWrapper.id); // Add section ID to hiddenSections array
+                    hiddenSections.push(checkSectionWrapper.id);
                     checkSectionWrapper.parentNode.removeChild(checkSectionWrapper);
                     i--;
                 }
@@ -234,7 +213,7 @@
             var wrapper = document.getElementById(id);
             if (wrapper) {
                 wrapper.parentNode.removeChild(wrapper);
-                hiddenSections.push(id); // Add section ID to hiddenSections array
+                hiddenSections.push(id);
             }
             var sidebarItems = document.querySelectorAll('.sidebar .' + id);
             sidebarItems.forEach(function (sidebarItem) {
@@ -242,13 +221,54 @@
             });
         }
 
-        function openCreoView(filePath) {
-            window.location.href = 'launchcreoview://' + filePath;
-        }
+        function printReport() { window.print(); }
 
-        function printReport() {
-            window.print();
-        }
+        (function () {
+            function clearSidebarNavActive() {
+                var nodes = document.querySelectorAll('.sidebar ul li.sidebar-nav-active');
+                for (var i = 0; i < nodes.length; i++) {
+                    nodes[i].classList.remove('sidebar-nav-active');
+                }
+            }
+            function setActiveOnLink(a) {
+                if (!a) { return; }
+                var li = a.closest ? a.closest('li') : null;
+                if (!li && a.parentNode && a.parentNode.tagName === 'LI') { li = a.parentNode; }
+                if (li) { li.classList.add('sidebar-nav-active'); }
+            }
+            function setActiveSidebarNavFromHash() {
+                clearSidebarNavActive();
+                var hash = (window.location.hash || '').trim();
+                if (!hash || hash.length < 2) { return; }
+                var sb = document.querySelector('.sidebar');
+                if (!sb) { return; }
+                var links = sb.querySelectorAll('ul a[href^="#"]');
+                var link = null;
+                for (var j = 0; j < links.length; j++) {
+                    if (links[j].getAttribute('href') === hash) { link = links[j]; break; }
+                }
+                setActiveOnLink(link);
+            }
+            function initSidebarNavHighlight() {
+                var sb = document.querySelector('.sidebar');
+                if (!sb) { return; }
+                sb.addEventListener('click', function (ev) {
+                    var a = ev.target.closest ? ev.target.closest('a') : null;
+                    if (!a) { return; }
+                    var href = a.getAttribute('href') || '';
+                    if (href.charAt(0) !== '#') { return; }
+                    clearSidebarNavActive();
+                    setActiveOnLink(a);
+                });
+                window.addEventListener('hashchange', setActiveSidebarNavFromHash);
+                setActiveSidebarNavFromHash();
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initSidebarNavHighlight);
+            } else {
+                initSidebarNavHighlight();
+            }
+        })();
     </script>
 </head>
 <body>
@@ -272,7 +292,6 @@
         <div id="summary-section">
             {{ summary_div }}
         </div>
-
     </div>
 
     {% for section in check_sections %}
