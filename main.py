@@ -33,8 +33,10 @@ _CREO_MODEL_TOPLEVEL_RE = re.compile(r".*\.(prt|asm|drw)(\.\d+)?$", re.IGNORECAS
 CREO_BATCH_BASE = "creo-batch"
 # GO writes this driver next to the chunk .dxc files in the working directory.
 CREO_BATCH_RUNNER_BASENAME = "creo-batch-run.ps1"
-# Generated runner: max wait per phase for xtop.exe (appear / exit), in seconds.
-XTOP_RUNNER_PHASE_TIMEOUT_SEC = 300
+# Generated runner: max time to wait for the expected output files of one chunk, in seconds.
+BATCH_OUTPUT_WAIT_TIMEOUT_SEC = 120
+# After all expected outputs for a chunk appear, settle this many seconds before running kill.bat.
+BATCH_OUTPUT_SETTLE_SEC = 5
 # When no Creo loadpoint / no .ttd list yet, File → New uses this default task (filename + UI label).
 DEFAULT_MODELCHECK_TTD = "modelcheck.ttd"
 DEFAULT_MODELCHECK_DISPLAY = "ModelCHECK"
@@ -142,6 +144,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "Inch Settings...",
             "Metric Settings...",
             "Sheetmetal Thickness...",
+            "Open settings...",
         ]
         self._refresh_action_buttons_job: str | None = None
         self._post_map_refresh_done = False
@@ -571,10 +574,17 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 else:
                     self._menubar.add_cascade(label="Settings", menu=self._settings_menu)
             for option in self._settings_options:
-                self._settings_menu.add_command(
-                    label=option,
-                    command=lambda o=option: self._on_settings_config_item(o),
-                )
+                if option == "Open settings...":
+                    self._settings_menu.add_separator()
+                    self._settings_menu.add_command(
+                        label=option,
+                        command=self._on_open_settings_folder,
+                    )
+                else:
+                    self._settings_menu.add_command(
+                        label=option,
+                        command=lambda o=option: self._on_settings_config_item(o),
+                    )
         else:
             if settings_idx is not None:
                 self._menubar.delete(settings_idx)
@@ -802,6 +812,23 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if not notepad.is_file():
             notepad = Path(system_root) / "notepad.exe"
         subprocess.Popen([str(notepad), str(target)], close_fds=True)
+
+    def _on_open_settings_folder(self) -> None:
+        """Open the bundled configs folder in File Explorer for manual edits."""
+        target = self._configs_dir.resolve()
+        if not target.is_dir():
+            messagebox.showerror(
+                "Folder not found",
+                f"Expected configs folder next to the app:\n{target}",
+            )
+            return
+        try:
+            os.startfile(str(target))
+        except OSError as exc:
+            messagebox.showerror(
+                "Open failed",
+                f"Could not open in File Explorer:\n{target}\n\n{exc}",
+            )
 
     def _on_settings_config_item(self, option: str) -> None:
         rel = self._settings_config_relative.get(option)
@@ -1217,6 +1244,31 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         s = str(path.resolve())
         return "'" + s.replace("'", "''") + "'"
 
+    @staticmethod
+    def _ps_single_quoted_str(value: str) -> str:
+        """Single-quoted PowerShell string literal for arbitrary text."""
+        return "'" + (value or "").replace("'", "''") + "'"
+
+    @staticmethod
+    def _expected_output_basename(model_path: Path, *, is_modelcheck: bool) -> str | None:
+        """Map a model filename to the basename produced in the working dir.
+
+        ModelCHECK: ``foo.prt`` / ``foo.prt.3`` → ``foo.p.xml``; .asm → .a.xml; .drw → .d.xml.
+        JPEG (raster write): any of the above → ``foo.jpg``.
+        Returns ``None`` if the name does not match ``*.{prt,asm,drw}[.N]``.
+        """
+        name = model_path.name
+        m_ver = re.match(r"^(.*)\.(\d+)$", name)
+        if m_ver:
+            name = m_ver.group(1)
+        m_ext = re.match(r"^(.*)\.(prt|asm|drw)$", name, flags=re.IGNORECASE)
+        if not m_ext:
+            return None
+        stem, ext_lower = m_ext.group(1), m_ext.group(2).lower()
+        if is_modelcheck:
+            return f"{stem}.{ext_lower[0]}.xml"
+        return f"{stem}.jpg"
+
     @classmethod
     def _build_chunk_runner_ps1(
         cls,
@@ -1224,13 +1276,25 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         working_dir: Path,
         kill_bat: Path,
         num_chunks: int,
+        expected_outputs_per_chunk: list[list[str]],
     ) -> str:
-        """PowerShell: each chunk runs ptcdbatch -nographics -process, waits on xtop.exe, runs kill.bat; then removes chunk .dxc files in the working directory."""
+        """PowerShell: per chunk, skip if outputs already exist; else launch ptcdbatch, poll for expected output files, settle, then run kill.bat. Cleans up chunk .dxc files at the end."""
         ptc = cls._ps_single_quoted_literal(ptcdbatch_bat)
         wd = cls._ps_single_quoted_literal(working_dir)
         kb = cls._ps_single_quoted_literal(kill_bat)
         n = int(num_chunks)
         base = CREO_BATCH_BASE.replace("'", "''")
+
+        expected_table_lines: list[str] = ["$ExpectedByChunk = @{"]
+        for idx in range(1, n + 1):
+            names = expected_outputs_per_chunk[idx - 1] if idx - 1 < len(expected_outputs_per_chunk) else []
+            if names:
+                joined = ", ".join(cls._ps_single_quoted_str(name) for name in names)
+                expected_table_lines.append(f"    {idx} = @({joined})")
+            else:
+                expected_table_lines.append(f"    {idx} = @()")
+        expected_table_lines.append("}")
+
         lines = [
             "$ErrorActionPreference = 'Continue'",
             f"$PtcDbatch = {ptc}",
@@ -1238,6 +1302,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             f"$KillBat = {kb}",
             f"$NumChunks = {n}",
             f"$ChunkBase = '{base}'",
+            f"$OutputTimeoutSec = {BATCH_OUTPUT_WAIT_TIMEOUT_SEC}",
+            f"$OutputSettleSec = {BATCH_OUTPUT_SETTLE_SEC}",
+            "",
+            *expected_table_lines,
             "",
             "function Write-ChLog {",
             "    param([string]$Message)",
@@ -1245,10 +1313,22 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             '    Write-Host "[$ts] $Message"',
             "}",
             "",
-            r'Write-ChLog "Runner starting. $NumChunks chunk(s). Close other Creo sessions if xtop waits misbehave."',
+            "function Get-MissingOutputs {",
+            "    param([string]$Dir, [string[]]$Names)",
+            "    $missing = @()",
+            "    foreach ($n in $Names) {",
+            "        if (-not $n) { continue }",
+            "        $p = Join-Path -Path $Dir -ChildPath $n",
+            "        if (-not (Test-Path -LiteralPath $p)) { $missing += $n }",
+            "    }",
+            "    return ,$missing",
+            "}",
+            "",
+            r'Write-ChLog "Runner starting. $NumChunks chunk(s). Skips chunks whose outputs already exist; otherwise polls for expected output files."',
             r'Write-ChLog "ptcdbatch: $PtcDbatch"',
             r'Write-ChLog "Working directory: $WorkDir"',
             r'Write-ChLog "kill.bat: $KillBat"',
+            r'Write-ChLog ("Output wait timeout: " + $OutputTimeoutSec + " s; settle: " + $OutputSettleSec + " s")',
             "",
             "for ($chunk = 1; $chunk -le $NumChunks; $chunk++) {",
             r'    Write-ChLog "---------- Chunk $chunk / $NumChunks ----------"',
@@ -1258,6 +1338,18 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             r'        Write-ChLog "ERROR: DXC file missing. Skipping this chunk."',
             "        continue",
             "    }",
+            "",
+            "    $expected = @($ExpectedByChunk[$chunk])",
+            "    if ($expected.Count -eq 0) {",
+            r'        Write-ChLog "SKIP: no expected output files were configured for this chunk; nothing to do."',
+            "        continue",
+            "    }",
+            "    $missing = Get-MissingOutputs -Dir $WorkDir -Names $expected",
+            "    if ($missing.Count -eq 0) {",
+            r'        Write-ChLog ("SKIP: all " + $expected.Count + " expected output file(s) already exist for chunk " + $chunk + ".")',
+            "        continue",
+            "    }",
+            r'    Write-ChLog ("Pre-check: " + $missing.Count + " of " + $expected.Count + " output file(s) missing; will run dbatch.")',
             "",
             "    $batParent = [System.IO.Path]::GetDirectoryName($PtcDbatch)",
             r'    Write-ChLog "Launching ptcdbatch (hidden window): -nographics -process $dxc"',
@@ -1270,52 +1362,36 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "        continue",
             "    }",
             "",
-            r'    Write-ChLog "WAITING: for xtop.exe to appear (poll every 1s)."',
+            r'    Write-ChLog "WAITING: for expected output file(s) to appear (poll every 2s; timer resets each time a file appears)."',
             "    $waitStart = Get-Date",
-            "    $xtopAtStart = $null",
+            "    $lastMissingCount = $expected.Count",
+            "    $timedOut = $false",
             "    while ($true) {",
-            "        $xtopAtStart = @(Get-Process -Name 'xtop' -ErrorAction SilentlyContinue)",
-            "        if ($xtopAtStart.Count -gt 0) { break }",
+            "        $missing = Get-MissingOutputs -Dir $WorkDir -Names $expected",
+            "        if ($missing.Count -eq 0) { break }",
+            "        if ($missing.Count -lt $lastMissingCount) {",
+            "            $delta = $lastMissingCount - $missing.Count",
+            r'            Write-ChLog ("PROGRESS: " + $delta + " new output file(s) detected; resetting inactivity timer. " + $missing.Count + " of " + $expected.Count + " remaining.")',
+            "            $waitStart = Get-Date",
+            "            $lastMissingCount = $missing.Count",
+            "        }",
             "        $elapsed = [int][math]::Floor(((Get-Date) - $waitStart).TotalSeconds)",
-            f"        if ($elapsed -ge {XTOP_RUNNER_PHASE_TIMEOUT_SEC}) {{",
-            r'            Write-ChLog "TIMEOUT: 5 min waiting for xtop.exe to start; continuing to kill step."',
+            "        if ($elapsed -ge $OutputTimeoutSec) {",
+            r'            Write-ChLog ("TIMEOUT: no new output file(s) for " + $elapsed + "s; " + $missing.Count + " of " + $expected.Count + " still missing. First missing: " + $missing[0] + ".")',
+            "            $timedOut = $true",
             "            break",
             "        }",
-            "        if ($elapsed -le 2 -or ($elapsed % 15 -eq 0)) {",
-            r'            Write-ChLog "WAITING: xtop.exe not in process list yet (${elapsed}s elapsed)."',
-            "        }",
-            "        Start-Sleep -Seconds 1",
-            "    }",
-            "    if ($xtopAtStart -and $xtopAtStart.Count -gt 0) {",
-            "        $ids = ($xtopAtStart | ForEach-Object { $_.Id }) -join ', '",
-            r'        Write-ChLog "FOUND: xtop.exe is running (PID(s): $ids)."',
-            "    } else {",
-            r'        Write-ChLog "WARNING: xtop.exe never appeared before timeout (or exited instantly)."',
-            "    }",
-            "",
-            r'    Write-ChLog "WAITING: for xtop.exe to exit (poll every 2s)."',
-            "    $waitEnd = Get-Date",
-            "    while ($true) {",
-            "        $xtopRunning = @(Get-Process -Name 'xtop' -ErrorAction SilentlyContinue)",
-            "        if ($xtopRunning.Count -eq 0) { break }",
-            "        $elapsed = [int][math]::Floor(((Get-Date) - $waitEnd).TotalSeconds)",
-            f"        if ($elapsed -ge {XTOP_RUNNER_PHASE_TIMEOUT_SEC}) {{",
-            r'            Write-ChLog "TIMEOUT: 5 min waiting for xtop.exe to exit; stopping exit-wait loop."',
-            "            break",
-            "        }",
-            "        if ($elapsed -le 4 -or ($elapsed % 20 -eq 0)) {",
-            "            $ids = ($xtopRunning | ForEach-Object { $_.Id }) -join ', '",
-            r'            Write-ChLog "WAITING: xtop.exe still running (PID(s): $ids), ${elapsed}s since exit-wait started."',
+            "        if ($elapsed -le 4 -or ($elapsed % 30 -eq 0)) {",
+            r'            Write-ChLog ("WAITING: " + $missing.Count + " of " + $expected.Count + " output file(s) missing (" + $elapsed + "s with no progress). First missing: " + $missing[0] + ".")',
             "        }",
             "        Start-Sleep -Seconds 2",
             "    }",
-            "    $xtopAfter = @(Get-Process -Name 'xtop' -ErrorAction SilentlyContinue)",
-            "    if ($xtopAfter.Count -eq 0) {",
-            r'        Write-ChLog "CLOSED: xtop.exe is no longer in the process list."',
-            "    } else {",
-            "        $ids = ($xtopAfter | ForEach-Object { $_.Id }) -join ', '",
-            r'        Write-ChLog "WARNING: xtop.exe still present (PID(s): $ids); exit wait may have timed out."',
+            "    if (-not $timedOut) {",
+            r'        Write-ChLog ("DONE: all " + $expected.Count + " expected output file(s) present.")',
             "    }",
+            "",
+            r'    Write-ChLog ("Settling " + $OutputSettleSec + "s before kill.bat...")',
+            "    Start-Sleep -Seconds $OutputSettleSec",
             "",
             "    $killParent = [System.IO.Path]::GetDirectoryName($KillBat)",
             r'    Write-ChLog "Running kill.bat (wait)..."',
@@ -1431,7 +1507,21 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 chunk_path.write_text(file_content, encoding="utf-8")
 
             num_chunks = len(model_chunks)
-            runner_text = self._build_chunk_runner_ps1(ptcdbatch_bat, working_dir, kill_bat, num_chunks)
+            expected_outputs_per_chunk: list[list[str]] = []
+            for chunk in model_chunks:
+                names: list[str] = []
+                for p in chunk:
+                    out = self._expected_output_basename(p, is_modelcheck=use_modelcheck_config)
+                    if out:
+                        names.append(out)
+                expected_outputs_per_chunk.append(names)
+            runner_text = self._build_chunk_runner_ps1(
+                ptcdbatch_bat,
+                working_dir,
+                kill_bat,
+                num_chunks,
+                expected_outputs_per_chunk,
+            )
             runner_ps1_path.write_text(runner_text, encoding="utf-8-sig")
         except OSError as exc:
             messagebox.showerror(
@@ -1445,7 +1535,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             f"Created {num_chunks} chunk file(s): {CREO_BATCH_BASE}-1.dxc … "
             f"{CREO_BATCH_BASE}-{num_chunks}.dxc\n"
             f"Runner: {runner_ps1_path}\n\n"
-            f"Use Open Batch to run {CREO_BATCH_RUNNER_BASENAME} in PowerShell (logs each step; xtop.exe waits; kill.bat per chunk).\n"
+            f"Use Open Batch to run {CREO_BATCH_RUNNER_BASENAME} in PowerShell (skips chunks whose outputs exist; otherwise polls for output files, then kill.bat).\n"
             f"Wrote {len(config_files)} config file(s) and {len(latest_files)} model object(s) "
             f"(.prt/.asm/.drw in working directory).",
         )
