@@ -6,14 +6,15 @@ Windows desktop utility for building Creo distributed batch (`.dxc`) files from 
 
 - GUI for working directory, Creo loadpoint, and task (paths are set with Browse… only).
 - Reads task labels from `modelcheck.ttd` and `solid-raster_write_jpg.ttd` under your loadpoint’s `Common Files\text\ttds` (not every `.ttd` on disk).
-- GO clears any prior `creo-batch-*.dxc` / `creo-batch-run.ps1` in the working folder, then writes chunk `.dxc` files (models per chunk is set in **Settings → Chunk size…**, default 10, non-recursive scan) plus `creo-batch-run.ps1`.
-- Open Batch opens that script in PowerShell; the script runs `ptcdbatch.bat -nographics -process` per chunk, polls for expected output files, runs `kill.bat`, then deletes the chunk `.dxc` files when finished.
+- GO clears any prior `creo-batch-*.dxc` / `creo-batch-run.ps1` in the working folder, then writes chunk `.dxc` files (models per chunk: **Settings → Chunk size…**, default 10, non-recursive scan) plus `creo-batch-run.ps1`.
+- Open Batch opens that script in PowerShell; the script runs `ptcdbatch.bat -nographics -process` per chunk, polls for expected output files (inactivity timeout: **Settings → Timeout…**, default **120** seconds), runs `kill.bat`, then deletes the chunk `.dxc` files when finished.
+- **Build** merges per-model check XML into `master.xml`; **Report** writes an HTML model quality report (sidebar lists failing checks A–Z by check name).
 
 ## Requirements
 
 - Windows
 - A Creo loadpoint that contains `Parametric` (so `Parametric\bin\ptcdbatch.bat` exists) and the usual `Common Files\text\ttds` content
-- In the same folder as the app you run (`main.exe` or `main.py`): `kill.bat` (needed for GO and for the PowerShell runner after each chunk). For ModelCHECK jobs, a `configs` folder there with the modelcheck files you want referenced in the `.dxc`.
+- In the same folder as the app you run (`main.exe` or `main.py`): `kill.bat`, `model_checks.xml`, and `report_template.html.j2` (for **Report**). For ModelCHECK jobs, a `configs` folder with the modelcheck files you want referenced in the `.dxc`.
 
 ## No Python needed
 
@@ -21,7 +22,7 @@ Windows desktop utility for building Creo distributed batch (`.dxc`) files from 
 .\main.exe
 ```
 
-The packaged build is typically `dist\main.exe`. Copy `main.exe` together with `kill.bat` (and `configs` if you use ModelCHECK) into the folder you run from; see Requirements above.
+The packaged build is `main.exe` in the project folder (`pyinstaller main.spec`). Copy `main.exe` together with the sidecar files above (and `configs\` if you use ModelCHECK) into the folder you run from.
 
 Launch options:
 
@@ -42,13 +43,14 @@ Usage:
 
 ### Settings
 
-Always visible.
+Always visible. Values are stored in `app_settings.json` (also written on successful **GO** and **File → Save**).
 
-- **Chunk size…** — how many models go in each `creo-batch-N.dxc` chunk (**1–10**, default **10**). Saved in `app_settings.json` as `chunk_size`. Run **GO** again after changing chunk size so chunk files are rebuilt.
+- **Chunk size…** — models per `creo-batch-N.dxc` chunk (**1–10**, default **10**). JSON key: `chunk_size`. Run **GO** again after changing.
+- **Timeout…** — seconds to wait for chunk output files with no new file appearing (**whole number ≥ 1**, default **120**). JSON key: `output_timeout_sec`. Run **GO** again after changing.
 
 ### Configuration
 
-Shown only when the selected task is **ModelCHECK** (hidden for JPEG/raster tasks). This menu used to be named **Settings**; it was renamed to **Configuration** so **Settings** could hold app-wide options like chunk size.
+Shown only when the selected task is **ModelCHECK** (hidden for JPEG/raster tasks). This menu used to be named **Settings**; it was renamed to **Configuration** so **Settings** could hold app-wide options (chunk size, timeout, etc.).
 
 Opens bundled ModelCHECK files from the app’s `configs\` folder in Notepad:
 
