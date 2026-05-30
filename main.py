@@ -31,6 +31,8 @@ _CREO_MODEL_TOPLEVEL_RE = re.compile(r".*\.(prt|asm|drw)(\.\d+)?$", re.IGNORECAS
 
 # Chunk .dxc files: working_dir / f"{CREO_BATCH_BASE}-1.dxc", "-2.dxc", ...
 CREO_BATCH_BASE = "creo-batch"
+# Models per chunk in each .dxc (default 10). Set to 1 to process one model per batch step when testing.
+CREO_BATCH_CHUNK_SIZE = 10
 # GO writes this driver next to the chunk .dxc files in the working directory.
 CREO_BATCH_RUNNER_BASENAME = "creo-batch-run.ps1"
 # Generated runner: max time to wait for the expected output files of one chunk, in seconds.
@@ -43,8 +45,8 @@ DEFAULT_MODELCHECK_DISPLAY = "ModelCHECK"
 
 
 def _app_bundle_dir() -> Path:
-    """Folder beside ``main.py`` (dev) or beside ``.exe`` (PyInstaller); not ``_MEIPASS``."""
-    if getattr(sys, "frozen", False):
+    """Sidecar files live beside main.exe (dev: beside main.py), not under PyInstaller _MEI temp."""
+    if getattr(sys, "frozen", False) or getattr(sys, "_MEIPASS", None):
         return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent
 
@@ -1277,13 +1279,20 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         kill_bat: Path,
         num_chunks: int,
         expected_outputs_per_chunk: list[list[str]],
+        output_to_model_per_chunk: list[dict[str, str]],
+        task_kind: str,
     ) -> str:
-        """PowerShell: per chunk, skip if outputs already exist; else launch ptcdbatch, poll for expected output files, settle, then run kill.bat. Cleans up chunk .dxc files at the end."""
+        """PowerShell: per chunk, skip if outputs already exist; else launch ptcdbatch, poll for expected output files, settle, then run kill.bat.
+
+        If any outputs time out, write one per-run timeout summary file in ``working_dir``
+        listing timed-out model names only. Cleans up chunk .dxc files at the end.
+        """
         ptc = cls._ps_single_quoted_literal(ptcdbatch_bat)
         wd = cls._ps_single_quoted_literal(working_dir)
         kb = cls._ps_single_quoted_literal(kill_bat)
         n = int(num_chunks)
         base = CREO_BATCH_BASE.replace("'", "''")
+        task_kind_ps = cls._ps_single_quoted_str(task_kind)
 
         expected_table_lines: list[str] = ["$ExpectedByChunk = @{"]
         for idx in range(1, n + 1):
@@ -1294,18 +1303,33 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             else:
                 expected_table_lines.append(f"    {idx} = @()")
         expected_table_lines.append("}")
+        model_map_lines: list[str] = ["$ModelByOutputByChunk = @{"]
+        for idx in range(1, n + 1):
+            out_map = output_to_model_per_chunk[idx - 1] if idx - 1 < len(output_to_model_per_chunk) else {}
+            if out_map:
+                pairs = "; ".join(
+                    f"{cls._ps_single_quoted_str(out)} = {cls._ps_single_quoted_str(model)}"
+                    for out, model in out_map.items()
+                )
+                model_map_lines.append(f"    {idx} = @{{ {pairs} }}")
+            else:
+                model_map_lines.append(f"    {idx} = @{{}}")
+        model_map_lines.append("}")
 
         lines = [
             "$ErrorActionPreference = 'Continue'",
             f"$PtcDbatch = {ptc}",
             f"$WorkDir = {wd}",
             f"$KillBat = {kb}",
+            f"$TaskKind = {task_kind_ps}",
             f"$NumChunks = {n}",
             f"$ChunkBase = '{base}'",
             f"$OutputTimeoutSec = {BATCH_OUTPUT_WAIT_TIMEOUT_SEC}",
             f"$OutputSettleSec = {BATCH_OUTPUT_SETTLE_SEC}",
             "",
             *expected_table_lines,
+            "",
+            *model_map_lines,
             "",
             "function Write-ChLog {",
             "    param([string]$Message)",
@@ -1322,6 +1346,38 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "        if (-not (Test-Path -LiteralPath $p)) { $missing += $n }",
             "    }",
             "    return ,$missing",
+            "}",
+            "",
+            "$TimedOutModels = @{}",
+            "$TimeoutLogInitialized = $false",
+            "$runStamp = Get-Date -Format 'yyyyMMdd-HHmmss'",
+            "$TimeoutLog = Join-Path -Path $WorkDir -ChildPath ('creo-batch-timeouts-' + $TaskKind + '-' + $runStamp + '.txt')",
+            "",
+            "function Record-TimedOutChunk {",
+            "    param([int]$Chunk, [string[]]$MissingOutputs)",
+            "    if ($MissingOutputs.Count -eq 0) { return }",
+            "    if (-not $TimeoutLogInitialized) {",
+            "        $header = @(",
+            "            ('Task: ' + $TaskKind),",
+            "            ('Started: ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')),",
+            "            ('Log file: ' + $TimeoutLog),",
+            "            '',",
+            "            'Models timed out:'",
+            "        )",
+            "        Set-Content -LiteralPath $TimeoutLog -Value $header -Encoding UTF8",
+            "        $script:TimeoutLogInitialized = $true",
+            r'        Write-ChLog ("TIMEOUT LOG: writing timed-out models to " + $TimeoutLog)',
+            "    }",
+            "    foreach ($mOut in $MissingOutputs) {",
+            "        $mName = $null",
+            "        if ($ModelByOutputByChunk.ContainsKey($Chunk)) {",
+            "            $mName = $ModelByOutputByChunk[$Chunk][$mOut]",
+            "        }",
+            "        if (-not $mName) { $mName = $mOut }",
+            "        if ($TimedOutModels.ContainsKey($mName)) { continue }",
+            "        $TimedOutModels[$mName] = $true",
+            "        Add-Content -LiteralPath $TimeoutLog -Value $mName -Encoding UTF8",
+            "    }",
             "}",
             "",
             r'Write-ChLog "Runner starting. $NumChunks chunk(s). Skips chunks whose outputs already exist; otherwise polls for expected output files."',
@@ -1364,7 +1420,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "",
             r'    Write-ChLog "WAITING: for expected output file(s) to appear (poll every 2s; timer resets each time a file appears)."',
             "    $waitStart = Get-Date",
-            "    $lastMissingCount = $expected.Count",
+            "    $missing = Get-MissingOutputs -Dir $WorkDir -Names $expected",
+            "    $lastMissingCount = $missing.Count",
             "    $timedOut = $false",
             "    while ($true) {",
             "        $missing = Get-MissingOutputs -Dir $WorkDir -Names $expected",
@@ -1378,6 +1435,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "        $elapsed = [int][math]::Floor(((Get-Date) - $waitStart).TotalSeconds)",
             "        if ($elapsed -ge $OutputTimeoutSec) {",
             r'            Write-ChLog ("TIMEOUT: no new output file(s) for " + $elapsed + "s; " + $missing.Count + " of " + $expected.Count + " still missing. First missing: " + $missing[0] + ".")',
+            "            Record-TimedOutChunk -Chunk $chunk -MissingOutputs $missing",
             "            $timedOut = $true",
             "            break",
             "        }",
@@ -1402,6 +1460,12 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "    } catch {",
             r'        Write-ChLog ("ERROR: kill.bat failed: " + $_.Exception.Message)',
             "    }",
+            "}",
+            "",
+            "if ($TimedOutModels.Count -gt 0) {",
+            "    Write-ChLog ('TIMEOUT LOG: ' + $TimedOutModels.Count + ' model(s) recorded in ' + $TimeoutLog)",
+            "} else {",
+            r'    Write-ChLog "TIMEOUT LOG: no models timed out."',
             "}",
             "",
             r'Write-ChLog "Runner finished all chunks."',
@@ -1485,7 +1549,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             config_files = (
                 self._scan_files_recursive(self._configs_dir) if use_modelcheck_config else []
             )
-            model_chunks = self._chunk_paths(latest_files, 10)
+            model_chunks = self._chunk_paths(latest_files, CREO_BATCH_CHUNK_SIZE)
             if not model_chunks:
                 model_chunks = [[]]
 
@@ -1508,19 +1572,25 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
             num_chunks = len(model_chunks)
             expected_outputs_per_chunk: list[list[str]] = []
+            output_to_model_per_chunk: list[dict[str, str]] = []
             for chunk in model_chunks:
                 names: list[str] = []
+                out_to_model: dict[str, str] = {}
                 for p in chunk:
                     out = self._expected_output_basename(p, is_modelcheck=use_modelcheck_config)
                     if out:
                         names.append(out)
+                        out_to_model[out] = p.name
                 expected_outputs_per_chunk.append(names)
+                output_to_model_per_chunk.append(out_to_model)
             runner_text = self._build_chunk_runner_ps1(
                 ptcdbatch_bat,
                 working_dir,
                 kill_bat,
                 num_chunks,
                 expected_outputs_per_chunk,
+                output_to_model_per_chunk,
+                "modelcheck" if use_modelcheck_config else "jpeg",
             )
             runner_ps1_path.write_text(runner_text, encoding="utf-8-sig")
         except OSError as exc:
@@ -1537,7 +1607,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             f"Runner: {runner_ps1_path}\n\n"
             f"Use Open Batch to run {CREO_BATCH_RUNNER_BASENAME} in PowerShell (skips chunks whose outputs exist; otherwise polls for output files, then kill.bat).\n"
             f"Wrote {len(config_files)} config file(s) and {len(latest_files)} model object(s) "
-            f"(.prt/.asm/.drw in working directory).",
+            f"({CREO_BATCH_CHUNK_SIZE} per chunk; .prt/.asm/.drw in working directory).",
         )
         self._save_settings(task_filename)
         # Open Batch depends on chunk .dxc files on disk; no StringVar changes here.
@@ -1593,13 +1663,17 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if not model_checks.is_file():
             messagebox.showerror(
                 "Missing model_checks.xml",
-                f"Expected next to the application:\n{model_checks}",
+                f"Place model_checks.xml in the same folder as the application executable:\n\n"
+                f"  {_app_bundle_dir() / 'model_checks.xml'}\n\n"
+                f"Executable:\n  {Path(sys.executable).resolve()}",
             )
             return
         if not template.is_file():
             messagebox.showerror(
                 "Missing report_template.html.j2",
-                f"Expected next to the application:\n{template}",
+                f"Place report_template.html.j2 in the same folder as the application executable:\n\n"
+                f"  {_app_bundle_dir() / 'report_template.html.j2'}\n\n"
+                f"Executable:\n  {Path(sys.executable).resolve()}",
             )
             return
         try:

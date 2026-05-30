@@ -23,6 +23,13 @@ from PIL import Image, ImageDraw
 from make_html_summary import generate_summary_div
 
 
+def _app_bundle_dir() -> str:
+    """Sidecar files live beside main.exe (dev: beside this .py), not under PyInstaller _MEI temp."""
+    if getattr(sys, "frozen", False) or getattr(sys, "_MEIPASS", None):
+        return os.path.dirname(os.path.abspath(sys.executable))
+    return os.path.dirname(os.path.abspath(__file__))
+
+
 def _direct_child_ans(check_el: ET.Element) -> ET.Element | None:
     for child in check_el:
         if child.tag == "ans":
@@ -483,7 +490,7 @@ def build_errors_warnings_html(
     Returns the path to the written HTML file. Raises ``FileNotFoundError`` if
     a required file is missing.
     """
-    bundle_dir = os.path.dirname(os.path.abspath(__file__))
+    bundle_dir = _app_bundle_dir()
     working_dir = os.path.normpath(os.path.abspath(working_directory))
     master_xml_file = (
         master_basename
