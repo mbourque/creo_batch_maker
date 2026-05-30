@@ -454,7 +454,7 @@ def create_html_report(
             }
         )
 
-    check_sections.sort(key=lambda x: x["category"])
+    check_sections.sort(key=lambda x: x["name"].casefold())
 
     rendered_html = template.render(
         check_sections=check_sections,
