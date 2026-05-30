@@ -38,7 +38,8 @@ CREO_BATCH_CHUNK_SIZE_MAX = 10
 # GO writes this driver next to the chunk .dxc files in the working directory.
 CREO_BATCH_RUNNER_BASENAME = "creo-batch-run.ps1"
 # Generated runner: max time to wait for the expected output files of one chunk, in seconds.
-BATCH_OUTPUT_WAIT_TIMEOUT_SEC = 120
+BATCH_OUTPUT_WAIT_TIMEOUT_DEFAULT = 120
+BATCH_OUTPUT_WAIT_TIMEOUT_MIN = 1
 # After all expected outputs for a chunk appear, settle this many seconds before running kill.bat.
 BATCH_OUTPUT_SETTLE_SEC = 5
 # When no Creo loadpoint / no .ttd list yet, File → New uses this default task (filename + UI label).
@@ -64,6 +65,16 @@ def _normalize_chunk_size(value: object) -> int:
     except (TypeError, ValueError):
         return CREO_BATCH_CHUNK_SIZE_DEFAULT
     return max(CREO_BATCH_CHUNK_SIZE_MIN, min(CREO_BATCH_CHUNK_SIZE_MAX, n))
+
+
+def _normalize_output_timeout_sec(value: object) -> int:
+    try:
+        n = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return BATCH_OUTPUT_WAIT_TIMEOUT_DEFAULT
+    if n < BATCH_OUTPUT_WAIT_TIMEOUT_MIN:
+        return BATCH_OUTPUT_WAIT_TIMEOUT_DEFAULT
+    return n
 
 
 def _xml_attr_escape(value: str) -> str:
@@ -143,6 +154,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._paired_settings_json_path: Path | None = None
         self._configs_dir = _app_bundle_dir() / "configs"
         self._chunk_size = CREO_BATCH_CHUNK_SIZE_DEFAULT
+        self._output_timeout_sec = BATCH_OUTPUT_WAIT_TIMEOUT_DEFAULT
         self._configuration_menu: tk.Menu | None = None
         self._menubar: tk.Menu | None = None
         self._settings_options = [
@@ -537,6 +549,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             label="Chunk size...",
             command=self._on_chunk_size_settings,
         )
+        general_settings_menu.add_command(
+            label="Timeout...",
+            command=self._on_timeout_settings,
+        )
         menubar.add_cascade(label="Settings", menu=general_settings_menu)
 
         self._configuration_menu = tk.Menu(menubar, tearoff=0)
@@ -651,6 +667,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 "creo_loadpoint": self.creo_loadpoint.get().strip(),
                 "task_filename": task_fn,
                 "chunk_size": self._chunk_size,
+                "output_timeout_sec": self._output_timeout_sec,
             },
             "",
         )
@@ -919,6 +936,70 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         dialog.bind("<Escape>", lambda _e: close_dialog())
         dialog.protocol("WM_DELETE_WINDOW", close_dialog)
 
+    def _persist_output_timeout_sec(self, timeout_sec: int) -> str | None:
+        self._output_timeout_sec = _normalize_output_timeout_sec(timeout_sec)
+        data = self._read_app_settings_dict()
+        data["output_timeout_sec"] = self._output_timeout_sec
+        return self._write_app_settings_dict(data)
+
+    def _on_timeout_settings(self) -> None:
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Timeout")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+
+        ctk.CTkLabel(
+            dialog,
+            text=f"Output wait timeout in seconds (minimum {BATCH_OUTPUT_WAIT_TIMEOUT_MIN}):",
+        ).pack(anchor="w", padx=16, pady=(16, 8))
+
+        value_var = tk.StringVar(value=str(self._output_timeout_sec))
+        entry = ctk.CTkEntry(dialog, textvariable=value_var, width=80)
+        entry.pack(anchor="w", padx=16, pady=(0, 12))
+        entry.focus_set()
+        entry.select_range(0, "end")
+
+        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_row.pack(anchor="e", padx=16, pady=(0, 16))
+
+        def close_dialog() -> None:
+            try:
+                dialog.grab_release()
+            except tk.TclError:
+                pass
+            dialog.destroy()
+
+        def on_ok() -> None:
+            raw = value_var.get().strip()
+            if not raw.isdigit():
+                messagebox.showwarning(
+                    "Timeout",
+                    f"Enter a whole number of seconds (minimum {BATCH_OUTPUT_WAIT_TIMEOUT_MIN}).",
+                    parent=dialog,
+                )
+                return
+            n = int(raw)
+            if n < BATCH_OUTPUT_WAIT_TIMEOUT_MIN:
+                messagebox.showwarning(
+                    "Timeout",
+                    f"Enter a whole number of seconds (minimum {BATCH_OUTPUT_WAIT_TIMEOUT_MIN}).",
+                    parent=dialog,
+                )
+                return
+            err = self._persist_output_timeout_sec(n)
+            if err:
+                messagebox.showerror("Timeout", err, parent=dialog)
+                return
+            close_dialog()
+
+        ctk.CTkButton(btn_row, text="Cancel", width=80, command=close_dialog).pack(side="right", padx=(8, 0))
+        ctk.CTkButton(btn_row, text="OK", width=80, command=on_ok).pack(side="right")
+
+        dialog.bind("<Return>", lambda _e: on_ok())
+        dialog.bind("<Escape>", lambda _e: close_dialog())
+        dialog.protocol("WM_DELETE_WINDOW", close_dialog)
+
     def _on_open_settings_folder(self) -> None:
         """Open the bundled configs folder in File Explorer for manual edits."""
         target = self._configs_dir.resolve()
@@ -1173,6 +1254,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._chunk_size = _normalize_chunk_size(
             data.get("chunk_size", CREO_BATCH_CHUNK_SIZE_DEFAULT)
         )
+        self._output_timeout_sec = _normalize_output_timeout_sec(
+            data.get("output_timeout_sec", BATCH_OUTPUT_WAIT_TIMEOUT_DEFAULT)
+        )
         self._set_working_directory_value(str(data.get("working_directory") or ""))
         self._warn_if_working_directory_invalid()
         self._warn_if_working_directory_has_no_creo_models()
@@ -1199,6 +1283,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 "creo_loadpoint": "",
                 "task_filename": "",
                 "chunk_size": CREO_BATCH_CHUNK_SIZE_DEFAULT,
+                "output_timeout_sec": BATCH_OUTPUT_WAIT_TIMEOUT_DEFAULT,
             }
             try:
                 self._settings_path.write_text(json.dumps(empty, indent=2), encoding="utf-8")
@@ -1234,6 +1319,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "creo_loadpoint": creo_loadpoint,
             "task_filename": task_fn,
             "chunk_size": self._chunk_size,
+            "output_timeout_sec": self._output_timeout_sec,
         }
         try:
             self._settings_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -1394,6 +1480,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         expected_outputs_per_chunk: list[list[str]],
         output_to_model_per_chunk: list[dict[str, str]],
         task_kind: str,
+        output_timeout_sec: int,
     ) -> str:
         """PowerShell: per chunk, skip if outputs already exist; else launch ptcdbatch, poll for expected output files, settle, then run kill.bat.
 
@@ -1437,7 +1524,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             f"$TaskKind = {task_kind_ps}",
             f"$NumChunks = {n}",
             f"$ChunkBase = '{base}'",
-            f"$OutputTimeoutSec = {BATCH_OUTPUT_WAIT_TIMEOUT_SEC}",
+            f"$OutputTimeoutSec = {int(output_timeout_sec)}",
             f"$OutputSettleSec = {BATCH_OUTPUT_SETTLE_SEC}",
             "",
             *expected_table_lines,
@@ -1704,6 +1791,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 expected_outputs_per_chunk,
                 output_to_model_per_chunk,
                 "modelcheck" if use_modelcheck_config else "jpeg",
+                self._output_timeout_sec,
             )
             runner_ps1_path.write_text(runner_text, encoding="utf-8-sig")
         except OSError as exc:
