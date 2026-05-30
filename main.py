@@ -31,8 +31,10 @@ _CREO_MODEL_TOPLEVEL_RE = re.compile(r".*\.(prt|asm|drw)(\.\d+)?$", re.IGNORECAS
 
 # Chunk .dxc files: working_dir / f"{CREO_BATCH_BASE}-1.dxc", "-2.dxc", ...
 CREO_BATCH_BASE = "creo-batch"
-# Models per chunk in each .dxc (default 10). Set to 1 to process one model per batch step when testing.
-CREO_BATCH_CHUNK_SIZE = 10
+# Models per chunk in each .dxc (default 10). User can change via Settings → Chunk size...
+CREO_BATCH_CHUNK_SIZE_DEFAULT = 10
+CREO_BATCH_CHUNK_SIZE_MIN = 1
+CREO_BATCH_CHUNK_SIZE_MAX = 10
 # GO writes this driver next to the chunk .dxc files in the working directory.
 CREO_BATCH_RUNNER_BASENAME = "creo-batch-run.ps1"
 # Generated runner: max time to wait for the expected output files of one chunk, in seconds.
@@ -54,6 +56,14 @@ def _app_bundle_dir() -> Path:
 def _default_app_settings_path() -> Path:
     """``app_settings.json`` next to the app: only used to persist current form fields for the next run."""
     return _app_bundle_dir() / "app_settings.json"
+
+
+def _normalize_chunk_size(value: object) -> int:
+    try:
+        n = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return CREO_BATCH_CHUNK_SIZE_DEFAULT
+    return max(CREO_BATCH_CHUNK_SIZE_MIN, min(CREO_BATCH_CHUNK_SIZE_MAX, n))
 
 
 def _xml_attr_escape(value: str) -> str:
@@ -132,7 +142,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         # After Save As or Open: File → Save / Exit also update this path (same JSON as app_settings).
         self._paired_settings_json_path: Path | None = None
         self._configs_dir = _app_bundle_dir() / "configs"
-        self._settings_menu: tk.Menu | None = None
+        self._chunk_size = CREO_BATCH_CHUNK_SIZE_DEFAULT
+        self._configuration_menu: tk.Menu | None = None
         self._menubar: tk.Menu | None = None
         self._settings_options = [
             "Model Checks...",
@@ -146,7 +157,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "Inch Settings...",
             "Metric Settings...",
             "Sheetmetal Thickness...",
-            "Open settings...",
+            "Open configurations...",
         ]
         self._refresh_action_buttons_job: str | None = None
         self._post_map_refresh_done = False
@@ -356,7 +367,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self.task_select.pack(fill="x", expand=True)
 
         def _on_task_selected(_e=None):
-            self._refresh_settings_menu()
+            self._refresh_configuration_menu()
             self._refresh_action_buttons()
 
         self.task_select.bind("<<ComboboxSelected>>", _on_task_selected)
@@ -521,7 +532,14 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         file_menu.add_command(label="Exit", command=self._on_exit)
         menubar.add_cascade(label="File", menu=file_menu)
 
-        self._settings_menu = tk.Menu(menubar, tearoff=0)
+        general_settings_menu = tk.Menu(menubar, tearoff=0)
+        general_settings_menu.add_command(
+            label="Chunk size...",
+            command=self._on_chunk_size_settings,
+        )
+        menubar.add_cascade(label="Settings", menu=general_settings_menu)
+
+        self._configuration_menu = tk.Menu(menubar, tearoff=0)
 
         help_menu = tk.Menu(menubar, tearoff=0)
         help_menu.add_command(label="Documentation...", command=self._open_documentation)
@@ -529,7 +547,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         menubar.add_cascade(label="Help", menu=help_menu)
 
         self.configure(menu=menubar)
-        self._refresh_settings_menu()
+        self._refresh_configuration_menu()
         self._refresh_file_menu_save_state()
 
     def _refresh_file_menu_save_state(self) -> None:
@@ -561,29 +579,31 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 continue
         return None
 
-    def _refresh_settings_menu(self) -> None:
-        if self._settings_menu is None or self._menubar is None:
+    def _refresh_configuration_menu(self) -> None:
+        if self._configuration_menu is None or self._menubar is None:
             return
-        self._settings_menu.delete(0, "end")
+        self._configuration_menu.delete(0, "end")
         is_mc = self._is_modelcheck_task(self.task.get() or "")
-        settings_idx = self._menubar_cascade_index(self._menubar, "Settings")
+        settings_idx = self._menubar_cascade_index(self._menubar, "Configuration")
 
         if is_mc:
             if settings_idx is None:
                 help_idx = self._menubar_cascade_index(self._menubar, "Help")
                 if help_idx is not None:
-                    self._menubar.insert_cascade(help_idx, label="Settings", menu=self._settings_menu)
+                    self._menubar.insert_cascade(
+                        help_idx, label="Configuration", menu=self._configuration_menu
+                    )
                 else:
-                    self._menubar.add_cascade(label="Settings", menu=self._settings_menu)
+                    self._menubar.add_cascade(label="Configuration", menu=self._configuration_menu)
             for option in self._settings_options:
-                if option == "Open settings...":
-                    self._settings_menu.add_separator()
-                    self._settings_menu.add_command(
+                if option == "Open configurations...":
+                    self._configuration_menu.add_separator()
+                    self._configuration_menu.add_command(
                         label=option,
                         command=self._on_open_settings_folder,
                     )
                 else:
-                    self._settings_menu.add_command(
+                    self._configuration_menu.add_command(
                         label=option,
                         command=lambda o=option: self._on_settings_config_item(o),
                     )
@@ -630,6 +650,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 "working_directory": self.working_directory.get().strip(),
                 "creo_loadpoint": self.creo_loadpoint.get().strip(),
                 "task_filename": task_fn,
+                "chunk_size": self._chunk_size,
             },
             "",
         )
@@ -814,6 +835,89 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if not notepad.is_file():
             notepad = Path(system_root) / "notepad.exe"
         subprocess.Popen([str(notepad), str(target)], close_fds=True)
+
+    def _read_app_settings_dict(self) -> dict[str, object]:
+        path = _default_app_settings_path()
+        if not path.is_file():
+            return {}
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    def _write_app_settings_dict(self, data: dict[str, object]) -> str | None:
+        path = _default_app_settings_path()
+        try:
+            path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        except OSError as exc:
+            return f"Could not write app_settings.json:\n{path.resolve()}\n\n{exc}"
+        return None
+
+    def _persist_chunk_size(self, chunk_size: int) -> str | None:
+        self._chunk_size = _normalize_chunk_size(chunk_size)
+        data = self._read_app_settings_dict()
+        data["chunk_size"] = self._chunk_size
+        return self._write_app_settings_dict(data)
+
+    def _on_chunk_size_settings(self) -> None:
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Chunk size")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+
+        ctk.CTkLabel(
+            dialog,
+            text=f"Models per batch chunk ({CREO_BATCH_CHUNK_SIZE_MIN}–{CREO_BATCH_CHUNK_SIZE_MAX}):",
+        ).pack(anchor="w", padx=16, pady=(16, 8))
+
+        value_var = tk.StringVar(value=str(self._chunk_size))
+        entry = ctk.CTkEntry(dialog, textvariable=value_var, width=80)
+        entry.pack(anchor="w", padx=16, pady=(0, 12))
+        entry.focus_set()
+        entry.select_range(0, "end")
+
+        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_row.pack(anchor="e", padx=16, pady=(0, 16))
+
+        def close_dialog() -> None:
+            try:
+                dialog.grab_release()
+            except tk.TclError:
+                pass
+            dialog.destroy()
+
+        def on_ok() -> None:
+            raw = value_var.get().strip()
+            try:
+                n = int(raw)
+            except ValueError:
+                messagebox.showwarning(
+                    "Chunk size",
+                    f"Enter a whole number from {CREO_BATCH_CHUNK_SIZE_MIN} to {CREO_BATCH_CHUNK_SIZE_MAX}.",
+                    parent=dialog,
+                )
+                return
+            if n < CREO_BATCH_CHUNK_SIZE_MIN or n > CREO_BATCH_CHUNK_SIZE_MAX:
+                messagebox.showwarning(
+                    "Chunk size",
+                    f"Enter a whole number from {CREO_BATCH_CHUNK_SIZE_MIN} to {CREO_BATCH_CHUNK_SIZE_MAX}.",
+                    parent=dialog,
+                )
+                return
+            err = self._persist_chunk_size(n)
+            if err:
+                messagebox.showerror("Chunk size", err, parent=dialog)
+                return
+            close_dialog()
+
+        ctk.CTkButton(btn_row, text="Cancel", width=80, command=close_dialog).pack(side="right", padx=(8, 0))
+        ctk.CTkButton(btn_row, text="OK", width=80, command=on_ok).pack(side="right")
+
+        dialog.bind("<Return>", lambda _e: on_ok())
+        dialog.bind("<Escape>", lambda _e: close_dialog())
+        dialog.protocol("WM_DELETE_WINDOW", close_dialog)
 
     def _on_open_settings_folder(self) -> None:
         """Open the bundled configs folder in File Explorer for manual edits."""
@@ -1015,7 +1119,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 self._task_filename_to_description = {}
                 self.task_select.configure(values=("",))
                 self.task.set("")
-                self._refresh_settings_menu()
+                self._refresh_configuration_menu()
                 return
 
             ttd_folder = Path(loadpoint) / "Common Files" / "text" / "ttds"
@@ -1055,17 +1159,20 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 self._task_filename_to_description = {DEFAULT_MODELCHECK_TTD: DEFAULT_MODELCHECK_DISPLAY}
                 self.task_select.configure(values=(DEFAULT_MODELCHECK_DISPLAY,))
                 self.task.set(DEFAULT_MODELCHECK_DISPLAY)
-                self._refresh_settings_menu()
+                self._refresh_configuration_menu()
                 return
 
             self.task_select.configure(values=tuple(display_values))
             self.task.set(display_values[0])
-            self._refresh_settings_menu()
+            self._refresh_configuration_menu()
         finally:
             self._refresh_action_buttons()
 
     def _apply_settings_data(self, data: dict[str, object]) -> None:
         """Apply settings from a dict (same keys as app_settings.json). Refreshes task list and menu."""
+        self._chunk_size = _normalize_chunk_size(
+            data.get("chunk_size", CREO_BATCH_CHUNK_SIZE_DEFAULT)
+        )
         self._set_working_directory_value(str(data.get("working_directory") or ""))
         self._warn_if_working_directory_invalid()
         self._warn_if_working_directory_has_no_creo_models()
@@ -1080,14 +1187,19 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 if filename.lower() == saved_task_filename.lower():
                     self.task.set(display)
                     break
-        self._refresh_settings_menu()
+        self._refresh_configuration_menu()
         self._refresh_action_buttons()
 
     def _load_settings(self) -> None:
         """On startup, restore form from ``app_settings.json`` (create empty file if missing)."""
         self._settings_path = _default_app_settings_path()
         if not self._settings_path.exists():
-            empty = {"working_directory": "", "creo_loadpoint": "", "task_filename": ""}
+            empty = {
+                "working_directory": "",
+                "creo_loadpoint": "",
+                "task_filename": "",
+                "chunk_size": CREO_BATCH_CHUNK_SIZE_DEFAULT,
+            }
             try:
                 self._settings_path.write_text(json.dumps(empty, indent=2), encoding="utf-8")
             except OSError:
@@ -1121,6 +1233,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "working_directory": working_directory,
             "creo_loadpoint": creo_loadpoint,
             "task_filename": task_fn,
+            "chunk_size": self._chunk_size,
         }
         try:
             self._settings_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -1333,7 +1446,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "",
             "function Write-ChLog {",
             "    param([string]$Message)",
-            "    $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'",
+            "    $ts = Get-Date -Format 'HH:mm:ss'",
             '    Write-Host "[$ts] $Message"',
             "}",
             "",
@@ -1350,7 +1463,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "",
             "$TimedOutModels = @{}",
             "$TimeoutLogInitialized = $false",
-            "$runStamp = Get-Date -Format 'yyyyMMdd-HHmmss'",
+            "$runStamp = Get-Date -Format 'HHmmss'",
             "$TimeoutLog = Join-Path -Path $WorkDir -ChildPath ('creo-batch-timeouts-' + $TaskKind + '-' + $runStamp + '.txt')",
             "",
             "function Record-TimedOutChunk {",
@@ -1359,7 +1472,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "    if (-not $TimeoutLogInitialized) {",
             "        $header = @(",
             "            ('Task: ' + $TaskKind),",
-            "            ('Started: ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')),",
+            "            ('Started: ' + (Get-Date -Format 'HH:mm:ss')),",
             "            ('Log file: ' + $TimeoutLog),",
             "            '',",
             "            'Models timed out:'",
@@ -1549,7 +1662,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             config_files = (
                 self._scan_files_recursive(self._configs_dir) if use_modelcheck_config else []
             )
-            model_chunks = self._chunk_paths(latest_files, CREO_BATCH_CHUNK_SIZE)
+            model_chunks = self._chunk_paths(latest_files, self._chunk_size)
             if not model_chunks:
                 model_chunks = [[]]
 
@@ -1607,7 +1720,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             f"Runner: {runner_ps1_path}\n\n"
             f"Use Open Batch to run {CREO_BATCH_RUNNER_BASENAME} in PowerShell (skips chunks whose outputs exist; otherwise polls for output files, then kill.bat).\n"
             f"Wrote {len(config_files)} config file(s) and {len(latest_files)} model object(s) "
-            f"({CREO_BATCH_CHUNK_SIZE} per chunk; .prt/.asm/.drw in working directory).",
+            f"({self._chunk_size} per chunk; .prt/.asm/.drw in working directory).",
         )
         self._save_settings(task_filename)
         # Open Batch depends on chunk .dxc files on disk; no StringVar changes here.

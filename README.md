@@ -6,8 +6,8 @@ Windows desktop utility for building Creo distributed batch (`.dxc`) files from 
 
 - GUI for working directory, Creo loadpoint, and task (paths are set with Browse… only).
 - Reads task labels from `modelcheck.ttd` and `solid-raster_write_jpg.ttd` under your loadpoint’s `Common Files\text\ttds` (not every `.ttd` on disk).
-- GO clears any prior `creo-batch-*.dxc` / `creo-batch-run.ps1` in the working folder, then writes chunk `.dxc` files (up to 10 models each, non-recursive scan) plus `creo-batch-run.ps1`.
-- Open Batch opens that script in PowerShell; the script runs `ptcdbatch.bat -nographics -process` per chunk, waits on `xtop.exe`, runs `kill.bat`, then deletes the chunk `.dxc` files when finished.
+- GO clears any prior `creo-batch-*.dxc` / `creo-batch-run.ps1` in the working folder, then writes chunk `.dxc` files (models per chunk is set in **Settings → Chunk size…**, default 10, non-recursive scan) plus `creo-batch-run.ps1`.
+- Open Batch opens that script in PowerShell; the script runs `ptcdbatch.bat -nographics -process` per chunk, polls for expected output files, runs `kill.bat`, then deletes the chunk `.dxc` files when finished.
 
 ## Requirements
 
@@ -33,6 +33,31 @@ Usage:
 - Use Browse… to set the working directory (models live there; outputs go there), Creo loadpoint, and task.
 - GO generates the chunk `.dxc` files and `creo-batch-run.ps1` (and updates `app_settings.json` when all GO checks pass).
 - Open Batch starts the runner in PowerShell when `creo-batch-run.ps1` and at least one `creo-batch-*.dxc` are in the working folder (run GO again after a finished run, because the runner deletes the chunk `.dxc` files).
+
+## Menus
+
+### File
+
+- **New**, **Open…**, **Save**, **Save as…**, **Exit** — working-directory / loadpoint / task settings as JSON (`app_settings.json` or a file you choose).
+
+### Settings
+
+Always visible.
+
+- **Chunk size…** — how many models go in each `creo-batch-N.dxc` chunk (**1–10**, default **10**). Saved in `app_settings.json` as `chunk_size`. Run **GO** again after changing chunk size so chunk files are rebuilt.
+
+### Configuration
+
+Shown only when the selected task is **ModelCHECK** (hidden for JPEG/raster tasks). This menu used to be named **Settings**; it was renamed to **Configuration** so **Settings** could hold app-wide options like chunk size.
+
+Opens bundled ModelCHECK files from the app’s `configs\` folder in Notepad:
+
+- Model Checks…, Config.pro…, Angles…, GMC…, Modelcheck Config…, Defaults…, Designers…, Holes…, Inch Settings…, Metric Settings…, Sheetmetal Thickness…
+- **Open configurations…** — opens the `configs\` folder in File Explorer (formerly **Open settings…**).
+
+### Help
+
+- **Documentation…**, **About…**
 
 ## Install with Python
 
