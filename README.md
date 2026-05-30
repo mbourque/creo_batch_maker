@@ -7,7 +7,7 @@ Windows desktop utility for building Creo distributed batch (`.dxc`) files from 
 - GUI for working directory, Creo loadpoint, and task (paths are set with Browse… only).
 - Reads task labels from `modelcheck.ttd` and `solid-raster_write_jpg.ttd` under your loadpoint’s `Common Files\text\ttds` (not every `.ttd` on disk).
 - GO clears any prior `creo-batch-*.dxc` / `creo-batch-run.ps1` in the working folder, then writes chunk `.dxc` files (models per chunk: **Settings → Chunk size…**, default 10, non-recursive scan) plus `creo-batch-run.ps1`.
-- Open Batch opens that script in PowerShell; the script runs `ptcdbatch.bat -nographics -process` per chunk, polls for expected output files (inactivity timeout: **Settings → Timeout…**, default **120** seconds), runs `kill.bat`, then deletes the chunk `.dxc` files when finished.
+- Open Batch opens that script in PowerShell; the script runs `ptcdbatch.bat -nographics -process` per chunk, polls for expected output files (inactivity timeout: **Settings → Timeout…**, default **120** seconds), runs `kill.bat`, then deletes the chunk `.dxc` files when finished. At the end it logs **Count of Files Success** and **Count of Files Timed Out** (per expected output file, including skips where outputs already existed).
 - **Build** merges per-model check XML into `master.xml`; **Report** writes an HTML model quality report (sidebar lists failing checks A–Z by check name).
 
 ## Requirements
