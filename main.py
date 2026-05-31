@@ -77,6 +77,25 @@ def _normalize_output_timeout_sec(value: object) -> int:
     return n
 
 
+def _center_toplevel_on_parent(toplevel: tk.Misc, parent: tk.Misc) -> None:
+    """Place *toplevel* centered over *parent* (call after widgets are laid out)."""
+    toplevel.update_idletasks()
+    parent.update_idletasks()
+    tw = toplevel.winfo_width()
+    th = toplevel.winfo_height()
+    pw = parent.winfo_width()
+    ph = parent.winfo_height()
+    if pw <= 1:
+        pw = parent.winfo_reqwidth()
+    if ph <= 1:
+        ph = parent.winfo_reqheight()
+    px = parent.winfo_rootx()
+    py = parent.winfo_rooty()
+    x = px + max(0, (pw - tw) // 2)
+    y = py + max(0, (ph - th) // 2)
+    toplevel.geometry(f"+{x}+{y}")
+
+
 def _xml_attr_escape(value: str) -> str:
     return (
         value.replace("&", "&amp;")
@@ -559,7 +578,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
         help_menu = tk.Menu(menubar, tearoff=0)
         help_menu.add_command(label="Documentation...", command=self._open_documentation)
-        help_menu.add_command(label="About...", command=self._show_about)
+        help_menu.add_command(label="Check for updates...", command=self._on_check_for_updates)
+        help_menu.add_command(label="About...", command=self._on_about)
         menubar.add_cascade(label="Help", menu=help_menu)
 
         self.configure(menu=menubar)
@@ -878,11 +898,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         return self._write_app_settings_dict(data)
 
     def _on_chunk_size_settings(self) -> None:
-        dialog = ctk.CTkToplevel(self)
-        dialog.title("Chunk size")
-        dialog.resizable(False, False)
-        dialog.transient(self)
-        dialog.grab_set()
+        dialog = self._create_modal_toplevel("Chunk size")
 
         ctk.CTkLabel(
             dialog,
@@ -892,8 +908,6 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         value_var = tk.StringVar(value=str(self._chunk_size))
         entry = ctk.CTkEntry(dialog, textvariable=value_var, width=80)
         entry.pack(anchor="w", padx=16, pady=(0, 12))
-        entry.focus_set()
-        entry.select_range(0, "end")
 
         btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
         btn_row.pack(anchor="e", padx=16, pady=(0, 16))
@@ -929,12 +943,13 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 return
             close_dialog()
 
-        ctk.CTkButton(btn_row, text="Cancel", width=80, command=close_dialog).pack(side="right", padx=(8, 0))
-        ctk.CTkButton(btn_row, text="OK", width=80, command=on_ok).pack(side="right")
+        ctk.CTkButton(btn_row, text="OK", width=80, command=on_ok).pack(side="right", padx=(12, 0))
+        ctk.CTkButton(btn_row, text="Cancel", width=80, command=close_dialog).pack(side="right")
 
         dialog.bind("<Return>", lambda _e: on_ok())
         dialog.bind("<Escape>", lambda _e: close_dialog())
         dialog.protocol("WM_DELETE_WINDOW", close_dialog)
+        self._present_modal_toplevel(dialog, focus_widget=entry)
 
     def _persist_output_timeout_sec(self, timeout_sec: int) -> str | None:
         self._output_timeout_sec = _normalize_output_timeout_sec(timeout_sec)
@@ -943,11 +958,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         return self._write_app_settings_dict(data)
 
     def _on_timeout_settings(self) -> None:
-        dialog = ctk.CTkToplevel(self)
-        dialog.title("Timeout")
-        dialog.resizable(False, False)
-        dialog.transient(self)
-        dialog.grab_set()
+        dialog = self._create_modal_toplevel("Timeout")
 
         ctk.CTkLabel(
             dialog,
@@ -957,8 +968,6 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         value_var = tk.StringVar(value=str(self._output_timeout_sec))
         entry = ctk.CTkEntry(dialog, textvariable=value_var, width=80)
         entry.pack(anchor="w", padx=16, pady=(0, 12))
-        entry.focus_set()
-        entry.select_range(0, "end")
 
         btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
         btn_row.pack(anchor="e", padx=16, pady=(0, 16))
@@ -993,12 +1002,13 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 return
             close_dialog()
 
-        ctk.CTkButton(btn_row, text="Cancel", width=80, command=close_dialog).pack(side="right", padx=(8, 0))
-        ctk.CTkButton(btn_row, text="OK", width=80, command=on_ok).pack(side="right")
+        ctk.CTkButton(btn_row, text="OK", width=80, command=on_ok).pack(side="right", padx=(12, 0))
+        ctk.CTkButton(btn_row, text="Cancel", width=80, command=close_dialog).pack(side="right")
 
         dialog.bind("<Return>", lambda _e: on_ok())
         dialog.bind("<Escape>", lambda _e: close_dialog())
         dialog.protocol("WM_DELETE_WINDOW", close_dialog)
+        self._present_modal_toplevel(dialog, focus_widget=entry)
 
     def _on_open_settings_folder(self) -> None:
         """Open the bundled configs folder in File Explorer for manual edits."""
@@ -1039,8 +1049,30 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "https://github.com/mbourque/creo_batch_maker/wiki/Documentation"
         )
 
-    def _show_about(self) -> None:
+    def _on_check_for_updates(self) -> None:
         webbrowser.open("https://github.com/mbourque/creo_batch_maker")
+
+    def _on_about(self) -> None:
+        dialog = self._create_modal_toplevel("About")
+
+        ctk.CTkLabel(dialog, text="Creo Batch Maker", font=ctk.CTkFont(size=16, weight="bold")).pack(
+            anchor="w", padx=16, pady=(16, 8)
+        )
+        ctk.CTkLabel(dialog, text="Created by Michael P. Bourque").pack(anchor="w", padx=16, pady=(0, 16))
+
+        def close_dialog() -> None:
+            try:
+                dialog.grab_release()
+            except tk.TclError:
+                pass
+            dialog.destroy()
+
+        ctk.CTkButton(dialog, text="OK", width=80, command=close_dialog).pack(anchor="e", padx=16, pady=(0, 16))
+
+        dialog.bind("<Return>", lambda _e: close_dialog())
+        dialog.bind("<Escape>", lambda _e: close_dialog())
+        dialog.protocol("WM_DELETE_WINDOW", close_dialog)
+        self._present_modal_toplevel(dialog)
 
     def _browse_target(self, target_variable: ctk.StringVar, browse_kind: str) -> None:
         initial = target_variable.get() or str(Path.home())
@@ -1143,28 +1175,158 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._refresh_action_buttons()
 
     def _install_dialog_parent(self) -> None:
-        """Make ``tkinter.messagebox`` / ``tkinter.filedialog`` calls default to
-        ``parent=self`` so dialogs center on the main window instead of the screen.
-        Existing explicit ``parent=`` arguments are still honored.
-        """
-        def _ensure_parent(orig_fn):
+        """Route message boxes through centered CTk dialogs; default file dialogs to this window."""
+
+        def _messagebox_wrapper(*, kind: str, ask_yes_no: bool = False):
+            def wrapped(*args, **kwargs):
+                parent = kwargs.pop("parent", self)
+                if len(args) >= 2:
+                    title, message = args[0], args[1]
+                elif len(args) == 1:
+                    title, message = "", args[0]
+                else:
+                    title = str(kwargs.pop("title", ""))
+                    message = str(kwargs.pop("message", ""))
+                return self._show_app_messagebox(
+                    title,
+                    message,
+                    kind=kind,
+                    ask_yes_no=ask_yes_no,
+                    parent=parent,
+                )
+
+            return wrapped
+
+        def _filedialog_wrapper(orig_fn):
             def wrapped(*args, **kwargs):
                 kwargs.setdefault("parent", self)
                 return orig_fn(*args, **kwargs)
+
             return wrapped
 
-        for module, names in (
-            (messagebox, (
-                "showinfo", "showwarning", "showerror",
-                "askyesno", "askokcancel", "askyesnocancel",
-                "askquestion", "askretrycancel",
-            )),
-            (fd, ("askdirectory", "askopenfilename", "asksaveasfilename")),
+        for name, kind in (
+            ("showinfo", "info"),
+            ("showwarning", "warning"),
+            ("showerror", "error"),
+            ("askquestion", "info"),
         ):
-            for name in names:
-                fn = getattr(module, name, None)
-                if fn is not None:
-                    setattr(module, name, _ensure_parent(fn))
+            fn = getattr(messagebox, name, None)
+            if fn is not None:
+                setattr(messagebox, name, _messagebox_wrapper(kind=kind))
+
+        for name in ("askyesno", "askokcancel", "askyesnocancel", "askretrycancel"):
+            fn = getattr(messagebox, name, None)
+            if fn is not None:
+                setattr(messagebox, name, _messagebox_wrapper(kind="info", ask_yes_no=True))
+
+        for name in ("askdirectory", "askopenfilename", "asksaveasfilename"):
+            fn = getattr(fd, name, None)
+            if fn is not None:
+                setattr(fd, name, _filedialog_wrapper(fn))
+
+    def _show_app_messagebox(
+        self,
+        title: str,
+        message: str,
+        *,
+        kind: str = "info",
+        ask_yes_no: bool = False,
+        parent: tk.Misc | None = None,
+    ) -> bool | None:
+        anchor = parent if parent is not None else self
+        dialog = ctk.CTkToplevel(anchor)
+        dialog.withdraw()
+        dialog.title(title)
+        dialog.resizable(False, False)
+        dialog.transient(anchor)
+        dialog.grab_set()
+
+        result: dict[str, bool | None] = {"value": False if ask_yes_no else None}
+
+        def close(value: bool | None = None) -> None:
+            if value is not None:
+                result["value"] = value
+            elif not ask_yes_no:
+                result["value"] = True
+            try:
+                dialog.grab_release()
+            except tk.TclError:
+                pass
+            dialog.destroy()
+
+        ctk.CTkLabel(dialog, text=message, justify="left", wraplength=420).pack(
+            anchor="w", padx=16, pady=(16, 12)
+        )
+        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_row.pack(anchor="e", padx=16, pady=(0, 16))
+
+        if ask_yes_no:
+            ctk.CTkButton(btn_row, text="No", width=80, command=lambda: close(False)).pack(
+                side="right", padx=(8, 0)
+            )
+            ctk.CTkButton(btn_row, text="Yes", width=80, command=lambda: close(True)).pack(side="right")
+            dialog.bind("<Escape>", lambda _e: close(False))
+            dialog.protocol("WM_DELETE_WINDOW", lambda: close(False))
+        else:
+            ctk.CTkButton(btn_row, text="OK", width=80, command=lambda: close(True)).pack(side="right")
+            dialog.bind("<Return>", lambda _e: close(True))
+            dialog.bind("<Escape>", lambda _e: close(True))
+            dialog.protocol("WM_DELETE_WINDOW", lambda: close(True))
+
+        def show() -> None:
+            if not dialog.winfo_exists():
+                return
+            _center_toplevel_on_parent(dialog, anchor)
+            dialog.deiconify()
+            try:
+                dialog.lift()
+                dialog.focus_force()
+            except tk.TclError:
+                pass
+
+        dialog.update_idletasks()
+        dialog.after_idle(show)
+        dialog.wait_window()
+        return result["value"]
+
+    def _create_modal_toplevel(self, title: str) -> ctk.CTkToplevel:
+        dialog = ctk.CTkToplevel(self)
+        dialog.withdraw()
+        dialog.title(title)
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+        return dialog
+
+    def _present_modal_toplevel(
+        self,
+        dialog: ctk.CTkToplevel,
+        *,
+        parent: tk.Misc | None = None,
+        focus_widget: tk.Misc | None = None,
+    ) -> None:
+        anchor = parent if parent is not None else self
+
+        def show() -> None:
+            if not dialog.winfo_exists():
+                return
+            _center_toplevel_on_parent(dialog, anchor)
+            dialog.deiconify()
+            try:
+                dialog.lift()
+                dialog.focus_force()
+            except tk.TclError:
+                pass
+            if focus_widget is not None:
+                try:
+                    focus_widget.focus_set()
+                    if hasattr(focus_widget, "select_range"):
+                        focus_widget.select_range(0, "end")
+                except tk.TclError:
+                    pass
+
+        dialog.update_idletasks()
+        dialog.after_idle(show)
 
     def _refresh_action_buttons_run(self) -> None:
         self._refresh_action_buttons_job = None

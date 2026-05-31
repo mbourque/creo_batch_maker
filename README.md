@@ -60,7 +60,7 @@ Opens bundled ModelCHECK files from the app’s `configs\` folder in Notepad:
 
 ### Help
 
-- **Documentation…**, **About…**
+- **Documentation…**, **Check for updates…**, **About…** (creator info)
 
 ## Install with Python
 
