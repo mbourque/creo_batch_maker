@@ -39,7 +39,7 @@ CREO_BATCH_CHUNK_SIZE_MAX = 10
 CREO_BATCH_RUNNER_BASENAME = "creo-batch-run.ps1"
 # Generated runner: max time to wait for the expected output files of one chunk, in seconds.
 BATCH_OUTPUT_WAIT_TIMEOUT_DEFAULT = 120
-BATCH_OUTPUT_WAIT_TIMEOUT_MIN = 1
+BATCH_OUTPUT_WAIT_TIMEOUT_MIN = 60
 # After all expected outputs for a chunk appear, settle this many seconds before running kill.bat.
 BATCH_OUTPUT_SETTLE_SEC = 5
 # When no Creo loadpoint / no .ttd list yet, File → New uses this default task (filename + UI label).

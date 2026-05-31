@@ -47,7 +47,7 @@ Usage:
 Always visible. Values are stored in `app_settings.json` (also written on successful **GO** and **File → Save**).
 
 - **Chunk size…** — models per `creo-batch-N.dxc` chunk (**1–10**, default **10**). JSON key: `chunk_size`. Run **GO** again after changing.
-- **Timeout…** — seconds to wait for chunk output files with no new file appearing (**whole number ≥ 1**, default **120**). JSON key: `output_timeout_sec`. Run **GO** again after changing.
+- **Timeout…** — seconds to wait for chunk output files with no new file appearing (**whole number ≥ 60**, default **120**). JSON key: `output_timeout_sec`. Run **GO** again after changing.
 
 ### Configuration
 
