@@ -5,8 +5,8 @@ Windows desktop utility for building Creo distributed batch (`.dxc`) files from 
 ## What this app does
 
 - GUI for working directory, Creo loadpoint, and task (paths are set with Browse… only).
-- Reads task labels from `modelcheck.ttd` and `solid-raster_write_jpg.ttd` under your loadpoint’s `Common Files\text\ttds` (not every `.ttd` on disk).
-- GO clears any prior `creo-batch-*.dxc` / `creo-batch-run.ps1` in the working folder, then writes chunk `.dxc` files (models per chunk: **Settings → Chunk size…**, default 10, non-recursive scan) plus `creo-batch-run.ps1`.
+- Reads task labels from `modelcheck.ttd`, `solid-raster_write_jpg.ttd`, and `plot_jpeg_a-size.ttd` under your loadpoint’s `Common Files\text\ttds` (not every `.ttd` on disk).
+- GO clears any prior `creo-batch-*.dxc` / `creo-batch-run.ps1` in the working folder, then writes chunk `.dxc` files (models per chunk: **Settings → Chunk size…**, default 10, non-recursive scan) plus `creo-batch-run.ps1`. **ModelCHECK** includes `.prt`, `.asm`, and `.drw`; **JPEG 3D** includes `.prt` and `.asm` only; **JPEG 2D Export to file, A Paper Size** includes `.drw` only.
 - Open Batch opens that script in PowerShell; the script runs `ptcdbatch.bat -nographics -process` per chunk, polls for expected output files (inactivity timeout: **Settings → Timeout…**, default **120** seconds), runs `kill.bat`, then deletes the chunk `.dxc` files when finished. At the end it logs **Count of Files Success** and **Count of Files Timed Out** (per expected output file, including skips where outputs already existed).
 - **Build** scans the working directory for ModelCHECK result XML (`*.p.xml`, `*.a.xml`, `*.d.xml`) and merges them into **`master.xml`** in that folder (run after batch output exists).
 - **Report** reads `master.xml` plus bundled **`model_checks.xml`** and **`report_template.html.j2`**, then writes **`index.html`** in the working directory — a Model Quality Report with a summary dashboard, a left sidebar of checks that had **errors or warnings** (A–Z by check name), and per-model detail (thumbnails, messages, links). Optionally opens the report in your browser when done.
@@ -16,6 +16,7 @@ Windows desktop utility for building Creo distributed batch (`.dxc`) files from 
 - Windows
 - A Creo loadpoint that contains `Parametric` (so `Parametric\bin\ptcdbatch.bat` exists) and the usual `Common Files\text\ttds` content
 - In the same folder as the app you run (`main.exe` or `main.py`): `kill.bat`, `model_checks.xml`, and `report_template.html.j2` (for **Report**). For ModelCHECK jobs, a `configs` folder with the modelcheck files you want referenced in the `.dxc`.
+- **Working directory** path must **not contain spaces** (required for **GO** / **Open Batch**). **Build** and **Report** are not blocked by spaces.
 
 ## No Python needed
 

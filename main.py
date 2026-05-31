@@ -28,6 +28,12 @@ DESCRIPTION_BLOCK_RE = re.compile(
 XML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 # Top-level Creo model filenames (same patterns as ``_scan_models_non_recursive``).
 _CREO_MODEL_TOPLEVEL_RE = re.compile(r".*\.(prt|asm|drw)(\.\d+)?$", re.IGNORECASE)
+_CREO_MODEL_EXT_PATTERNS: dict[str, str] = {
+    "prt": r".*\.prt(\.\d+)?$",
+    "asm": r".*\.asm(\.\d+)?$",
+    "drw": r".*\.drw(\.\d+)?$",
+}
+_CREO_MODEL_EXTENSIONS_ALL = ("prt", "asm", "drw")
 
 # Chunk .dxc files: working_dir / f"{CREO_BATCH_BASE}-1.dxc", "-2.dxc", ...
 CREO_BATCH_BASE = "creo-batch"
@@ -45,6 +51,13 @@ BATCH_OUTPUT_SETTLE_SEC = 5
 # When no Creo loadpoint / no .ttd list yet, File → New uses this default task (filename + UI label).
 DEFAULT_MODELCHECK_TTD = "modelcheck.ttd"
 DEFAULT_MODELCHECK_DISPLAY = "ModelCHECK"
+JPEG_2D_PLOT_TTD = "plot_jpeg_a-size.ttd"
+JPEG_2D_PLOT_DISPLAY = "JPEG 2D Export to file, A Paper Size"
+
+
+def _creo_model_name_pattern(extensions: tuple[str, ...]) -> re.Pattern[str]:
+    inner = "|".join(re.escape(ext) for ext in extensions)
+    return re.compile(rf".*\.({inner})(\.\d+)?$", re.IGNORECASE)
 
 
 def _app_bundle_dir() -> Path:
@@ -139,6 +152,11 @@ def _working_directory_ok_for_go(working_directory: str) -> bool:
         return False
 
 
+def _path_contains_spaces(path: str) -> bool:
+    """True if *path* contains whitespace (batch runner does not support spaced paths)."""
+    return " " in (path or "").strip()
+
+
 def _summary_report_inputs_ok(working_directory: str) -> bool:
     """True when master.xml exists in the working dir and bundled report assets exist."""
     if not _working_directory_exists_as_dir(working_directory):
@@ -225,6 +243,41 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if not filename:
             return False
         return Path(filename).stem.lower() == "modelcheck"
+
+    def _is_jpeg_3d_task(self, task_display: str) -> bool:
+        filename = self._task_filename_from_ui(task_display)
+        if not filename:
+            return False
+        if filename.lower() == "solid-raster_write_jpg.ttd":
+            return True
+        display = (task_display or "").strip().casefold()
+        if "jpeg" in display and "3d" in display:
+            return True
+        stem = Path(filename).stem.casefold()
+        return "jpeg" in stem and "3d" in stem
+
+    def _is_jpeg_2d_plot_task(self, task_display: str) -> bool:
+        filename = self._task_filename_from_ui(task_display)
+        if not filename:
+            return False
+        return filename.lower() == JPEG_2D_PLOT_TTD.lower()
+
+    def _model_scan_extensions_for_task(self, task_display: str) -> tuple[str, ...]:
+        if self._is_jpeg_2d_plot_task(task_display):
+            return ("drw",)
+        if self._is_jpeg_3d_task(task_display):
+            return ("prt", "asm")
+        return _CREO_MODEL_EXTENSIONS_ALL
+
+    def _model_scan_types_label(self, task_display: str) -> str:
+        return "/".join(f".{ext}" for ext in self._model_scan_extensions_for_task(task_display))
+
+    def _runner_task_kind(self, task_display: str) -> str:
+        if self._is_modelcheck_task(task_display):
+            return "modelcheck"
+        if self._is_jpeg_2d_plot_task(task_display):
+            return "jpeg2d"
+        return "jpeg3d"
 
     def _task_filename_from_ui(self, task_display: str) -> str:
         key = (task_display or "").strip()
@@ -656,12 +709,27 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 False,
                 "Working directory must be an existing folder (use Browse or a path that exists on disk).",
             )
-        if not self._working_directory_has_creo_models(wd):
-            return (
-                False,
-                "Working directory must contain at least one Creo model file "
-                "(.prt, .asm, or .drw) in that folder itself (subfolders are not used).",
-            )
+        if not self._working_directory_has_creo_models(
+            wd, extensions=self._model_scan_extensions_for_task(self.task.get() or "")
+        ):
+            task_display = self.task.get() or ""
+            types_label = self._model_scan_types_label(task_display)
+            if self._is_jpeg_2d_plot_task(task_display):
+                detail = (
+                    f"Working directory must contain at least one {types_label} file "
+                    "in that folder itself (.prt and .asm are not used for JPEG 2D plot batch; subfolders are not used)."
+                )
+            elif self._is_jpeg_3d_task(task_display):
+                detail = (
+                    f"Working directory must contain at least one {types_label} file "
+                    "in that folder itself (.drw files are not used for JPEG 3D batch; subfolders are not used)."
+                )
+            else:
+                detail = (
+                    f"Working directory must contain at least one Creo model file "
+                    f"({types_label}) in that folder itself (subfolders are not used)."
+                )
+            return False, detail
         if not (self.creo_loadpoint.get() or "").strip():
             return False, "Creo loadpoint cannot be empty."
         if not _creo_loadpoint_has_parametric_dir(self.creo_loadpoint.get()):
@@ -726,13 +794,40 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         wd = (self.working_directory.get() or "").strip()
         if not wd or not _working_directory_exists_as_dir(wd):
             return
-        if self._working_directory_has_creo_models(wd):
+        task_display = self.task.get() or ""
+        scan_exts = self._model_scan_extensions_for_task(task_display)
+        if self._working_directory_has_creo_models(wd, extensions=scan_exts):
             return
+        types_label = self._model_scan_types_label(task_display)
+        if self._is_jpeg_2d_plot_task(task_display):
+            detail = (
+                f"Add at least one {types_label} file directly in this directory "
+                "(.prt and .asm are not used for JPEG 2D plot batch). "
+            )
+        elif self._is_jpeg_3d_task(task_display):
+            detail = (
+                f"Add at least one {types_label} file directly in this directory "
+                "(.drw files are not used for JPEG 3D batch). "
+            )
+        else:
+            detail = f"Add at least one {types_label} file directly in this directory "
         messagebox.showwarning(
             "Working directory",
             "No Creo models found in this folder.\n\n"
-            "Add at least one .prt, .asm, or .drw file directly in this directory "
+            f"{detail}"
             "(the app does not look inside subfolders).",
+        )
+
+    def _warn_if_working_directory_has_spaces(self) -> None:
+        wd = (self.working_directory.get() or "").strip()
+        if not wd or not _path_contains_spaces(wd):
+            return
+        messagebox.showerror(
+            "Working directory",
+            "Working directory path cannot contain spaces.\n\n"
+            "Batch processing does not support paths with spaces.\n\n"
+            "Choose or create a folder without spaces in the path "
+            "(for example C:\\Projects\\MyBatch instead of C:\\My Projects\\MyBatch).",
         )
 
     def _warn_if_creo_loadpoint_missing_parametric(self) -> None:
@@ -1091,12 +1186,15 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             elif target_variable is self.working_directory:
                 self._set_working_directory_value(selected_path)
                 self._warn_if_working_directory_invalid()
+                self._warn_if_working_directory_has_spaces()
                 self._warn_if_working_directory_has_no_creo_models()
 
     @staticmethod
     def _task_allowed_for_dropdown(filename: str, display_label: str) -> bool:
-        """Only ModelCHECK and JPEG 3D… style tasks appear in the Task combobox."""
+        """Only ModelCHECK, JPEG 3D, and JPEG 2D plot tasks appear in the Task combobox."""
         if filename.lower() == "modelcheck.ttd":
+            return True
+        if filename.lower() == JPEG_2D_PLOT_TTD.lower():
             return True
         dl = display_label.casefold()
         if "jpeg" in dl and "3d" in dl:
@@ -1112,7 +1210,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         task_fn = self._task_filename_from_ui((self.task.get() or "").strip())
         if not wd or not _working_directory_ok_for_go(wd):
             return False
-        if not self._working_directory_has_creo_models(wd):
+        if _path_contains_spaces(wd):
+            return False
+        if not self._working_directory_has_creo_models(
+            wd, extensions=self._model_scan_extensions_for_task(self.task.get() or "")
+        ):
             return False
         if not lp or not _creo_loadpoint_has_parametric_dir(lp):
             return False
@@ -1136,6 +1238,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         wd = (self.working_directory.get() or "").strip()
         lp = (self.creo_loadpoint.get() or "").strip().rstrip("\\/")
         if not wd or not _working_directory_exists_as_dir(wd):
+            return False
+        if _path_contains_spaces(wd):
             return False
         if not lp or not _creo_loadpoint_has_parametric_dir(lp):
             return False
@@ -1383,6 +1487,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 desc_j = self._read_ttd_description(ttd_folder / fn_jpg)
                 if self._task_allowed_for_dropdown(fn_jpg, desc_j):
                     pairs.append((fn_jpg, desc_j))
+            fn_plot = next((f for f in filenames if f.lower() == JPEG_2D_PLOT_TTD.lower()), None)
+            if fn_plot:
+                pairs.append((fn_plot, JPEG_2D_PLOT_DISPLAY))
 
             self._task_filename_to_description = {name: desc for name, desc in pairs}
 
@@ -1391,8 +1498,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             preferred = "modelcheck.ttd"
             preferred_rows = [(fn, lab) for fn, lab in allowed if fn.lower() == preferred]
             other_rows = [(fn, lab) for fn, lab in allowed if fn.lower() != preferred]
-            other_rows.sort(key=lambda row: row[1].casefold())
-            ordered = (preferred_rows[:1] + other_rows) if preferred_rows else other_rows
+            plot_rows = [(fn, lab) for fn, lab in other_rows if fn.lower() == JPEG_2D_PLOT_TTD.lower()]
+            middle_rows = [(fn, lab) for fn, lab in other_rows if fn.lower() != JPEG_2D_PLOT_TTD.lower()]
+            middle_rows.sort(key=lambda row: row[1].casefold())
+            ordered = (preferred_rows[:1] + middle_rows + plot_rows) if preferred_rows else (middle_rows + plot_rows)
 
             self._task_display_to_filename = {lab: fn for fn, lab in ordered}
             display_values = [lab for _fn, lab in ordered]
@@ -1421,6 +1530,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         )
         self._set_working_directory_value(str(data.get("working_directory") or ""))
         self._warn_if_working_directory_invalid()
+        self._warn_if_working_directory_has_spaces()
         self._warn_if_working_directory_has_no_creo_models()
         self._set_creo_loadpoint_value(str(data.get("creo_loadpoint") or ""))
         self._warn_if_creo_loadpoint_missing_parametric()
@@ -1489,12 +1599,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             # Keep GO success path non-blocking if settings save fails.
             pass
 
-    def _scan_models_non_recursive(self, directory: Path) -> dict[Path, list[str]]:
-        patterns = [
-            r".*\.prt(\.\d+)?$",
-            r".*\.asm(\.\d+)?$",
-            r".*\.drw(\.\d+)?$",
-        ]
+    def _scan_models_non_recursive(
+        self, directory: Path, *, extensions: tuple[str, ...] = _CREO_MODEL_EXTENSIONS_ALL
+    ) -> dict[Path, list[str]]:
+        patterns = [_CREO_MODEL_EXT_PATTERNS[ext] for ext in extensions if ext in _CREO_MODEL_EXT_PATTERNS]
         files: dict[Path, list[str]] = defaultdict(list)
         for entry in directory.iterdir():
             if not entry.is_file():
@@ -1536,17 +1644,20 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
         return sorted(latest_files, key=model_sort_key)
 
-    def _working_directory_has_creo_models(self, working_dir_str: str | None = None) -> bool:
-        """True if the path is a directory with at least one .prt / .asm / .drw at top level (same rules as GO)."""
+    def _working_directory_has_creo_models(
+        self, working_dir_str: str | None = None, *, extensions: tuple[str, ...] = _CREO_MODEL_EXTENSIONS_ALL
+    ) -> bool:
+        """True if the path is a directory with at least one matching model file at top level."""
         s = (working_dir_str if working_dir_str is not None else self.working_directory.get()).strip()
         if not s:
             return False
+        pattern = _creo_model_name_pattern(extensions)
         try:
             d = Path(s).expanduser()
             if not d.is_dir():
                 return False
             for entry in d.iterdir():
-                if entry.is_file() and _CREO_MODEL_TOPLEVEL_RE.match(entry.name):
+                if entry.is_file() and pattern.match(entry.name):
                     return True
             return False
         except OSError:
@@ -1696,7 +1807,14 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "function Write-ChLog {",
             "    param([string]$Message)",
             "    $ts = Get-Date -Format 'HH:mm:ss'",
-            '    Write-Host "[$ts] $Message"',
+            '    $line = "[$ts] $Message"',
+            "    if ($Message -match '(?i)^DONE:' -or $Message -match '(?i)^SKIP:') {",
+            '        Write-Host $line -ForegroundColor Green',
+            "    } elseif ($Message -match '(?i)^TIMEOUT:') {",
+            '        Write-Host $line -ForegroundColor Red',
+            "    } else {",
+            '        Write-Host $line',
+            "    }",
             "}",
             "",
             "function Get-MissingOutputs {",
@@ -1869,10 +1987,29 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 "If the folder does not exist yet, its parent must exist so the app can create it.",
             )
             return
-        if not self._working_directory_has_creo_models(working_dir_raw):
+        if _path_contains_spaces(working_dir_raw):
+            self._warn_if_working_directory_has_spaces()
+            return
+        scan_extensions = self._model_scan_extensions_for_task(task_display_raw)
+        types_label = self._model_scan_types_label(task_display_raw)
+        if not self._working_directory_has_creo_models(working_dir_raw, extensions=scan_extensions):
+            if self._is_jpeg_2d_plot_task(task_display_raw):
+                model_msg = (
+                    f"GO needs at least one {types_label} file directly in the working directory "
+                    "(.prt and .asm are not used for JPEG 2D plot batch) "
+                )
+            elif self._is_jpeg_3d_task(task_display_raw):
+                model_msg = (
+                    f"GO needs at least one {types_label} file directly in the working directory "
+                    "(.drw files are not used for JPEG 3D batch) "
+                )
+            else:
+                model_msg = (
+                    f"GO needs at least one Creo model file ({types_label}) directly in the working directory "
+                )
             messagebox.showwarning(
                 "Working directory",
-                "GO needs at least one Creo model file (.prt, .asm, or .drw) directly in the working directory "
+                f"{model_msg}"
                 "(not in subfolders). If the folder does not exist yet, create it and add models first.",
             )
             return
@@ -1916,7 +2053,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
         try:
             models_dir.mkdir(parents=True, exist_ok=True)
-            scanned = self._scan_models_non_recursive(models_dir)
+            scanned = self._scan_models_non_recursive(models_dir, extensions=scan_extensions)
             latest_files = self._get_latest_model_files(scanned)
             config_files = (
                 self._scan_files_recursive(self._configs_dir) if use_modelcheck_config else []
@@ -1962,7 +2099,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 num_chunks,
                 expected_outputs_per_chunk,
                 output_to_model_per_chunk,
-                "modelcheck" if use_modelcheck_config else "jpeg",
+                self._runner_task_kind(task_display_raw),
                 self._output_timeout_sec,
             )
             runner_ps1_path.write_text(runner_text, encoding="utf-8-sig")
@@ -1980,7 +2117,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             f"Runner: {runner_ps1_path}\n\n"
             f"Use Open Batch to run {CREO_BATCH_RUNNER_BASENAME} in PowerShell (skips chunks whose outputs exist; otherwise polls for output files, then kill.bat).\n"
             f"Wrote {len(config_files)} config file(s) and {len(latest_files)} model object(s) "
-            f"({self._chunk_size} per chunk; .prt/.asm/.drw in working directory).",
+            f"({self._chunk_size} per chunk; {types_label} in working directory).",
         )
         self._save_settings(task_filename)
         # Open Batch depends on chunk .dxc files on disk; no StringVar changes here.
@@ -2087,6 +2224,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return
         if not _working_directory_exists_as_dir(working_dir_raw):
             self._warn_if_working_directory_invalid()
+            return
+        if _path_contains_spaces(working_dir_raw):
+            self._warn_if_working_directory_has_spaces()
             return
 
         bat_path = Path(loadpoint_raw) / "Parametric" / "bin" / "ptcdbatch.bat"
