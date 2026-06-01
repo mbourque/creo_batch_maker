@@ -263,6 +263,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return False
         return filename.lower() == JPEG_2D_PLOT_TTD.lower()
 
+    def _is_jpeg_export_task(self, task_display: str) -> bool:
+        return self._is_jpeg_3d_task(task_display) or self._is_jpeg_2d_plot_task(task_display)
+
     def _model_scan_extensions_for_task(self, task_display: str) -> tuple[str, ...]:
         if self._is_jpeg_2d_plot_task(task_display):
             return ("drw",)
@@ -2025,12 +2028,22 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             )
             return
         use_modelcheck_config = self._is_modelcheck_task(task_display_raw)
+        use_jpeg_config = self._is_jpeg_export_task(task_display_raw)
+        jpeg_config_pro: Path | None = None
         if use_modelcheck_config and not self._configs_dir.is_dir():
             messagebox.showerror(
                 "Missing configs",
                 f"Modelcheck task requires the configs folder next to the app:\n{self._configs_dir}",
             )
             return
+        if use_jpeg_config:
+            jpeg_config_pro = self._configs_dir / "config.pro"
+            if not jpeg_config_pro.is_file():
+                messagebox.showerror(
+                    "Missing configs",
+                    f"JPEG batch task requires config.pro in the configs folder next to the app:\n{jpeg_config_pro}",
+                )
+                return
         if not loadpoint_raw:
             messagebox.showwarning("Missing Creo Loadpoint", "Please enter a Creo loadpoint.")
             return
@@ -2082,6 +2095,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     f'OutputDir="{_xml_attr_escape(working_dir_raw)}" PrimaryContent="0" '
                     f'TTD="{_xml_attr_escape(str(ttd_path))}" VaultResults="0">'
                 ]
+                if jpeg_config_pro is not None:
+                    group_lines.append(f"        <Config>{str(jpeg_config_pro)}</Config>")
                 group_lines.extend(f"        <Object>{str(p)}</Object>" for p in chunk)
                 if config_files:
                     group_lines.extend(f"        <ConfigFile>{str(p)}</ConfigFile>" for p in config_files)
@@ -2127,7 +2142,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             f"{CREO_BATCH_BASE}-{num_chunks}.dxc\n"
             f"Runner: {runner_ps1_path}\n\n"
             f"Use Open Batch to run {CREO_BATCH_RUNNER_BASENAME} in PowerShell (skips chunks whose outputs exist; otherwise polls for output files, then kill.bat).\n"
-            f"Wrote {len(config_files)} config file(s) and {len(latest_files)} model object(s) "
+            f"Wrote {len(config_files) + (1 if jpeg_config_pro else 0)} config file(s) and {len(latest_files)} model object(s) "
             f"({self._chunk_size} per chunk; {types_label} in working directory).",
         )
         self._save_settings(task_filename)
