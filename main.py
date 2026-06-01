@@ -18,6 +18,7 @@ from PIL import Image
 
 import build_errors_warnings_report
 import merge_master_xml
+import patch
 
 # Non-greedy inner; Creo files may contain multiple <DESCRIPTION> blocks — the first
 # is sometimes legacy/comment junk; we pick the best candidate after cleaning.
@@ -211,6 +212,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         ]
         self._refresh_action_buttons_job: str | None = None
         self._post_map_refresh_done = False
+        self._suppress_settings_autosave = False
         self._settings_config_relative: dict[str, str] = {
             "Model Checks...": "default_checks.mch",
             "Config.pro...": "config.pro",
@@ -522,12 +524,16 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self.build_master_button.pack(side="left", padx=(0, _action_btn_gap))
         self.summary_report_button.pack(side="left", padx=(0, 0))
 
-        def _on_path_var_changed(*_args: object) -> None:
+        def _on_working_directory_or_loadpoint_changed(*_args: object) -> None:
+            self._refresh_action_buttons()
+            self._persist_working_directory_and_loadpoint()
+
+        def _on_task_var_changed(*_args: object) -> None:
             self._refresh_action_buttons()
 
-        self.working_directory.trace_add("write", _on_path_var_changed)
-        self.creo_loadpoint.trace_add("write", _on_path_var_changed)
-        self.task.trace_add("write", _on_path_var_changed)
+        self.working_directory.trace_add("write", _on_working_directory_or_loadpoint_changed)
+        self.creo_loadpoint.trace_add("write", _on_working_directory_or_loadpoint_changed)
+        self.task.trace_add("write", _on_task_var_changed)
 
         self._refresh_action_buttons()
 
@@ -1534,8 +1540,35 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         finally:
             self._refresh_action_buttons()
 
+    def _persist_working_directory_and_loadpoint(self) -> None:
+        """Write working directory and loadpoint to app_settings.json (merge, non-blocking)."""
+        if self._suppress_settings_autosave:
+            return
+        data = self._read_app_settings_dict()
+        data["working_directory"] = self.working_directory.get().strip()
+        data["creo_loadpoint"] = self.creo_loadpoint.get().strip()
+        data["chunk_size"] = _normalize_chunk_size(
+            data.get("chunk_size", self._chunk_size)
+        )
+        data["output_timeout_sec"] = _normalize_output_timeout_sec(
+            data.get("output_timeout_sec", self._output_timeout_sec)
+        )
+        task_fn = self._task_filename_from_ui(self.task.get() or "").strip()
+        if task_fn:
+            data["task_filename"] = task_fn
+        elif "task_filename" not in data:
+            data["task_filename"] = ""
+        self._write_app_settings_dict(data)
+
     def _apply_settings_data(self, data: dict[str, object]) -> None:
         """Apply settings from a dict (same keys as app_settings.json). Refreshes task list and menu."""
+        self._suppress_settings_autosave = True
+        try:
+            self._apply_settings_data_impl(data)
+        finally:
+            self._suppress_settings_autosave = False
+
+    def _apply_settings_data_impl(self, data: dict[str, object]) -> None:
         self._chunk_size = _normalize_chunk_size(
             data.get("chunk_size", CREO_BATCH_CHUNK_SIZE_DEFAULT)
         )
@@ -1590,7 +1623,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._apply_settings_data(data)
 
     def _save_settings(self, task_filename: str) -> None:
-        """Persist current form to ``app_settings.json`` (called after a successful GO)."""
+        """Persist full form to ``app_settings.json`` (called after a successful GO)."""
         self._settings_path = _default_app_settings_path()
         ok, _ = self._settings_fields_ready()
         if not ok:
@@ -2211,6 +2244,12 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 f"  {_app_bundle_dir() / 'report_template.html.j2'}\n\n"
                 f"Executable:\n  {Path(sys.executable).resolve()}",
             )
+            return
+        self._persist_working_directory_and_loadpoint()
+        try:
+            patch.run(settings_path=_default_app_settings_path(), quiet=True)
+        except patch.PatchError as exc:
+            messagebox.showerror("Report Failed", f"Could not patch ModelCHECK HTML.\n\n{exc}")
             return
         try:
             written = build_errors_warnings_report.build_errors_warnings_html(str(working_dir))

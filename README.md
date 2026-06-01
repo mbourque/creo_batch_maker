@@ -9,7 +9,7 @@ Windows desktop utility for building Creo distributed batch (`.dxc`) files from 
 - GO clears any prior `creo-batch-*.dxc` / `creo-batch-run.ps1` in the working folder, then writes chunk `.dxc` files (models per chunk: **Settings → Chunk size…**, default 10, non-recursive scan) plus `creo-batch-run.ps1`. **ModelCHECK** includes `.prt`, `.asm`, and `.drw`; **JPEG 3D** includes `.prt` and `.asm` only; **JPEG 2D Export to file, A Paper Size** includes `.drw` only.
 - Open Batch opens that script in PowerShell; the script runs `ptcdbatch.bat -nographics -process` per chunk, polls for expected output files (inactivity timeout: **Settings → Timeout…**, default **120** seconds), runs `kill.bat`, then deletes the chunk `.dxc` files when finished. At the end it logs **Count of Files Success** and **Count of Files Timed Out** (per expected output file, including skips where outputs already existed).
 - **Build** scans the working directory for ModelCHECK result XML (`*.p.xml`, `*.a.xml`, `*.d.xml`) and merges them into **`master.xml`** in that folder (run after batch output exists).
-- **Report** reads `master.xml` plus bundled **`model_checks.xml`** and **`report_template.html.j2`**, then writes **`index.html`** in the working directory — a Model Quality Report with a summary dashboard, a left sidebar of checks that had **errors or warnings** (A–Z by check name), and per-model detail (thumbnails, messages, links). Optionally opens the report in your browser when done.
+- **Report** first copies `<creo_loadpoint>/Common Files/modchk` to `<working_directory>/modchk` and patches ModelCHECK `*.html` in the working folder (except **`index.html`**) so offline links work, then reads `master.xml` plus bundled **`model_checks.xml`** and **`report_template.html.j2`**, and writes **`index.html`** — a Model Quality Report with a summary dashboard, a left sidebar of checks that had **errors or warnings** (A–Z by check name), and per-model detail (thumbnails, messages, links). Optionally opens the report in your browser when done. Same patch logic is available as `python patch.py` for development.
 
 ## Requirements
 
@@ -24,7 +24,14 @@ Windows desktop utility for building Creo distributed batch (`.dxc`) files from 
 .\main.exe
 ```
 
-The packaged build is `main.exe` in the project folder (`pyinstaller main.spec`). Copy `main.exe` together with the sidecar files above (and `configs\` if you use ModelCHECK) into the folder you run from.
+Build from the project folder:
+
+```powershell
+pip install pyinstaller
+pyinstaller main.spec
+```
+
+This writes **`dist\main.exe`**. The patch tool is bundled inside it (`main.py` imports `patch`). Copy `main.exe` together with the sidecar files above (and `configs\` if you use ModelCHECK) into the folder you run from.
 
 Launch options:
 

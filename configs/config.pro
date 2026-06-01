@@ -37,6 +37,7 @@ retrieve_data_sharing_ref_parts yes
 dm_family_table_inst_name yes
 instance_dep_generic yes
 display_out_of_date_instances no
+rettab_instances_first no
 
 ! =========================================================
 ! DRAWING / MODEL CLEANUP
