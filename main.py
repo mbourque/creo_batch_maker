@@ -53,6 +53,7 @@ DEFAULT_MODELCHECK_TTD = "modelcheck.ttd"
 DEFAULT_MODELCHECK_DISPLAY = "ModelCHECK"
 JPEG_2D_PLOT_TTD = "plot_jpeg_a-size.ttd"
 JPEG_2D_PLOT_DISPLAY = "JPEG 2D Export to file, A Paper Size"
+JPEG_3D_TTD = "solid-raster_write_jpg.ttd"
 
 
 def _creo_model_name_pattern(extensions: tuple[str, ...]) -> re.Pattern[str]:
@@ -248,7 +249,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         filename = self._task_filename_from_ui(task_display)
         if not filename:
             return False
-        if filename.lower() == "solid-raster_write_jpg.ttd":
+        if filename.lower() == JPEG_3D_TTD.lower():
             return True
         display = (task_display or "").strip().casefold()
         if "jpeg" in display and "3d" in display:
@@ -1196,6 +1197,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return True
         if filename.lower() == JPEG_2D_PLOT_TTD.lower():
             return True
+        if filename.lower() == JPEG_3D_TTD.lower():
+            return True
         dl = display_label.casefold()
         if "jpeg" in dl and "3d" in dl:
             return True
@@ -1482,11 +1485,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             fn_mc = next((f for f in filenames if f.lower() == "modelcheck.ttd"), None)
             if fn_mc:
                 pairs.append((fn_mc, self._read_ttd_description(ttd_folder / fn_mc)))
-            fn_jpg = next((f for f in filenames if f.lower() == "solid-raster_write_jpg.ttd"), None)
+            fn_jpg = next((f for f in filenames if f.lower() == JPEG_3D_TTD.lower()), None)
             if fn_jpg:
                 desc_j = self._read_ttd_description(ttd_folder / fn_jpg)
-                if self._task_allowed_for_dropdown(fn_jpg, desc_j):
-                    pairs.append((fn_jpg, desc_j))
+                pairs.append((fn_jpg, desc_j))
             fn_plot = next((f for f in filenames if f.lower() == JPEG_2D_PLOT_TTD.lower()), None)
             if fn_plot:
                 pairs.append((fn_plot, JPEG_2D_PLOT_DISPLAY))
@@ -1515,7 +1517,16 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 return
 
             self.task_select.configure(values=tuple(display_values))
-            self.task.set(display_values[0])
+            prev_fn = self._task_filename_from_ui(self.task.get() or "")
+            restored = False
+            if prev_fn:
+                for display, filename in self._task_display_to_filename.items():
+                    if filename.lower() == prev_fn.lower():
+                        self.task.set(display)
+                        restored = True
+                        break
+            if not restored:
+                self.task.set(display_values[0])
             self._refresh_configuration_menu()
         finally:
             self._refresh_action_buttons()
