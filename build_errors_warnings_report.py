@@ -80,6 +80,34 @@ def _normalize_family_instance_key(name: str, *, default_ext: str = ".PRT") -> s
     return up + default_ext
 
 
+def _family_info_instance_lookup_keys(info1_text: str, *, default_ext: str = ".PRT") -> list[str]:
+    """
+    Normalized lookup keys for one FAMILY_INFO ``info1`` value.
+
+    Creo often uses ``parent|instance`` (see ``title1`` Instance|Verified|…). Register the
+    full label and each pipe segment so ``<Model>`` tags match simple or nested instances.
+    """
+    raw = (info1_text or "").strip()
+    if not raw:
+        return []
+    keys: list[str] = []
+    seen: set[str] = set()
+
+    def add(part: str) -> None:
+        key = _normalize_family_instance_key(part, default_ext=default_ext)
+        if key and key not in seen:
+            seen.add(key)
+            keys.append(key)
+
+    add(raw)
+    if "|" in raw:
+        for segment in raw.split("|"):
+            segment = segment.strip()
+            if segment:
+                add(segment)
+    return keys
+
+
 def build_family_instance_to_generic_map(root: ET.Element) -> dict[str, str]:
     """
     For each generic model in master.xml, map family-table instance names (from FAMILY_INFO
@@ -111,8 +139,7 @@ def build_family_instance_to_generic_map(root: ET.Element) -> dict[str, str]:
             info1 = item.find("info1")
             if info1 is None or not (info1.text or "").strip():
                 continue
-            key = _normalize_family_instance_key(info1.text, default_ext=default_ext)
-            if key:
+            for key in _family_info_instance_lookup_keys(info1.text, default_ext=default_ext):
                 instance_to_generic[key] = generic_model
 
     return instance_to_generic
