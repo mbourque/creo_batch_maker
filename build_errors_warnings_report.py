@@ -8,6 +8,7 @@ working directory you pass in.
 from __future__ import annotations
 
 import argparse
+import glob
 import hashlib
 import os
 import re
@@ -61,13 +62,167 @@ def _file_size_header_is_zero(size_text: str) -> bool:
     return False
 
 
-def read_master_xml(master_xml_file: str) -> dict:
-    try:
-        tree = ET.parse(master_xml_file)
-        root = tree.getroot()
-        files_info: dict = {}
+def _pro_type_ext(pro_type: str) -> str:
+    pt = (pro_type or "").strip().upper()
+    if pt == "ASM":
+        return ".ASM"
+    return ".PRT"
 
-        for file_element in root.findall("File"):
+
+def _normalize_family_instance_key(name: str, *, default_ext: str = ".PRT") -> str:
+    """Map FAMILY_INFO instance labels to a Model-tag style key (uppercase, with extension)."""
+    s = (name or "").strip()
+    if not s:
+        return ""
+    up = s.upper()
+    if up.endswith((".PRT", ".ASM", ".DRW")):
+        return up
+    return up + default_ext
+
+
+def build_family_instance_to_generic_map(root: ET.Element) -> dict[str, str]:
+    """
+    For each generic model in master.xml, map family-table instance names (from FAMILY_INFO
+  items) to that generic's ``<Model>`` value.
+    """
+    instance_to_generic: dict[str, str] = {}
+    for file_element in root.findall("File"):
+        model_el = file_element.find("Model")
+        if model_el is None or not (model_el.text or "").strip():
+            continue
+        generic_model = model_el.text.strip()
+        pro_type_el = file_element.find("ProType")
+        default_ext = _pro_type_ext(pro_type_el.text if pro_type_el is not None else "PRT")
+
+        family = None
+        for check in file_element.findall(".//check"):
+            if (check.get("name") or "") == "FAMILY_INFO":
+                family = check
+                break
+        if family is None:
+            continue
+
+        ans_el = family.find("ans")
+        ans = (ans_el.text or "").strip().upper() if ans_el is not None else ""
+        if "GENERIC" not in ans:
+            continue
+
+        for item in family.findall("item"):
+            info1 = item.find("info1")
+            if info1 is None or not (info1.text or "").strip():
+                continue
+            key = _normalize_family_instance_key(info1.text, default_ext=default_ext)
+            if key:
+                instance_to_generic[key] = generic_model
+
+    return instance_to_generic
+
+
+def _family_info_is_instance(file_element: ET.Element) -> bool:
+    for check in file_element.findall(".//check"):
+        if (check.get("name") or "") != "FAMILY_INFO":
+            continue
+        ans_el = check.find("ans")
+        ans = (ans_el.text or "").strip().upper() if ans_el is not None else ""
+        return "INSTANCE" in ans
+    return False
+
+
+def model_file_exists_on_disk(working_dir: str, model_tag: str, xml_path: str) -> bool:
+    """True if the Creo model file exists (path from master.xml or under working_dir)."""
+    if xml_path:
+        if os.path.isfile(xml_path):
+            return True
+        try:
+            if os.path.isfile(os.path.normpath(xml_path)):
+                return True
+        except OSError:
+            pass
+
+    model_tag = (model_tag or "").strip()
+    if not model_tag:
+        return False
+
+    wd = os.path.normpath(os.path.abspath(working_dir))
+    direct = os.path.join(wd, model_tag)
+    if os.path.isfile(direct):
+        return True
+
+    stem, ext = os.path.splitext(model_tag)
+    if ext:
+        for variant in (ext, ext.lower(), ext.upper()):
+            p = os.path.join(wd, stem + variant)
+            if os.path.isfile(p):
+                return True
+        pattern = os.path.join(wd, stem + ext + ".*")
+        if glob.glob(pattern):
+            return True
+
+    want = model_tag.casefold()
+    try:
+        for fn in os.listdir(wd):
+            if fn.casefold() == want:
+                full = os.path.join(wd, fn)
+                if os.path.isfile(full):
+                    return True
+    except OSError:
+        pass
+    return False
+
+
+def model_tag_to_display_name(model_tag: str) -> str:
+    base, ext = os.path.splitext((model_tag or "").strip())
+    if ext:
+        return base + ext.lower()
+    return (model_tag or "").strip().lower()
+
+
+def resolve_report_display_name(
+    *,
+    working_dir: str,
+    file_path: str,
+    file_info: dict,
+    family_map: dict[str, str],
+) -> str:
+    """
+    Display / thumbnail / detail HTML name for the report.
+
+    When the instance ``<Model>`` file is missing on disk but master.xml lists it as a
+    family-table instance, use the generic ``<Model>`` from the matching FAMILY_INFO table.
+    """
+    model_tag = (file_info.get("model") or "").strip()
+    xml_path = (file_info.get("path") or "").strip()
+    display = get_display_name(file_path)
+    if not model_tag:
+        return display
+    # Family-table fallback is only for part/assembly models.
+    if model_tag.upper().endswith(".DRW"):
+        return display
+
+    if model_file_exists_on_disk(working_dir, model_tag, xml_path):
+        return display
+
+    if not file_info.get("family_is_instance"):
+        return display
+
+    key = _normalize_family_instance_key(model_tag)
+    generic_model = family_map.get(key)
+    if not generic_model:
+        stem_key = _normalize_family_instance_key(os.path.splitext(model_tag)[0])
+        generic_model = family_map.get(stem_key)
+    if not generic_model:
+        return display
+
+    generic_display = model_tag_to_display_name(generic_model)
+    if model_file_exists_on_disk(working_dir, generic_model, ""):
+        return generic_display
+    return display
+
+
+def _parse_master_root(root: ET.Element) -> dict:
+    files_info: dict = {}
+
+    for file_element in root.findall("File"):
             file_info = {
                 "path": file_element.find("Path").text if file_element.find("Path") is not None else "",
                 "model": file_element.find("Model").text if file_element.find("Model") is not None else "",
@@ -80,6 +235,7 @@ def read_master_xml(master_xml_file: str) -> dict:
                 "overall_size": file_element.find("OverallSize").text if file_element.find("OverallSize") is not None else "",
                 "units_length": file_element.find("UnitsLength").text if file_element.find("UnitsLength") is not None else "",
                 "checks": [],
+                "family_is_instance": _family_info_is_instance(file_element),
             }
 
             for check in file_element.findall(".//check"):
@@ -118,6 +274,24 @@ def read_master_xml(master_xml_file: str) -> dict:
 
             files_info[file_info["path"]] = file_info
 
+    return files_info
+
+
+def read_master_xml(master_xml_file: str, working_dir: str | None = None) -> dict:
+    try:
+        tree = ET.parse(master_xml_file)
+        root = tree.getroot()
+        family_map = build_family_instance_to_generic_map(root)
+        files_info = _parse_master_root(root)
+        if working_dir:
+            wd = os.path.normpath(os.path.abspath(working_dir))
+            for file_path, file_info in files_info.items():
+                file_info["report_display_name"] = resolve_report_display_name(
+                    working_dir=wd,
+                    file_path=file_path,
+                    file_info=file_info,
+                    family_map=family_map,
+                )
         return files_info
     except ET.ParseError as e:
         print(f"Error parsing master XML file {master_xml_file}: {e}")
@@ -402,7 +576,8 @@ def create_html_report(
     check_dict: dict = defaultdict(list)
     more_info_index = build_more_info_name_index(working_dir)
     for file_path, file_info in files_info.items():
-        display_name = get_display_name(file_path)
+        original_display_name = get_display_name(file_path)
+        drag_image_display_name = file_info.get("report_display_name") or original_display_name
         for check in file_info["checks"]:
             check_name = check["name"]
             description_data = descriptions.get(check_name)
@@ -411,7 +586,9 @@ def create_html_report(
                 continue
 
             if check["stat"] in ("ERROR", "WARNING"):
-                image_url = thumbnail_src_for_report(report_assets_dir, working_dir, display_name)
+                image_url = thumbnail_src_for_report(
+                    report_assets_dir, working_dir, drag_image_display_name
+                )
 
                 check_dict[f"{check['stat']}: {check['name']}"].append(
                     {
@@ -425,10 +602,14 @@ def create_html_report(
                         "num_features": file_info["num_features"],
                         "overall_size": file_info["overall_size"],
                         "units_length": file_info["units_length"],
-                        "display_name": display_name,
-                        "model_href": model_file_link_href(display_name),
+                        # Keep report text on the original model, but allow drag/image fallback.
+                        "display_name": original_display_name,
+                        "model_href": model_file_link_href(drag_image_display_name),
                         "image_url": image_url,
-                        "more_info_link": resolve_more_info_link(working_dir, display_name, more_info_index),
+                        # Keep detail HTML lookup tied to the original model entry.
+                        "more_info_link": resolve_more_info_link(
+                            working_dir, original_display_name, more_info_index
+                        ),
                         "file_list_id": safe_file_list_id(check_name, file_info.get("model") or ""),
                         "category": description_data["category"],
                     }
@@ -514,7 +695,7 @@ def build_errors_warnings_html(
     else:
         output_file = os.path.join(working_dir, "index.html")
 
-    files_info = read_master_xml(master_xml_file)
+    files_info = read_master_xml(master_xml_file, working_dir)
     descriptions = get_check_descriptions(model_checks_file)
 
     warning_count = sum(

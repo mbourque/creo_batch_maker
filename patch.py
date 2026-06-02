@@ -126,12 +126,32 @@ def _html_files_to_patch(working_dir: Path) -> list[Path]:
     return out
 
 
-def copy_modchk(src: Path, dest: Path, *, dry_run: bool = False, quiet: bool = False) -> None:
+def _modchk_dest_looks_usable(dest: Path) -> bool:
+    """Best-effort check that existing local modchk has expected assets."""
+    return (
+        (dest / "templates_new").is_dir()
+        and (dest / "templates_new" / "mctopban.js").is_file()
+        and (dest / "text").is_dir()
+    )
+
+
+def copy_modchk(
+    src: Path,
+    dest: Path,
+    *,
+    dry_run: bool = False,
+    quiet: bool = False,
+    replace_existing: bool = False,
+) -> None:
     if dest.exists() and not dest.is_dir():
         raise PatchError(f"Cannot create modchk folder; path exists as a file:\n{dest}")
     if dry_run:
         if not quiet:
             print(f"[dry-run] would copy:\n  {src}\n  -> {dest}")
+        return
+    if dest.exists() and dest.is_dir() and not replace_existing and _modchk_dest_looks_usable(dest):
+        if not quiet:
+            print(f"Using existing modchk:\n  {dest}")
         return
     if dest.exists():
         shutil.rmtree(dest)
@@ -145,6 +165,7 @@ def run(
     settings_path: Path | None = None,
     dry_run: bool = False,
     quiet: bool = False,
+    replace_existing_modchk: bool = False,
 ) -> PatchResult:
     path = (settings_path or default_settings_path()).resolve()
     settings = _load_settings(path)
@@ -153,7 +174,13 @@ def run(
 
     modchk_src = _modchk_source(loadpoint)
     modchk_dest = working_dir / "modchk"
-    copy_modchk(modchk_src, modchk_dest, dry_run=dry_run, quiet=quiet)
+    copy_modchk(
+        modchk_src,
+        modchk_dest,
+        dry_run=dry_run,
+        quiet=quiet,
+        replace_existing=replace_existing_modchk,
+    )
 
     html_files = _html_files_to_patch(working_dir)
     patched_files = 0
