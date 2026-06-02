@@ -43,6 +43,14 @@ def extract_check_content(file_path):
                 return child
         return None
 
+    def _normalize_units_length(raw: str) -> str:
+        """Display-friendly length units from ModelCHECK UNITS_LENGTH check."""
+        text = raw.strip()
+        if not text:
+            return "Unknown"
+        key = text.upper()
+        return {"MM": "mm", "INCH": "in", "IN": "in"}.get(key, text)
+
     for check in root.findall('.//check'):
         name = check.get('name')
         if name == 'FILE_SIZE':
@@ -56,10 +64,10 @@ def extract_check_content(file_path):
             num_features = check.find('ans').text if check.find('ans') is not None else 0
         elif name == 'OVERALL_SIZE':
             overall_size = check.find('ans').text if check.find('ans') is not None else 'Unknown'
-        elif name == 'PARAM_INFO':
-            for item in check.findall('.//item'):
-                if item.find('info1').text == 'PTC_UNITS_LENGTH':
-                    units_length = item.find('info2').text if item.find('info2') is not None else 'Unknown'
+        elif name == 'UNITS_LENGTH':
+            ans_el = _direct_ans(check)
+            if ans_el is not None and ans_el.text:
+                units_length = _normalize_units_length(ans_el.text)
 
     os.remove(cleaned_file_path)  # Clean up temporary file
     return checks, model, pro_type, date, last_saved, created, file_size, num_features, overall_size, units_length
