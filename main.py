@@ -211,6 +211,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "Open configurations...",
         ]
         self._refresh_action_buttons_job: str | None = None
+        self._activate_refresh_job: str | None = None
+        self._modal_dialog_depth = 0
         self._post_map_refresh_done = False
         self._suppress_settings_autosave = False
         self._settings_config_relative: dict[str, str] = {
@@ -1018,10 +1020,6 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         btn_row.pack(anchor="e", padx=16, pady=(0, 16))
 
         def close_dialog() -> None:
-            try:
-                dialog.grab_release()
-            except tk.TclError:
-                pass
             dialog.destroy()
 
         def on_ok() -> None:
@@ -1029,22 +1027,32 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             try:
                 n = int(raw)
             except ValueError:
-                messagebox.showwarning(
-                    "Chunk size",
-                    f"Enter a whole number from {CREO_BATCH_CHUNK_SIZE_MIN} to {CREO_BATCH_CHUNK_SIZE_MAX}.",
-                    parent=dialog,
-                )
+                def warn() -> None:
+                    messagebox.showwarning(
+                        "Chunk size",
+                        f"Enter a whole number from {CREO_BATCH_CHUNK_SIZE_MIN} to {CREO_BATCH_CHUNK_SIZE_MAX}.",
+                        parent=dialog,
+                    )
+
+                warn()
                 return
             if n < CREO_BATCH_CHUNK_SIZE_MIN or n > CREO_BATCH_CHUNK_SIZE_MAX:
-                messagebox.showwarning(
-                    "Chunk size",
-                    f"Enter a whole number from {CREO_BATCH_CHUNK_SIZE_MIN} to {CREO_BATCH_CHUNK_SIZE_MAX}.",
-                    parent=dialog,
-                )
+                def warn_range() -> None:
+                    messagebox.showwarning(
+                        "Chunk size",
+                        f"Enter a whole number from {CREO_BATCH_CHUNK_SIZE_MIN} to {CREO_BATCH_CHUNK_SIZE_MAX}.",
+                        parent=dialog,
+                    )
+
+                warn_range()
                 return
             err = self._persist_chunk_size(n)
             if err:
-                messagebox.showerror("Chunk size", err, parent=dialog)
+
+                def show_err() -> None:
+                    messagebox.showerror("Chunk size", err, parent=dialog)
+
+                show_err()
                 return
             close_dialog()
 
@@ -1078,32 +1086,40 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         btn_row.pack(anchor="e", padx=16, pady=(0, 16))
 
         def close_dialog() -> None:
-            try:
-                dialog.grab_release()
-            except tk.TclError:
-                pass
             dialog.destroy()
 
         def on_ok() -> None:
             raw = value_var.get().strip()
             if not raw.isdigit():
-                messagebox.showwarning(
-                    "Timeout",
-                    f"Enter a whole number of seconds (minimum {BATCH_OUTPUT_WAIT_TIMEOUT_MIN}).",
-                    parent=dialog,
-                )
+
+                def warn_digits() -> None:
+                    messagebox.showwarning(
+                        "Timeout",
+                        f"Enter a whole number of seconds (minimum {BATCH_OUTPUT_WAIT_TIMEOUT_MIN}).",
+                        parent=dialog,
+                    )
+
+                warn_digits()
                 return
             n = int(raw)
             if n < BATCH_OUTPUT_WAIT_TIMEOUT_MIN:
-                messagebox.showwarning(
-                    "Timeout",
-                    f"Enter a whole number of seconds (minimum {BATCH_OUTPUT_WAIT_TIMEOUT_MIN}).",
-                    parent=dialog,
-                )
+
+                def warn_min() -> None:
+                    messagebox.showwarning(
+                        "Timeout",
+                        f"Enter a whole number of seconds (minimum {BATCH_OUTPUT_WAIT_TIMEOUT_MIN}).",
+                        parent=dialog,
+                    )
+
+                warn_min()
                 return
             err = self._persist_output_timeout_sec(n)
             if err:
-                messagebox.showerror("Timeout", err, parent=dialog)
+
+                def show_err() -> None:
+                    messagebox.showerror("Timeout", err, parent=dialog)
+
+                show_err()
                 return
             close_dialog()
 
@@ -1166,10 +1182,6 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         ctk.CTkLabel(dialog, text="Created by Michael P. Bourque").pack(anchor="w", padx=16, pady=(0, 16))
 
         def close_dialog() -> None:
-            try:
-                dialog.grab_release()
-            except tk.TclError:
-                pass
             dialog.destroy()
 
         ctk.CTkButton(dialog, text="OK", width=80, command=close_dialog).pack(anchor="e", padx=16, pady=(0, 16))
@@ -1287,7 +1299,21 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._refresh_action_buttons()
 
     def _on_app_activate(self, _event: object = None) -> None:
-        """Refresh action buttons when this window becomes active (alt-tab back, dialog closed)."""
+        """Refresh action buttons when this window becomes active (debounced; skip during modals)."""
+        if self._modal_dialog_depth > 0:
+            return
+        jid = self._activate_refresh_job
+        if jid is not None:
+            try:
+                self.after_cancel(jid)
+            except tk.TclError:
+                pass
+        self._activate_refresh_job = self.after(250, self._on_app_activate_run)
+
+    def _on_app_activate_run(self) -> None:
+        self._activate_refresh_job = None
+        if self._modal_dialog_depth > 0:
+            return
         self._refresh_action_buttons()
 
     def _install_dialog_parent(self) -> None:
@@ -1355,7 +1381,6 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         dialog.title(title)
         dialog.resizable(False, False)
         dialog.transient(anchor)
-        dialog.grab_set()
 
         result: dict[str, bool | None] = {"value": False if ask_yes_no else None}
 
@@ -1395,14 +1420,22 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             _center_toplevel_on_parent(dialog, anchor)
             dialog.deiconify()
             try:
+                dialog.grab_set()
+            except tk.TclError:
+                pass
+            try:
                 dialog.lift()
                 dialog.focus_force()
             except tk.TclError:
                 pass
 
-        dialog.update_idletasks()
-        dialog.after_idle(show)
-        dialog.wait_window()
+        self._modal_dialog_depth += 1
+        try:
+            dialog.update_idletasks()
+            dialog.after_idle(show)
+            dialog.wait_window()
+        finally:
+            self._modal_dialog_depth = max(0, self._modal_dialog_depth - 1)
         return result["value"]
 
     def _create_modal_toplevel(self, title: str) -> ctk.CTkToplevel:
@@ -1411,7 +1444,6 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         dialog.title(title)
         dialog.resizable(False, False)
         dialog.transient(self)
-        dialog.grab_set()
         return dialog
 
     def _present_modal_toplevel(
@@ -1426,8 +1458,12 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         def show() -> None:
             if not dialog.winfo_exists():
                 return
-            _center_toplevel_on_parent(dialog, anchor)
             dialog.deiconify()
+            try:
+                _center_toplevel_on_parent(dialog, anchor)
+            except tk.TclError:
+                # Parent geometry can be transient/invalid while focus changes; keep dialog visible.
+                pass
             try:
                 dialog.lift()
                 dialog.focus_force()
@@ -1711,7 +1747,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return False
 
     def _working_directory_has_modelcheck_xml(self, working_dir_str: str | None = None) -> bool:
-        """True if at least one ``*.p.xml`` / ``*.a.xml`` / ``*.d.xml`` exists (recursive, same scan as Build)."""
+        """True if at least one ModelCHECK result XML exists in the working directory (top level only)."""
         s = (working_dir_str if working_dir_str is not None else self.working_directory.get()).strip()
         if not s:
             return False
@@ -1719,8 +1755,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             d = Path(s).expanduser()
             if not d.is_dir():
                 return False
-            for pattern in ("*.p.xml", "*.a.xml", "*.d.xml"):
-                if next(d.rglob(pattern), None) is not None:
+            for entry in d.iterdir():
+                if not entry.is_file():
+                    continue
+                low = entry.name.lower()
+                if low.endswith((".p.xml", ".a.xml", ".d.xml")):
                     return True
             return False
         except OSError:

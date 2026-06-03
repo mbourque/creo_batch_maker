@@ -22,6 +22,7 @@ modelcheck_enabled yes
 prompt_on_exit no
 confirm_on_delete no
 regen_failure_handling no_resolve_mode
+allow_mfg_in_assem_mode yes
 
 ! graphics NO_GRAPHICS
 ! NOTE:

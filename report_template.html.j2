@@ -321,7 +321,7 @@
                     <img title="No file link for this model name" src="{{ file.image_url | e }}" alt="" onerror="this.onerror=null;this.style.display='none';"/></span>
                     {% endif %}
                 {% endif %}
-                <p>{% if file.model_href %}<a href="{{ file.model_href | safe }}" onclick="void(0); return false;">{{ file.display_name | e }}</a>{% else %}<span class="model-name-plain">{{ file.display_name | e }}</span>{% endif %}&nbsp;
+                <p>{% if file.model_href %}<a href="{{ file.model_href | safe }}" onclick="void(0); return false;">{{ file.display_name_link_text | e }}</a>{% else %}<span class="model-name-plain">{{ file.display_name | e }}</span>{% endif %}&nbsp;
                     {% if file.more_info_link %}
                     <button type="button" onclick="openPopup(event, '{{ file.more_info_link | safe }}');">More details...</button>
                     {% else %}

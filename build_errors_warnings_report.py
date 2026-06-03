@@ -467,6 +467,22 @@ def model_file_link_href(display_name: str) -> str | None:
     return build_model_href(display_name)
 
 
+def display_name_link_text(original_display_name: str, drag_image_display_name: str) -> str:
+    """
+    Link label shown in the report.
+
+    When family-table fallback swaps drag/image behavior to a generic model, show
+    ``instance<generic>`` so readers can tell the row is an instance.
+    """
+    if (
+        original_display_name
+        and drag_image_display_name
+        and original_display_name.casefold() != drag_image_display_name.casefold()
+    ):
+        return f"{original_display_name}<{drag_image_display_name}>"
+    return original_display_name
+
+
 def safe_file_list_id(check_name: str, model: str) -> str:
     """HTML id / fragment; must not contain characters that break CSS selectors or the DOM."""
     raw = f"{check_name}_{model.replace(os.sep, '_')}"
@@ -631,6 +647,9 @@ def create_html_report(
                         "units_length": file_info["units_length"],
                         # Keep report text on the original model, but allow drag/image fallback.
                         "display_name": original_display_name,
+                        "display_name_link_text": display_name_link_text(
+                            original_display_name, drag_image_display_name
+                        ),
                         "model_href": model_file_link_href(drag_image_display_name),
                         "image_url": image_url,
                         # Keep detail HTML lookup tied to the original model entry.
