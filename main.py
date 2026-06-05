@@ -8,6 +8,7 @@ import re
 import shutil
 import sys
 import subprocess
+import threading
 import webbrowser
 import xml.etree.ElementTree as ET
 import tkinter as tk
@@ -98,6 +99,10 @@ def _center_toplevel_on_parent(toplevel: tk.Misc, parent: tk.Misc) -> None:
     parent.update_idletasks()
     tw = toplevel.winfo_width()
     th = toplevel.winfo_height()
+    if tw <= 1:
+        tw = toplevel.winfo_reqwidth()
+    if th <= 1:
+        th = toplevel.winfo_reqheight()
     pw = parent.winfo_width()
     ph = parent.winfo_height()
     if pw <= 1:
@@ -213,6 +218,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._refresh_action_buttons_job: str | None = None
         self._activate_refresh_job: str | None = None
         self._modal_dialog_depth = 0
+        self._report_job_running = False
         self._post_map_refresh_done = False
         self._suppress_settings_autosave = False
         self._settings_config_relative: dict[str, str] = {
@@ -1389,10 +1395,6 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 result["value"] = value
             elif not ask_yes_no:
                 result["value"] = True
-            try:
-                dialog.grab_release()
-            except tk.TclError:
-                pass
             dialog.destroy()
 
         ctk.CTkLabel(dialog, text=message, justify="left", wraplength=420).pack(
@@ -1414,20 +1416,33 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             dialog.bind("<Escape>", lambda _e: close(True))
             dialog.protocol("WM_DELETE_WINDOW", lambda: close(True))
 
+        def place_centered() -> None:
+            if not dialog.winfo_exists():
+                return
+            try:
+                anchor.deiconify()
+                anchor.update_idletasks()
+            except tk.TclError:
+                pass
+            dialog.update_idletasks()
+            try:
+                _center_toplevel_on_parent(dialog, anchor)
+            except tk.TclError:
+                pass
+
         def show() -> None:
             if not dialog.winfo_exists():
                 return
-            _center_toplevel_on_parent(dialog, anchor)
             dialog.deiconify()
+            place_centered()
             try:
-                dialog.grab_set()
-            except tk.TclError:
-                pass
-            try:
+                dialog.attributes("-topmost", True)
                 dialog.lift()
                 dialog.focus_force()
+                dialog.after(200, lambda: dialog.attributes("-topmost", False) if dialog.winfo_exists() else None)
             except tk.TclError:
                 pass
+            dialog.after(50, place_centered)
 
         self._modal_dialog_depth += 1
         try:
@@ -1455,15 +1470,20 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
     ) -> None:
         anchor = parent if parent is not None else self
 
+        def place_centered() -> None:
+            if not dialog.winfo_exists():
+                return
+            dialog.update_idletasks()
+            try:
+                _center_toplevel_on_parent(dialog, anchor)
+            except tk.TclError:
+                pass
+
         def show() -> None:
             if not dialog.winfo_exists():
                 return
             dialog.deiconify()
-            try:
-                _center_toplevel_on_parent(dialog, anchor)
-            except tk.TclError:
-                # Parent geometry can be transient/invalid while focus changes; keep dialog visible.
-                pass
+            place_centered()
             try:
                 dialog.lift()
                 dialog.focus_force()
@@ -1476,6 +1496,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                         focus_widget.select_range(0, "end")
                 except tk.TclError:
                     pass
+            dialog.after(50, place_centered)
 
         dialog.update_idletasks()
         dialog.after_idle(show)
@@ -2249,6 +2270,93 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         # Report depends on master.xml on disk; no StringVar changes here.
         self._refresh_action_buttons()
 
+    def _set_report_busy(self, busy: bool) -> None:
+        self._report_job_running = busy
+        btn = getattr(self, "summary_report_button", None)
+        if btn is not None:
+            btn.configure(state="disabled", text="Report..." if busy else "Report")
+        try:
+            self.configure(cursor="wait" if busy else "")
+        except tk.TclError:
+            pass
+
+    def _bring_app_forward(self) -> None:
+        try:
+            self.deiconify()
+            self.lift()
+            self.focus_force()
+            self.update_idletasks()
+        except tk.TclError:
+            pass
+
+    def _finish_report_job(self, result: dict[str, object]) -> None:
+        self._set_report_busy(False)
+        self._refresh_action_buttons()
+        self._bring_app_forward()
+
+        error = result.get("error")
+        if error:
+            kind = result.get("kind")
+            if kind == "patch":
+                messagebox.showerror(
+                    "Report Failed",
+                    f"Could not patch ModelCHECK HTML.\n\n{error}",
+                )
+            elif kind == "notfound":
+                messagebox.showerror("Report Failed", str(error))
+            elif kind == "os":
+                messagebox.showerror(
+                    "Report Failed",
+                    f"Could not write report HTML.\n\n{error}",
+                )
+            else:
+                messagebox.showerror(
+                    "Report Failed",
+                    f"An error occurred while building the report.\n\n{error}",
+                )
+            return
+
+        written = result.get("written")
+        if written and messagebox.askyesno(
+            "Report",
+            f"Wrote full report (with sidebar):\n{written}\n\nOpen in browser?",
+        ):
+            try:
+                webbrowser.open(Path(str(written)).as_uri())
+            except OSError as exc:
+                messagebox.showerror(
+                    "Open Failed",
+                    f"Could not open report in browser.\n\n{exc}",
+                )
+
+    def _start_report_job(self, working_dir: Path) -> None:
+        if self._report_job_running:
+            return
+        self._set_report_busy(True)
+        settings_path = _default_app_settings_path()
+        wd = str(working_dir)
+
+        def work() -> None:
+            result: dict[str, object] = {"written": None, "error": None, "kind": None}
+            try:
+                patch.run(settings_path=settings_path, quiet=True)
+                result["written"] = build_errors_warnings_report.build_errors_warnings_html(wd)
+            except patch.PatchError as exc:
+                result["error"] = str(exc)
+                result["kind"] = "patch"
+            except FileNotFoundError as exc:
+                result["error"] = str(exc)
+                result["kind"] = "notfound"
+            except OSError as exc:
+                result["error"] = str(exc)
+                result["kind"] = "os"
+            except Exception as exc:
+                result["error"] = str(exc)
+                result["kind"] = "generic"
+            self.after(0, lambda: self._finish_report_job(result))
+
+        threading.Thread(target=work, daemon=True).start()
+
     def _on_write_summary_report(self) -> None:
         wd = (self.working_directory.get() or "").strip()
         if not wd:
@@ -2285,34 +2393,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             )
             return
         self._persist_working_directory_and_loadpoint()
-        try:
-            patch.run(settings_path=_default_app_settings_path(), quiet=True)
-        except patch.PatchError as exc:
-            messagebox.showerror("Report Failed", f"Could not patch ModelCHECK HTML.\n\n{exc}")
-            return
-        try:
-            written = build_errors_warnings_report.build_errors_warnings_html(str(working_dir))
-        except FileNotFoundError as exc:
-            messagebox.showerror("Report Failed", str(exc))
-            return
-        except OSError as exc:
-            messagebox.showerror("Report Failed", f"Could not write report HTML.\n\n{exc}")
-            return
-        except Exception as exc:
-            messagebox.showerror("Report Failed", f"An error occurred while building the report.\n\n{exc}")
-            return
-        if messagebox.askyesno(
-            "Report",
-            f"Wrote full report (with sidebar):\n{written}\n\nOpen in browser?",
-        ):
-            try:
-                webbrowser.open(Path(written).as_uri())
-            except OSError as exc:
-                messagebox.showerror(
-                    "Open Failed",
-                    f"Could not open report in browser.\n\n{exc}",
-                )
-        self._refresh_action_buttons()
+        self._start_report_job(working_dir)
 
     def _launch_ptcdbatch(self) -> None:
         loadpoint_raw = (self.creo_loadpoint.get() or "").strip().rstrip("\\/")

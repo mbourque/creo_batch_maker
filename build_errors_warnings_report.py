@@ -21,7 +21,7 @@ import markdown
 from jinja2 import Environment, FileSystemLoader
 from PIL import Image, ImageDraw
 
-from make_html_summary import generate_summary_div
+from make_html_summary import generate_adjusted_summary_shell, get_category_descriptions
 
 
 def _app_bundle_dir() -> str:
@@ -606,7 +606,8 @@ def create_html_report(
     master_xml_path: str,
     model_checks_path: str,
 ) -> None:
-    summary_div = generate_summary_div(master_xml_path, model_checks_path)
+    category_descriptions = get_category_descriptions(model_checks_path)
+    summary_div = generate_adjusted_summary_shell(category_descriptions)
 
     env = Environment(loader=FileSystemLoader(bundle_dir))
     template = env.get_template("report_template.html.j2")

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Model Quality Report</title>
+    <title>index</title>
     <style>
         body {
             font-family: "Segoe UI", Arial, sans-serif;
@@ -42,6 +42,32 @@
         .sidebar ul li.sidebar-nav-active {
             background-color: #e8ecf1;
             border-radius: 4px;
+        }
+        .sidebar-filter-wrap {
+            margin: 10px 0 12px 0;
+        }
+        .sidebar-filter-label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 6px;
+        }
+        .sidebar-stat-filter {
+            width: 100%;
+            box-sizing: border-box;
+            font-family: inherit;
+            font-size: 0.95rem;
+            color: #1a1a1a;
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            padding: 6px 8px;
+            cursor: pointer;
+        }
+        .sidebar-stat-filter:focus {
+            outline: 2px solid #007BFF;
+            outline-offset: 1px;
         }
         h1 { color: #0f172a; font-weight: 700; }
         .check-section-wrapper { margin-bottom: 20px; border: 1px solid #007BFF; border-radius: 8px; padding: 10px; display: flow-root; }
@@ -97,6 +123,7 @@
     </style>
     <script defer>
         let hiddenSections = [];
+        let scoreViewAdjusted = false;
 
         function openPopup(event, url) {
             const x = event.screenX;
@@ -112,38 +139,74 @@
             return el && el.closest ? el.closest('.file-row') : null;
         }
 
-        function toggleFlaggedView() {
-            var allFiles = document.getElementsByClassName('file-list');
-            var flaggedFiles = document.getElementsByClassName('flagged');
-            var checkSections = document.getElementsByClassName('check-section-wrapper');
-            var flaggedButton = document.getElementById('flagged-button');
-            var showOnlyFlagged = flaggedButton.classList.toggle('active');
-            flaggedButton.classList.toggle('flag-button');
-            for (var i = 0; i < allFiles.length; i++) {
-                if (!hiddenSections.includes(allFiles[i].id)) {
-                    var row = fileRowFor(allFiles[i]) || allFiles[i];
-                    row.style.display = showOnlyFlagged ? 'none' : '';
+        function rowVisibleForViewMode(fileListEl, mode) {
+            if (mode === 'all') { return true; }
+            var stat = (fileListEl.getAttribute('data-mq-stat') || '').toUpperCase();
+            var flagged = fileListEl.classList.contains('flagged');
+            if (mode === 'warning') { return stat === 'WARNING'; }
+            if (mode === 'error') { return stat === 'ERROR'; }
+            if (mode === 'flagged') { return flagged; }
+            if (mode === 'unflagged') { return !flagged; }
+            return true;
+        }
+
+        function setFileRowDisplay(fileListEl, show) {
+            var row = fileRowFor(fileListEl) || fileListEl;
+            row.style.display = show ? '' : 'none';
+        }
+
+        function sidebarNavForSection(sectionId) {
+            return document.querySelector('.sidebar .' + escapeCssSelector(sectionId));
+        }
+
+        function applyViewFilter() {
+            var sel = document.getElementById('sidebar-view-filter');
+            if (!sel) { return; }
+            var mode = sel.value;
+            var sections = document.getElementsByClassName('check-section-wrapper');
+
+            for (var s = 0; s < sections.length; s++) {
+                var wrapper = sections[s];
+                var sectionId = wrapper.id;
+                if (hiddenSections.includes(sectionId)) { continue; }
+
+                var sectionStat = (wrapper.getAttribute('data-mq-section-stat') || '').toUpperCase();
+                var sidebarItem = sidebarNavForSection(sectionId);
+                var fileLists = wrapper.getElementsByClassName('file-list');
+                var showSection = true;
+
+                if (mode === 'warning' && sectionStat === 'ERROR') {
+                    showSection = false;
+                } else if (mode === 'error' && sectionStat === 'WARNING') {
+                    showSection = false;
                 }
-            }
-            if (showOnlyFlagged) {
-                for (var i = 0; i < flaggedFiles.length; i++) {
-                    if (!hiddenSections.includes(flaggedFiles[i].id)) {
-                        var rowF = fileRowFor(flaggedFiles[i]) || flaggedFiles[i];
-                        rowF.style.display = '';
+
+                if (!showSection) {
+                    wrapper.style.display = 'none';
+                    if (sidebarItem) { sidebarItem.style.display = 'none'; }
+                    continue;
+                }
+
+                if (mode === 'all' || mode === 'warning' || mode === 'error') {
+                    wrapper.style.display = '';
+                    if (sidebarItem) { sidebarItem.style.display = ''; }
+                    for (var f = 0; f < fileLists.length; f++) {
+                        if (!fileLists[f].parentNode) { continue; }
+                        setFileRowDisplay(fileLists[f], true);
                     }
+                    continue;
                 }
-            }
-            for (var i = 0; i < checkSections.length; i++) {
-                var section = checkSections[i];
-                var hasVisibleFlagged = section.getElementsByClassName('flagged').length > 0;
-                var sectionId = section.id;
-                if (!hiddenSections.includes(sectionId)) {
-                    section.style.display = (showOnlyFlagged && !hasVisibleFlagged) ? 'none' : '';
+
+                var anyVisible = false;
+                for (var g = 0; g < fileLists.length; g++) {
+                    var fileList = fileLists[g];
+                    if (!fileList.parentNode) { continue; }
+                    var showRow = rowVisibleForViewMode(fileList, mode);
+                    setFileRowDisplay(fileList, showRow);
+                    if (showRow) { anyVisible = true; }
                 }
-                var sidebarItem = document.querySelector('.sidebar .' + sectionId);
-                if (sidebarItem && !hiddenSections.includes(sectionId)) {
-                    sidebarItem.style.display = (showOnlyFlagged && !hasVisibleFlagged) ? 'none' : '';
-                }
+                wrapper.style.display = anyVisible ? '' : 'none';
+                if (sidebarItem) { sidebarItem.style.display = anyVisible ? '' : 'none'; }
             }
         }
 
@@ -153,10 +216,115 @@
             var flagButton = element.querySelector('.flag-button');
             element.classList.toggle('flagged');
             if (flagButton) { flagButton.classList.toggle('dimmed-button'); }
+            applyViewFilter();
         }
 
         function escapeCssSelector(selector) {
             return selector.replace(/([\:\.\[\],=|@!"#$%&'()*+;<>?\\^`{}~])/g, "\\$1");
+        }
+
+        function mqGradeClass(letter) {
+            var map = { A: 'mq-grade-a', B: 'mq-grade-b', C: 'mq-grade-c', D: 'mq-grade-d' };
+            return map[letter] || 'mq-grade-na';
+        }
+
+        function mqGradeFromCounts(pass, warn, err) {
+            var total = pass + warn + err;
+            if (total === 0) { return 'A'; }
+            if (err > 0) { return 'D'; }
+            var yellowRatio = warn / total;
+            if (yellowRatio > 0.25) { return 'C'; }
+            if (yellowRatio >= 0.05) { return 'B'; }
+            return 'A';
+        }
+
+        function mqSetGradeRing(el, letter) {
+            if (!el) { return; }
+            el.textContent = letter;
+            el.className = 'mq-grade-ring ' + mqGradeClass(letter);
+        }
+
+        function mqSetCategoryBadge(badge, letter) {
+            if (!badge) { return; }
+            badge.textContent = letter;
+            badge.className = 'mq-cat-badge ' + mqGradeClass(letter);
+        }
+
+        function recalculateAdjustedSummary() {
+            var rows = document.querySelectorAll('.mq-issue-row');
+            var warnIssues = 0;
+            var errIssues = 0;
+            var warnModels = {};
+            var errModels = {};
+            var allModels = {};
+            var byCategory = {};
+
+            for (var i = 0; i < rows.length; i++) {
+                var row = rows[i];
+                var stat = (row.getAttribute('data-mq-stat') || '').toUpperCase();
+                var cat = row.getAttribute('data-mq-category') || '';
+                var model = row.getAttribute('data-mq-model') || '';
+                if (!byCategory[cat]) { byCategory[cat] = { warn: 0, err: 0 }; }
+                if (model) { allModels[model] = true; }
+                if (stat === 'WARNING') {
+                    warnIssues++;
+                    byCategory[cat].warn++;
+                    if (model) { warnModels[model] = true; }
+                } else if (stat === 'ERROR') {
+                    errIssues++;
+                    byCategory[cat].err++;
+                    if (model) { errModels[model] = true; }
+                }
+            }
+
+            var issuesEl = document.getElementById('mq-stat-issues');
+            var modelsEl = document.getElementById('mq-stat-models');
+            var warnModelsEl = document.getElementById('mq-stat-warn-models');
+            var errModelsEl = document.getElementById('mq-stat-err-models');
+            if (issuesEl) { issuesEl.textContent = String(warnIssues + errIssues); }
+            if (modelsEl) { modelsEl.textContent = String(Object.keys(allModels).length); }
+            if (warnModelsEl) { warnModelsEl.textContent = String(Object.keys(warnModels).length); }
+            if (errModelsEl) { errModelsEl.textContent = String(Object.keys(errModels).length); }
+            mqSetGradeRing(
+                document.getElementById('mq-overall-grade'),
+                mqGradeFromCounts(0, warnIssues, errIssues)
+            );
+
+            var titleEl = document.getElementById('mq-page-title');
+            if (titleEl) {
+                titleEl.textContent = scoreViewAdjusted ? 'Your Adjusted Score' : 'Your score';
+            }
+
+            var cards = document.querySelectorAll('#mq-categories .mq-cat-card[data-mq-category]');
+            for (var c = 0; c < cards.length; c++) {
+                var card = cards[c];
+                var catName = card.getAttribute('data-mq-category') || '';
+                var counts = byCategory[catName] || { warn: 0, err: 0 };
+                var w = counts.warn;
+                var e = counts.err;
+                var hasIssues = (w + e) > 0;
+                card.classList.toggle('mq-cat-empty', !hasIssues);
+                if (!hasIssues) { continue; }
+                var letter = mqGradeFromCounts(0, w, e);
+                var total = w + e;
+                var yPct = (w / total) * 100;
+                var rPct = (e / total) * 100;
+                mqSetCategoryBadge(card.querySelector('[data-mq-role="badge"]'), letter);
+                var segWarn = card.querySelector('[data-mq-role="seg-warn"]');
+                var segErr = card.querySelector('[data-mq-role="seg-err"]');
+                var segPass = card.querySelector('[data-mq-role="seg-pass"]');
+                var stack = card.querySelector('[data-mq-role="stack"]');
+                if (segWarn) { segWarn.style.width = yPct.toFixed(4) + '%'; }
+                if (segErr) { segErr.style.width = rPct.toFixed(4) + '%'; }
+                if (segPass) { segPass.style.width = '0%'; }
+                if (stack) {
+                    stack.title = yPct.toFixed(2) + '% warning, ' + rPct.toFixed(2) + '% error';
+                }
+                var warnCount = card.querySelector('[data-mq-role="warn-count"]');
+                var errCount = card.querySelector('[data-mq-role="err-count"]');
+                if (warnCount) { warnCount.textContent = String(w); }
+                if (errCount) { errCount.textContent = String(e); }
+            }
         }
 
         function hideElementById(id) {
@@ -170,6 +338,9 @@
                 hiddenSections = hiddenSections.filter(sec => sec !== id);
             }
             removeEmptyCheckSections();
+            scoreViewAdjusted = true;
+            recalculateAdjustedSummary();
+            applyViewFilter();
         }
 
         function hideElementsByClass(className) {
@@ -185,6 +356,9 @@
                 sidebarItem.parentNode.removeChild(sidebarItem);
             });
             removeEmptyCheckSections();
+            scoreViewAdjusted = true;
+            recalculateAdjustedSummary();
+            applyViewFilter();
         }
 
         function removeEmptyCheckSections() {
@@ -219,6 +393,9 @@
             sidebarItems.forEach(function (sidebarItem) {
                 sidebarItem.parentNode.removeChild(sidebarItem);
             });
+            scoreViewAdjusted = true;
+            recalculateAdjustedSummary();
+            applyViewFilter();
         }
 
         function printReport() { window.print(); }
@@ -263,10 +440,15 @@
                 window.addEventListener('hashchange', setActiveSidebarNavFromHash);
                 setActiveSidebarNavFromHash();
             }
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', initSidebarNavHighlight);
-            } else {
+            function initReportUi() {
                 initSidebarNavHighlight();
+                applyViewFilter();
+                recalculateAdjustedSummary();
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initReportUi);
+            } else {
+                initReportUi();
             }
         })();
     </script>
@@ -274,20 +456,30 @@
 <body>
 <div class="sidebar">
     <button class="button print-button" onclick="printReport()">Print This</button>
-    <button class="button" id="flagged-button" onclick="toggleFlaggedView()">Flagged View</button>
+    <div class="sidebar-filter-wrap" id="sidebar-filter-wrap">
+        <label class="sidebar-filter-label" for="sidebar-view-filter">Filter view</label>
+        <select id="sidebar-view-filter" class="sidebar-stat-filter" onchange="applyViewFilter()">
+            <option value="all" selected>Show all</option>
+            <option value="warning">Show warnings</option>
+            <option value="error">Show errors</option>
+            <option value="flagged">Show flagged</option>
+            <option value="unflagged">Show unflagged</option>
+        </select>
+    </div>
     <ul>
-        <li><a href="report.xlsx">Download Report</a></li>
-        <li><a href="#summary">Summary</a></li>
+        <li><a href="#summary">Your Score</a></li>
         <hr>
         {% for section in check_sections %}
-        <li title="{{ section.category }}" class="wrapper-{{ section.class }}"><a href="#{{ section.class }}">{{ section.name }} ({{ section.count }})</a></li>
+        <li title="{{ section.category }}" class="sidebar-check-nav wrapper-{{ section.class }}"
+            data-mq-sidebar-stat="{{ 'ERROR' if section.stat_type == 'ERRORS' else 'WARNING' }}">
+            <a href="#{{ section.class }}">{{ section.name }} ({{ section.count }})</a>
+        </li>
         {% endfor %}
     </ul>
 </div>
 
 <a id="summary"></a>
 <div class="container main-content">
-    <h1>Model Quality Report</h1>
     <div class="summary">
         <div id="summary-section">
             {{ summary_div }}
@@ -296,7 +488,8 @@
 
     {% for section in check_sections %}
     <a id="{{ section.class }}"></a>
-    <div class="check-section-wrapper" id="wrapper-{{ section.class }}">
+    <div class="check-section-wrapper" id="wrapper-{{ section.class }}"
+         data-mq-section-stat="{{ 'ERROR' if section.stat_type == 'ERRORS' else 'WARNING' }}">
         <div class="check-header">
             <div class="check-title">
                 <h2 id="{{ section.class }}"><span class="bold-text">{{ section.stat_type }}:</span> {{ section.count }} {{ section.name }}</h2>
@@ -311,7 +504,11 @@
         <div class="check-section {{ section.class }}" id="{{ section.class }}">
             {% for file in section.files %}
             <div class="file-row">
-            <div class="file-list {{ file.stat }}{{ (file.desc or '').replace(' ', '').replace(':', '\\:').replace('.', '\\.') }}" id="{{ file.file_list_id | escape }}">
+            <div class="file-list mq-issue-row {{ file.stat }}{{ (file.desc or '').replace(' ', '').replace(':', '\\:').replace('.', '\\.') }}"
+                 id="{{ file.file_list_id | escape }}"
+                 data-mq-stat="{{ file.stat }}"
+                 data-mq-category="{{ file.category | e }}"
+                 data-mq-model="{{ file.display_name | e }}">
                 {% if file.image_url %}
                     {% if file.model_href %}
                 <a class="model-thumb-wrap" href="{{ file.model_href | safe }}" onclick="void(0); return false;">
@@ -336,7 +533,7 @@
                 <p><strong>Model Overall Size:</strong> {{ file.overall_size }}</p>
                 <p><strong>Model Units for Length:</strong> {{ file.units_length }}</p>
                 <div class="check-buttons">
-                    <button class="flag-button button" onclick="toggleFlag('{{ file.file_list_id | escape }}')">Flag&nbsp;this&nbsp;file</button>
+                    <button class="flag-button button" onclick="toggleFlag('{{ file.file_list_id | escape }}')">Flag&nbsp;this</button>
                     <button class="hide-button button" onclick="hideElementById('{{ file.file_list_id | escape }}')">Remove&nbsp;only&nbsp;this</button>
                     <button class="hide-button button" onclick="hideElementsByClass('{{ file.stat }}{{ (file.desc or '').replace(' ', '').replace(':', '\\:').replace('.', '\\.') }}')">Remove&nbsp;all&nbsp;like&nbsp;this</button>
                 </div>
