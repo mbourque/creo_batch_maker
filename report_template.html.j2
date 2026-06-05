@@ -115,7 +115,67 @@
         .model-thumb-wrap { float: left; padding: 10px; margin-right: 8px; box-sizing: border-box; }
         .model-thumb-wrap img { display: block; width: 300px; height: auto; }
         .model-name-plain { color: #1a1a1a; font-weight: normal; }
+        .save-help-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            background: rgba(15, 23, 42, 0.45);
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .save-help-overlay.open { display: flex; }
+        .save-help-dialog {
+            position: relative;
+            max-width: 420px;
+            width: 100%;
+            background: #fff;
+            color: #1a1a1a;
+            border-radius: 8px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+            padding: 20px 22px 18px;
+        }
+        .save-help-dialog h2 {
+            margin: 0 36px 12px 0;
+            font-size: 1.15rem;
+            color: #0f172a;
+        }
+        .save-help-dialog p {
+            margin: 0 0 10px;
+            line-height: 1.45;
+        }
+        .save-help-dialog ol {
+            margin: 0 0 14px;
+            padding-left: 1.25rem;
+            line-height: 1.5;
+        }
+        .save-help-dialog li { margin-bottom: 6px; }
+        .save-help-close {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 28px;
+            height: 28px;
+            border: none;
+            border-radius: 4px;
+            background: #f0f0f0;
+            color: #475569;
+            font-size: 18px;
+            line-height: 1;
+            cursor: pointer;
+        }
+        .save-help-close:hover { background: #e2e8f0; }
+        .save-help-actions {
+            text-align: right;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+        .save-help-actions .button { margin: 0; }
         @media print {
+            .save-help-overlay { display: none !important; }
             .sidebar, .hide-button, .check-buttons, .print-button, .button { display: none; }
             body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: #1a1a1a; }
             .container { margin: 0; max-width: none; box-shadow: none; font-size: 0.95rem; }
@@ -217,6 +277,7 @@
             element.classList.toggle('flagged');
             if (flagButton) { flagButton.classList.toggle('dimmed-button'); }
             applyViewFilter();
+            updateSaveButtonVisibility();
         }
 
         function escapeCssSelector(selector) {
@@ -325,6 +386,19 @@
                 if (warnCount) { warnCount.textContent = String(w); }
                 if (errCount) { errCount.textContent = String(e); }
             }
+            updateSaveButtonVisibility();
+        }
+
+        function reportHasUnsavedChanges() {
+            if (scoreViewAdjusted) { return true; }
+            return document.querySelector('.file-list.flagged') !== null;
+        }
+
+        function updateSaveButtonVisibility() {
+            var btn = document.getElementById('save-help-button');
+            if (btn) {
+                btn.style.display = reportHasUnsavedChanges() ? '' : 'none';
+            }
         }
 
         function hideElementById(id) {
@@ -400,6 +474,66 @@
 
         function printReport() { window.print(); }
 
+        function openSaveHelp() {
+            var overlay = document.getElementById('save-help-overlay');
+            if (overlay) { overlay.classList.add('open'); }
+        }
+
+        function closeSaveHelp() {
+            var overlay = document.getElementById('save-help-overlay');
+            if (overlay) { overlay.classList.remove('open'); }
+        }
+
+        function prepareDocumentForSave() {
+            closeSaveHelp();
+            var sel = document.getElementById('sidebar-view-filter');
+            if (sel) { sel.value = 'all'; }
+            applyViewFilter();
+            if (scoreViewAdjusted) {
+                document.body.setAttribute('data-mq-adjusted', '1');
+            }
+        }
+
+        function buildReportHtmlForSave() {
+            return '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+        }
+
+        function downloadAdjustedReport() {
+            var html = buildReportHtmlForSave();
+            var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+            var url = URL.createObjectURL(blob);
+            var link = document.createElement('a');
+            link.href = url;
+            link.download = 'index.html';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        function saveAdjustedReport() {
+            prepareDocumentForSave();
+            if (window.showSaveFilePicker) {
+                var html = buildReportHtmlForSave();
+                var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+                window.showSaveFilePicker({
+                    suggestedName: 'index.html',
+                    types: [{ description: 'HTML', accept: { 'text/html': ['.html'] } }]
+                }).then(function (handle) {
+                    return handle.createWritable().then(function (writable) {
+                        return writable.write(blob).then(function () {
+                            return writable.close();
+                        });
+                    });
+                }).catch(function (err) {
+                    if (err && err.name === 'AbortError') { return; }
+                    downloadAdjustedReport();
+                });
+                return;
+            }
+            downloadAdjustedReport();
+        }
+
         (function () {
             function clearSidebarNavActive() {
                 var nodes = document.querySelectorAll('.sidebar ul li.sidebar-nav-active');
@@ -440,8 +574,32 @@
                 window.addEventListener('hashchange', setActiveSidebarNavFromHash);
                 setActiveSidebarNavFromHash();
             }
+            function initSaveHelpDialog() {
+                var overlay = document.getElementById('save-help-overlay');
+                if (!overlay) { return; }
+                overlay.addEventListener('click', function (ev) {
+                    if (ev.target === overlay) { closeSaveHelp(); }
+                });
+                document.addEventListener('keydown', function (ev) {
+                    if (ev.key === 'Escape' && overlay.classList.contains('open')) {
+                        closeSaveHelp();
+                    }
+                });
+            }
+            function initPersistedReportState() {
+                if (document.body.getAttribute('data-mq-adjusted') === '1') {
+                    scoreViewAdjusted = true;
+                    return;
+                }
+                var titleEl = document.getElementById('mq-page-title');
+                if (titleEl && titleEl.textContent.trim() === 'Your Adjusted Score') {
+                    scoreViewAdjusted = true;
+                }
+            }
             function initReportUi() {
+                initPersistedReportState();
                 initSidebarNavHighlight();
+                initSaveHelpDialog();
                 applyViewFilter();
                 recalculateAdjustedSummary();
             }
@@ -456,6 +614,7 @@
 <body>
 <div class="sidebar">
     <button class="button print-button" onclick="printReport()">Print This</button>
+    <button class="button" type="button" id="save-help-button" style="display: none;" onclick="openSaveHelp()">Save</button>
     <div class="sidebar-filter-wrap" id="sidebar-filter-wrap">
         <label class="sidebar-filter-label" for="sidebar-view-filter">Filter view</label>
         <select id="sidebar-view-filter" class="sidebar-stat-filter" onchange="applyViewFilter()">
@@ -543,6 +702,23 @@
         </div>
     </div>
     {% endfor %}
+</div>
+
+<div class="save-help-overlay" id="save-help-overlay" role="dialog" aria-modal="true" aria-labelledby="save-help-title">
+    <div class="save-help-dialog">
+        <button class="save-help-close" type="button" aria-label="Close" onclick="closeSaveHelp()">&times;</button>
+        <h2 id="save-help-title">Save your adjusted report</h2>
+        <p><strong>Ctrl+S</strong> often does not keep flags or other edits on a local report. Use <strong>Save index.html</strong> to write the current page to disk.</p>
+        <ol>
+            <li>Click <strong>Save index.html</strong>.</li>
+            <li>Choose your working folder and replace the existing <strong>index.html</strong>.</li>
+        </ol>
+        <p>If no save dialog appears, the file downloads to your Downloads folder — move it to the working folder and replace <strong>index.html</strong>.</p>
+        <div class="save-help-actions">
+            <button class="button" type="button" onclick="saveAdjustedReport()">Save index.html</button>
+            <button class="button" type="button" onclick="closeSaveHelp()">Close</button>
+        </div>
+    </div>
 </div>
 </body>
 </html>
