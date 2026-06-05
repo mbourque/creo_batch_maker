@@ -484,11 +484,37 @@
             if (overlay) { overlay.classList.remove('open'); }
         }
 
+        function syncViewFilterForSave() {
+            var sel = document.getElementById('sidebar-view-filter');
+            if (!sel) { return; }
+            var mode = sel.value;
+            document.body.setAttribute('data-mq-view-filter', mode);
+            var options = sel.options;
+            for (var i = 0; i < options.length; i++) {
+                if (options[i].value === mode) {
+                    options[i].setAttribute('selected', 'selected');
+                } else {
+                    options[i].removeAttribute('selected');
+                }
+            }
+        }
+
+        function restoreViewFilterFromDom() {
+            var sel = document.getElementById('sidebar-view-filter');
+            if (!sel) { return; }
+            var mode = document.body.getAttribute('data-mq-view-filter');
+            if (!mode) { return; }
+            for (var i = 0; i < sel.options.length; i++) {
+                if (sel.options[i].value === mode) {
+                    sel.value = mode;
+                    return;
+                }
+            }
+        }
+
         function prepareDocumentForSave() {
             closeSaveHelp();
-            var sel = document.getElementById('sidebar-view-filter');
-            if (sel) { sel.value = 'all'; }
-            applyViewFilter();
+            syncViewFilterForSave();
             if (scoreViewAdjusted) {
                 document.body.setAttribute('data-mq-adjusted', '1');
             }
@@ -598,6 +624,7 @@
             }
             function initReportUi() {
                 initPersistedReportState();
+                restoreViewFilterFromDom();
                 initSidebarNavHighlight();
                 initSaveHelpDialog();
                 applyViewFilter();
