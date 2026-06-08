@@ -1,3 +1,4 @@
+# Per-user / per-machine; app creates this on first run or save
 app_settings.json
 venv/
 __pycache__/
@@ -7,6 +8,6 @@ __pycache__/
 creo_batch_maker.code-workspace
 build/
 dist/
+main.exe
 main.spec
 .gitignore
-developer_notes.md

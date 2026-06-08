@@ -184,6 +184,52 @@
     <script defer>
         let hiddenSections = [];
         let scoreViewAdjusted = false;
+        var MQ_CATEGORY_FILTER_ORDER = [
+            'Consistency',
+            'Design Intent Strength',
+            'Geometry Quality',
+            'Model Complexity',
+            'Model Integrity'
+        ];
+
+        function isCategoryFilterMode(mode) {
+            return MQ_CATEGORY_FILTER_ORDER.indexOf(mode) !== -1;
+        }
+
+        function categoriesPresentInDom() {
+            var present = {};
+            var sections = document.getElementsByClassName('check-section-wrapper');
+            for (var i = 0; i < sections.length; i++) {
+                var cat = sections[i].getAttribute('data-mq-category') || '';
+                if (cat) { present[cat] = true; }
+            }
+            return present;
+        }
+
+        function syncCategoryFilterOptions() {
+            var sel = document.getElementById('sidebar-view-filter');
+            if (!sel) { return; }
+            var optgroup = document.getElementById('sidebar-category-filter-group');
+            if (!optgroup) { return; }
+
+            var present = categoriesPresentInDom();
+            var options = optgroup.getElementsByTagName('option');
+            for (var j = options.length - 1; j >= 0; j--) {
+                var opt = options[j];
+                if (!present[opt.value]) {
+                    opt.parentNode.removeChild(opt);
+                }
+            }
+
+            if (!optgroup.getElementsByTagName('option').length && optgroup.parentNode) {
+                optgroup.parentNode.removeChild(optgroup);
+            }
+
+            if (isCategoryFilterMode(sel.value) && !present[sel.value]) {
+                sel.value = 'all';
+                document.body.setAttribute('data-mq-view-filter', 'all');
+            }
+        }
 
         function openPopup(event, url) {
             const x = event.screenX;
@@ -231,9 +277,16 @@
                 if (hiddenSections.includes(sectionId)) { continue; }
 
                 var sectionStat = (wrapper.getAttribute('data-mq-section-stat') || '').toUpperCase();
+                var sectionCategory = wrapper.getAttribute('data-mq-category') || '';
                 var sidebarItem = sidebarNavForSection(sectionId);
                 var fileLists = wrapper.getElementsByClassName('file-list');
                 var showSection = true;
+
+                if (isCategoryFilterMode(mode) && sectionCategory !== mode) {
+                    wrapper.style.display = 'none';
+                    if (sidebarItem) { sidebarItem.style.display = 'none'; }
+                    continue;
+                }
 
                 if (mode === 'warning' && sectionStat === 'ERROR') {
                     showSection = false;
@@ -247,7 +300,7 @@
                     continue;
                 }
 
-                if (mode === 'all' || mode === 'warning' || mode === 'error') {
+                if (mode === 'all' || mode === 'warning' || mode === 'error' || isCategoryFilterMode(mode)) {
                     wrapper.style.display = '';
                     if (sidebarItem) { sidebarItem.style.display = ''; }
                     for (var f = 0; f < fileLists.length; f++) {
@@ -413,6 +466,7 @@
             }
             removeEmptyCheckSections();
             scoreViewAdjusted = true;
+            syncCategoryFilterOptions();
             recalculateAdjustedSummary();
             applyViewFilter();
         }
@@ -431,6 +485,7 @@
             });
             removeEmptyCheckSections();
             scoreViewAdjusted = true;
+            syncCategoryFilterOptions();
             recalculateAdjustedSummary();
             applyViewFilter();
         }
@@ -468,6 +523,7 @@
                 sidebarItem.parentNode.removeChild(sidebarItem);
             });
             scoreViewAdjusted = true;
+            syncCategoryFilterOptions();
             recalculateAdjustedSummary();
             applyViewFilter();
         }
@@ -625,6 +681,7 @@
             function initReportUi() {
                 initPersistedReportState();
                 restoreViewFilterFromDom();
+                syncCategoryFilterOptions();
                 initSidebarNavHighlight();
                 initSaveHelpDialog();
                 applyViewFilter();
@@ -650,6 +707,13 @@
             <option value="error">Show errors</option>
             <option value="flagged">Show flagged</option>
             <option value="unflagged">Show unflagged</option>
+            <optgroup label="By category" id="sidebar-category-filter-group">
+                <option value="Consistency">Consistency</option>
+                <option value="Design Intent Strength">Design Intent Strength</option>
+                <option value="Geometry Quality">Geometry Quality</option>
+                <option value="Model Complexity">Model Complexity</option>
+                <option value="Model Integrity">Model Integrity</option>
+            </optgroup>
         </select>
     </div>
     <ul>
@@ -657,7 +721,8 @@
         <hr>
         {% for section in check_sections %}
         <li title="{{ section.category }}" class="sidebar-check-nav wrapper-{{ section.class }}"
-            data-mq-sidebar-stat="{{ 'ERROR' if section.stat_type == 'ERRORS' else 'WARNING' }}">
+            data-mq-sidebar-stat="{{ 'ERROR' if section.stat_type == 'ERRORS' else 'WARNING' }}"
+            data-mq-category="{{ section.category | e }}">
             <a href="#{{ section.class }}">{{ section.name }} ({{ section.count }})</a>
         </li>
         {% endfor %}
@@ -675,7 +740,8 @@
     {% for section in check_sections %}
     <a id="{{ section.class }}"></a>
     <div class="check-section-wrapper" id="wrapper-{{ section.class }}"
-         data-mq-section-stat="{{ 'ERROR' if section.stat_type == 'ERRORS' else 'WARNING' }}">
+         data-mq-section-stat="{{ 'ERROR' if section.stat_type == 'ERRORS' else 'WARNING' }}"
+         data-mq-category="{{ section.category | e }}">
         <div class="check-header">
             <div class="check-title">
                 <h2 id="{{ section.class }}"><span class="bold-text">{{ section.stat_type }}:</span> {{ section.count }} {{ section.name }}</h2>

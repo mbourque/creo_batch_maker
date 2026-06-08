@@ -36,6 +36,16 @@ _CREO_MODEL_EXT_PATTERNS: dict[str, str] = {
     "drw": r".*\.drw(\.\d+)?$",
 }
 _CREO_MODEL_EXTENSIONS_ALL = ("prt", "asm", "drw")
+_START_TEMPLATE_KINDS: tuple[tuple[str, str], ...] = (
+    ("prt", "Part..."),
+    ("asm", "Assembly..."),
+    ("drw", "Drawing..."),
+)
+_START_TEMPLATE_DEST_NAMES: dict[str, str] = {
+    "prt": "part_template.prt",
+    "asm": "assembly_template.asm",
+    "drw": "drawing_template.drw",
+}
 
 # Chunk .dxc files: working_dir / f"{CREO_BATCH_BASE}-1.dxc", "-2.dxc", ...
 CREO_BATCH_BASE = "creo-batch"
@@ -631,6 +641,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         file_menu.add_command(label="Save", command=self._on_file_menu_save)
         file_menu.add_command(label="Save as...", command=self._on_file_menu_save_as)
         file_menu.add_separator()
+        file_menu.add_command(
+            label="Open Working Directory...",
+            command=self._on_open_working_directory,
+        )
+        file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self._on_exit)
         menubar.add_cascade(label="File", menu=file_menu)
 
@@ -704,16 +719,18 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     self._menubar.add_cascade(label="Configuration", menu=self._configuration_menu)
             for option in self._settings_options:
                 if option == "Open configurations...":
-                    self._configuration_menu.add_separator()
-                    self._configuration_menu.add_command(
-                        label=option,
-                        command=self._on_open_settings_folder,
-                    )
-                else:
-                    self._configuration_menu.add_command(
-                        label=option,
-                        command=lambda o=option: self._on_settings_config_item(o),
-                    )
+                    continue
+                self._configuration_menu.add_command(
+                    label=option,
+                    command=lambda o=option: self._on_settings_config_item(o),
+                )
+            self._configuration_menu.add_separator()
+            self._add_start_templates_cascade(self._configuration_menu)
+            self._configuration_menu.add_separator()
+            self._configuration_menu.add_command(
+                label="Open configurations...",
+                command=self._on_open_settings_folder,
+            )
         else:
             if settings_idx is not None:
                 self._menubar.delete(settings_idx)
@@ -1136,6 +1153,123 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         dialog.bind("<Escape>", lambda _e: close_dialog())
         dialog.protocol("WM_DELETE_WINDOW", close_dialog)
         self._present_modal_toplevel(dialog, focus_widget=entry)
+
+    def _add_start_templates_cascade(self, parent_menu: tk.Menu) -> None:
+        start_templates_menu = tk.Menu(parent_menu, tearoff=0)
+        for kind, label in _START_TEMPLATE_KINDS:
+            start_templates_menu.add_command(
+                label=label,
+                command=lambda k=kind: self._on_pick_start_template(k),
+            )
+        parent_menu.add_cascade(label="Templates...", menu=start_templates_menu)
+
+    def _start_templates_dir(self) -> Path | None:
+        wd = (self.working_directory.get() or "").strip()
+        if not wd or not Path(wd).is_dir():
+            return None
+        return Path(wd) / "templates"
+
+    @staticmethod
+    def _creo_model_filename_matches(filename: str, kind: str) -> bool:
+        pattern = _CREO_MODEL_EXT_PATTERNS.get(kind)
+        if not pattern:
+            return False
+        return re.match(pattern, filename, re.IGNORECASE) is not None
+
+    def _on_pick_start_template(self, kind: str) -> None:
+        labels = {k: label.rstrip(".") for k, label in _START_TEMPLATE_KINDS}
+        title = labels.get(kind, "Start template")
+        pattern = _CREO_MODEL_EXT_PATTERNS.get(kind)
+        if not pattern:
+            messagebox.showerror("Start template", f"Unknown template type:\n{kind}")
+            return
+
+        wd = (self.working_directory.get() or "").strip()
+        if not wd or not Path(wd).is_dir():
+            messagebox.showwarning(
+                "Start template",
+                "Set a working directory that exists on disk before choosing a template.",
+            )
+            return
+
+        selected = fd.askopenfilename(
+            title=title,
+            initialdir=wd,
+            filetypes=[
+                (f"Creo {kind} files", f"*.{kind};*.{kind}.*"),
+                ("All files", "*.*"),
+            ],
+        )
+        if not selected:
+            return
+
+        source = Path(selected)
+        if not source.is_file():
+            messagebox.showerror(
+                "Start template",
+                f"File not found:\n{source}",
+            )
+            return
+        if not self._creo_model_filename_matches(source.name, kind):
+            messagebox.showerror(
+                "Start template",
+                f"Select a Creo {kind} file (*.{kind} or *.{kind}.*).",
+            )
+            return
+
+        dest_dir = self._start_templates_dir()
+        if dest_dir is None:
+            messagebox.showwarning(
+                "Start template",
+                "Set a working directory that exists on disk before choosing a template.",
+            )
+            return
+
+        try:
+            dest_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            messagebox.showerror(
+                "Start template",
+                f"Could not create templates folder:\n{dest_dir.resolve()}\n\n{exc}",
+            )
+            return
+
+        dest_name = _START_TEMPLATE_DEST_NAMES.get(kind)
+        if not dest_name:
+            messagebox.showerror("Start template", f"Unknown template type:\n{kind}")
+            return
+
+        dest = dest_dir / dest_name
+        try:
+            shutil.copy2(source, dest)
+        except OSError as exc:
+            messagebox.showerror(
+                "Start template",
+                f"Could not copy template:\n{source}\n\n→\n\n{dest.resolve()}\n\n{exc}",
+            )
+            return
+
+        messagebox.showinfo(
+            "Start template",
+            f"Copied {title.lower()} to:\n{dest.resolve()}",
+        )
+
+    def _on_open_working_directory(self) -> None:
+        wd = (self.working_directory.get() or "").strip()
+        if not wd or not _working_directory_exists_as_dir(wd):
+            messagebox.showwarning(
+                "Open Working Directory",
+                "Set a working directory that exists on disk before opening it.",
+            )
+            return
+        target = Path(wd).resolve()
+        try:
+            os.startfile(str(target))
+        except OSError as exc:
+            messagebox.showerror(
+                "Open failed",
+                f"Could not open in File Explorer:\n{target}\n\n{exc}",
+            )
 
     def _on_open_settings_folder(self) -> None:
         """Open the bundled configs folder in File Explorer for manual edits."""
