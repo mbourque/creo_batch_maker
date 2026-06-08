@@ -1,6 +1,7 @@
 import hashlib
 import html
 import os
+from collections import defaultdict
 import xml.etree.ElementTree as ET
 
 
@@ -78,6 +79,67 @@ def scan_pro_type_counts(master_root: ET.Element) -> dict[str, int]:
         if pro in counts:
             counts[pro] += 1
     return counts
+
+
+def _model_check_category_map(model_checks_xml_path: str) -> dict[str, str]:
+    """ModelCheckName -> Category for checks included in the report."""
+    model_tree = ET.parse(model_checks_xml_path)
+    mapping: dict[str, str] = {}
+    for check in model_tree.getroot().findall("Check"):
+        hide_from_report = check.find("hideFromReport")
+        if hide_from_report is not None and (hide_from_report.text or "").strip() == "Y":
+            continue
+        mcn = check.find("ModelCheckName")
+        cat = check.find("Category")
+        if mcn is None or cat is None or not (mcn.text or "").strip() or not (cat.text or "").strip():
+            continue
+        mapping[mcn.text.strip()] = cat.text.strip()
+    return mapping
+
+
+def scan_visible_issue_summary(master_root: ET.Element, model_checks_xml_path: str) -> dict:
+    """
+    Counts matching the report's visible ERROR/WARNING rows (for baking the dashboard at build time).
+    """
+    model_check_mapping = _model_check_category_map(model_checks_xml_path)
+    warn_issues = 0
+    err_issues = 0
+    warn_models: set[str] = set()
+    err_models: set[str] = set()
+    by_category: dict[str, dict[str, int]] = defaultdict(lambda: {"warn": 0, "err": 0})
+
+    for file_element in master_root.findall("File"):
+        model = (file_element.findtext("Model") or "").strip()
+        for check in file_element.findall(".//check"):
+            if _check_hidden_from_report(check):
+                continue
+            stat = _check_stat(check)
+            if stat not in ("WARNING", "ERROR"):
+                continue
+            name = check.get("name") or ""
+            if name not in model_check_mapping:
+                continue
+            category = model_check_mapping[name]
+            if stat == "WARNING":
+                warn_issues += 1
+                if model:
+                    warn_models.add(model)
+                by_category[category]["warn"] += 1
+            else:
+                err_issues += 1
+                if model:
+                    err_models.add(model)
+                by_category[category]["err"] += 1
+
+    overall_grade = calculate_grade([0, warn_issues, err_issues])[0]
+    return {
+        "warn_issues": warn_issues,
+        "err_issues": err_issues,
+        "warn_models": len(warn_models),
+        "err_models": len(err_models),
+        "overall_grade": overall_grade,
+        "by_category": {k: dict(v) for k, v in by_category.items()},
+    }
 
 
 def calculate_grade(sizes: list[int]) -> tuple[str, str]:
@@ -159,7 +221,7 @@ _MQ_DASHBOARD_CSS = """
   font-weight: 800; font-size: 1rem; color: #fff; flex-shrink: 0; }
 .mq-cat-desc { font-size: 0.82rem; color: #475569; line-height: 1.45; margin: 0 0 12px 0; }
 .mq-stack { display: flex; height: 14px; border-radius: 6px; overflow: hidden; background: #f1f5f9; margin-bottom: 10px; }
-.mq-stack span { height: 100%; transition: width 0.35s ease; }
+.mq-stack span { height: 100%; }
 .mq-seg-pass { background: #16a34a; }
 .mq-seg-warn { background: #eab308; }
 .mq-seg-err { background: #dc2626; }
@@ -177,36 +239,47 @@ _MQ_DASHBOARD_CSS = """
 def generate_adjusted_summary_shell(
     category_descriptions: dict[str, str],
     pro_type_counts: dict[str, int] | None = None,
+    *,
+    files_scanned: int = 0,
+    issue_summary: dict | None = None,
 ) -> str:
     """
-    Dashboard shell for the full report: counts and grades are filled by client-side JS
-    from remaining visible ERROR/WARNING rows.
+    Dashboard shell for the full report. Scan totals are fixed at build time; issue counts and
+    grades are baked from master.xml when ``issue_summary`` is provided so the browser does not
+    need a full DOM scan on first load. Client-side JS recalculates after removals or filters.
     """
     pt = pro_type_counts or {}
     prt_n = pt.get("PRT", 0)
     asm_n = pt.get("ASM", 0)
     drw_n = pt.get("DRW", 0)
+    summary = issue_summary or {}
+    visible_issues = summary.get("warn_issues", 0) + summary.get("err_issues", 0)
+    warn_models = summary.get("warn_models", 0)
+    err_models = summary.get("err_models", 0)
+    overall_grade = summary.get("overall_grade", "A")
+    by_category = summary.get("by_category") or {}
+    baked_attr = ' data-mq-summary-baked="1"' if issue_summary else ""
     parts = [
         _MQ_DASHBOARD_CSS,
         f"""
-<div class="mq-dashboard">
-  <h1 class="mq-page-title" id="mq-page-title">Your score</h1>
+<div class="mq-dashboard"{baked_attr}>
+  <h1 class="mq-page-title" id="mq-page-title">Your Score</h1>
   <div class="mq-grid">
     <div class="mq-left">
       <div class="mq-hero-card">
         <div class="mq-hero-top">
           <div class="mq-stats">
-            <p><strong>Files scanned:</strong> <span id="mq-stat-models">0</span></p>
-            <p><strong>Parts:</strong> <span id="mq-stat-parts">{prt_n}</span></p>
-            <p><strong>Assemblies:</strong> <span id="mq-stat-assemblies">{asm_n}</span></p>
-            <p><strong>Drawings:</strong> <span id="mq-stat-drawings">{drw_n}</span></p>
-            <p><strong>Visible issues:</strong> <span id="mq-stat-issues">0</span></p>
-            <p><strong>Models with warnings:</strong> <span id="mq-stat-warn-models">0</span></p>
-            <p><strong>Models with errors:</strong> <span id="mq-stat-err-models">0</span></p>
+            <p><strong>Files scanned:</strong> <span id="mq-stat-models" data-mq-scan-fixed="1">{files_scanned}</span></p>
+            <p><strong>Parts scanned:</strong> <span id="mq-stat-parts" data-mq-scan-fixed="1">{prt_n}</span></p>
+            <p><strong>Assemblies scanned:</strong> <span id="mq-stat-assemblies" data-mq-scan-fixed="1">{asm_n}</span></p>
+            <p><strong>Drawings scanned:</strong> <span id="mq-stat-drawings" data-mq-scan-fixed="1">{drw_n}</span></p>
+            <p><strong>Visible issues:</strong> <span id="mq-stat-issues">{visible_issues}</span></p>
+            <p><strong>Models with warnings:</strong> <span id="mq-stat-warn-models">{warn_models}</span></p>
+            <p><strong>Models with errors:</strong> <span id="mq-stat-err-models">{err_models}</span></p>
           </div>
           <div class="mq-overall">
             <div class="mq-overall-label">Overall grade</div>
-            <div id="mq-overall-grade" class="mq-grade-ring mq-grade-a">A</div>
+            <div id="mq-overall-grade" class="mq-grade-ring {grade_css_class(overall_grade)}">{html.escape(overall_grade)}</div>
           </div>
         </div>
         <div class="mq-scale">
@@ -232,26 +305,42 @@ def generate_adjusted_summary_shell(
 """,
     ]
 
-    for category in sorted(category_descriptions.keys(), key=str.casefold):
+    categories_with_issues = [
+        cat
+        for cat in sorted(category_descriptions.keys(), key=str.casefold)
+        if (by_category.get(cat, {}).get("warn", 0) + by_category.get(cat, {}).get("err", 0)) > 0
+    ]
+    if issue_summary is None:
+        categories_with_issues = sorted(category_descriptions.keys(), key=str.casefold)
+
+    for category in categories_with_issues:
         desc = category_descriptions.get(category, "No description available.")
         cat_esc = html.escape(category, quote=False)
         desc_esc = html.escape(desc, quote=False)
         dom_id = category_dom_id(category)
+        counts = by_category.get(category, {"warn": 0, "err": 0})
+        w = counts.get("warn", 0)
+        e = counts.get("err", 0)
+        total = w + e
+        letter = calculate_grade([0, w, e])[0] if total else "A"
+        y_pct = (w / total * 100) if total else 0.0
+        r_pct = (e / total * 100) if total else 0.0
+        empty_class = "" if (w + e) > 0 else " mq-cat-empty"
         parts.append(f"""
-      <div class="mq-cat-card mq-cat-empty" id="{dom_id}" data-mq-category="{cat_esc}">
+      <div class="mq-cat-card{empty_class}" id="{dom_id}" data-mq-category="{cat_esc}">
         <div class="mq-cat-head">
           <h3 class="mq-cat-title">{cat_esc}</h3>
-          <div class="mq-cat-badge mq-grade-a" data-mq-role="badge">A</div>
+          <div class="mq-cat-badge {grade_css_class(letter)}" data-mq-role="badge">{html.escape(letter)}</div>
         </div>
         <p class="mq-cat-desc">{desc_esc}</p>
-        <div class="mq-stack" data-mq-role="stack" title="0% warning, 0% error">
+        <div class="mq-stack" data-mq-role="stack" title="{y_pct:.2f}% warning, {r_pct:.2f}% error">
           <span class="mq-seg-pass" data-mq-role="seg-pass" style="width:0%"></span>
-          <span class="mq-seg-warn" data-mq-role="seg-warn" style="width:0%"></span>
-          <span class="mq-seg-err" data-mq-role="seg-err" style="width:0%"></span>
+          <span class="mq-seg-warn" data-mq-role="seg-warn" style="width:{y_pct:.4f}%"></span>
+          <span class="mq-seg-err" data-mq-role="seg-err" style="width:{r_pct:.4f}%"></span>
         </div>
         <div class="mq-legend" data-mq-role="legend">
-          <span><span class="mq-sq mq-seg-warn"></span> Warning: <span data-mq-role="warn-count">0</span></span>
-          <span><span class="mq-sq mq-seg-err"></span> Error: <span data-mq-role="err-count">0</span></span>
+          <span><span class="mq-sq mq-seg-warn"></span> Warning: <span data-mq-role="warn-count">{w}</span></span>
+          <span><span class="mq-sq mq-seg-err"></span> Error: <span data-mq-role="err-count">{e}</span></span>
         </div>
       </div>""")
 
@@ -319,9 +408,9 @@ def generate_summary_div(master_xml_path, model_checks_xml_path):
         <div class="mq-hero-top">
           <div class="mq-stats">
             <p><strong>Files scanned:</strong> {total_f}</p>
-            <p><strong>Parts:</strong> {pro_type_counts.get("PRT", 0)}</p>
-            <p><strong>Assemblies:</strong> {pro_type_counts.get("ASM", 0)}</p>
-            <p><strong>Drawings:</strong> {pro_type_counts.get("DRW", 0)}</p>
+            <p><strong>Parts scanned:</strong> {pro_type_counts.get("PRT", 0)}</p>
+            <p><strong>Assemblies scanned:</strong> {pro_type_counts.get("ASM", 0)}</p>
+            <p><strong>Drawings scanned:</strong> {pro_type_counts.get("DRW", 0)}</p>
             <p><strong>Visible issues:</strong> {visible_issues}</p>
             <p><strong>Models with warnings:</strong> {warn_f}</p>
             <p><strong>Models with errors:</strong> {err_f}</p>

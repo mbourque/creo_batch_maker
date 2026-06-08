@@ -21,10 +21,13 @@ import markdown
 from jinja2 import Environment, FileSystemLoader
 from PIL import Image, ImageDraw
 
+from make_html_statistics import generate_statistics_fragment
 from make_html_summary import (
     generate_adjusted_summary_shell,
     get_category_descriptions,
+    scan_file_stats,
     scan_pro_type_counts,
+    scan_visible_issue_summary,
 )
 
 
@@ -159,7 +162,27 @@ def _family_info_is_instance(file_element: ET.Element) -> bool:
     return False
 
 
-def model_file_exists_on_disk(working_dir: str, model_tag: str, xml_path: str) -> bool:
+def build_working_dir_file_index(working_dir: str) -> dict[str, str]:
+    """Map casefolded basename -> absolute path for files in ``working_dir``."""
+    idx: dict[str, str] = {}
+    wd = os.path.normpath(os.path.abspath(working_dir))
+    try:
+        for fn in os.listdir(wd):
+            full = os.path.join(wd, fn)
+            if os.path.isfile(full):
+                idx[fn.casefold()] = full
+    except OSError:
+        pass
+    return idx
+
+
+def model_file_exists_on_disk(
+    working_dir: str,
+    model_tag: str,
+    xml_path: str,
+    *,
+    file_index: dict[str, str] | None = None,
+) -> bool:
     """True if the Creo model file exists (path from master.xml or under working_dir)."""
     if xml_path:
         if os.path.isfile(xml_path):
@@ -185,11 +208,19 @@ def model_file_exists_on_disk(working_dir: str, model_tag: str, xml_path: str) -
             p = os.path.join(wd, stem + variant)
             if os.path.isfile(p):
                 return True
-        pattern = os.path.join(wd, stem + ext + ".*")
-        if glob.glob(pattern):
-            return True
+        if file_index is None:
+            pattern = os.path.join(wd, stem + ext + ".*")
+            if glob.glob(pattern):
+                return True
+        else:
+            prefix = (stem + ext).casefold()
+            for key, full in file_index.items():
+                if key.startswith(prefix) and key != prefix:
+                    return True
 
     want = model_tag.casefold()
+    if file_index is not None:
+        return want in file_index
     try:
         for fn in os.listdir(wd):
             if fn.casefold() == want:
@@ -214,6 +245,7 @@ def resolve_report_display_name(
     file_path: str,
     file_info: dict,
     family_map: dict[str, str],
+    file_index: dict[str, str] | None = None,
 ) -> str:
     """
     Display / thumbnail / detail HTML name for the report.
@@ -230,7 +262,7 @@ def resolve_report_display_name(
     if model_tag.upper().endswith(".DRW"):
         return display
 
-    if model_file_exists_on_disk(working_dir, model_tag, xml_path):
+    if model_file_exists_on_disk(working_dir, model_tag, xml_path, file_index=file_index):
         return display
 
     if not file_info.get("family_is_instance"):
@@ -245,7 +277,7 @@ def resolve_report_display_name(
         return display
 
     generic_display = model_tag_to_display_name(generic_model)
-    if model_file_exists_on_disk(working_dir, generic_model, ""):
+    if model_file_exists_on_disk(working_dir, generic_model, "", file_index=file_index):
         return generic_display
     return display
 
@@ -316,12 +348,14 @@ def read_master_xml(master_xml_file: str, working_dir: str | None = None) -> dic
         files_info = _parse_master_root(root)
         if working_dir:
             wd = os.path.normpath(os.path.abspath(working_dir))
+            file_index = build_working_dir_file_index(wd)
             for file_path, file_info in files_info.items():
                 file_info["report_display_name"] = resolve_report_display_name(
                     working_dir=wd,
                     file_path=file_path,
                     file_info=file_info,
                     family_map=family_map,
+                    file_index=file_index,
                 )
         return files_info
     except ET.ParseError as e:
@@ -613,7 +647,20 @@ def create_html_report(
     category_descriptions = get_category_descriptions(model_checks_path)
     master_root = ET.parse(master_xml_path).getroot()
     pro_type_counts = scan_pro_type_counts(master_root)
-    summary_div = generate_adjusted_summary_shell(category_descriptions, pro_type_counts)
+    files_scanned, _, _ = scan_file_stats(master_root)
+    issue_summary = scan_visible_issue_summary(master_root, model_checks_path)
+    summary_div = generate_adjusted_summary_shell(
+        category_descriptions,
+        pro_type_counts,
+        files_scanned=files_scanned,
+        issue_summary=issue_summary,
+    )
+    statistics_div = generate_statistics_fragment(
+        master_root,
+        working_dir,
+        master_path=master_xml_path,
+        embedded=True,
+    )
 
     env = Environment(loader=FileSystemLoader(bundle_dir))
     template = env.get_template("report_template.html.j2")
@@ -625,6 +672,8 @@ def create_html_report(
     check_sections: list = []
     check_dict: dict = defaultdict(list)
     more_info_index = build_more_info_name_index(working_dir)
+    ensure_shared_placeholder_jpeg(report_assets_dir)
+    thumbnail_cache: dict[str, str] = {}
     for file_path, file_info in files_info.items():
         original_display_name = get_display_name(file_path)
         drag_image_display_name = file_info.get("report_display_name") or original_display_name
@@ -636,9 +685,11 @@ def create_html_report(
                 continue
 
             if check["stat"] in ("ERROR", "WARNING"):
-                image_url = thumbnail_src_for_report(
-                    report_assets_dir, working_dir, drag_image_display_name
-                )
+                if drag_image_display_name not in thumbnail_cache:
+                    thumbnail_cache[drag_image_display_name] = thumbnail_src_for_report(
+                        report_assets_dir, working_dir, drag_image_display_name
+                    )
+                image_url = thumbnail_cache[drag_image_display_name]
 
                 check_dict[f"{check['stat']}: {check['name']}"].append(
                     {
@@ -695,6 +746,7 @@ def create_html_report(
         check_sections=check_sections,
         summary=summary,
         summary_div=summary_div,
+        statistics_div=statistics_div,
     )
 
     out_dir = os.path.dirname(os.path.abspath(output_file))
