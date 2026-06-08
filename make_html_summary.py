@@ -196,13 +196,13 @@ def generate_adjusted_summary_shell(
       <div class="mq-hero-card">
         <div class="mq-hero-top">
           <div class="mq-stats">
-            <p><strong>Visible issues:</strong> <span id="mq-stat-issues">0</span></p>
             <p><strong>Files scanned:</strong> <span id="mq-stat-models">0</span></p>
-            <p><strong>Models with warnings:</strong> <span id="mq-stat-warn-models">0</span></p>
-            <p><strong>Models with errors:</strong> <span id="mq-stat-err-models">0</span></p>
             <p><strong>Parts:</strong> <span id="mq-stat-parts">{prt_n}</span></p>
             <p><strong>Assemblies:</strong> <span id="mq-stat-assemblies">{asm_n}</span></p>
             <p><strong>Drawings:</strong> <span id="mq-stat-drawings">{drw_n}</span></p>
+            <p><strong>Visible issues:</strong> <span id="mq-stat-issues">0</span></p>
+            <p><strong>Models with warnings:</strong> <span id="mq-stat-warn-models">0</span></p>
+            <p><strong>Models with errors:</strong> <span id="mq-stat-err-models">0</span></p>
           </div>
           <div class="mq-overall">
             <div class="mq-overall-label">Overall grade</div>
@@ -296,7 +296,14 @@ def generate_summary_div(master_xml_path, model_checks_xml_path):
                     categories[category][stat] += 1
         return categories
 
-    def generate_div_content(categories, category_descriptions, file_stats, pro_type_counts, overall_letter):
+    def generate_div_content(
+        categories,
+        category_descriptions,
+        file_stats,
+        pro_type_counts,
+        visible_issues,
+        overall_letter,
+    ):
         total_f, warn_f, err_f = file_stats
         grade_class = grade_css_class(overall_letter)
         grade_letter = html.escape(overall_letter)
@@ -312,11 +319,12 @@ def generate_summary_div(master_xml_path, model_checks_xml_path):
         <div class="mq-hero-top">
           <div class="mq-stats">
             <p><strong>Files scanned:</strong> {total_f}</p>
-            <p><strong>Files with warnings:</strong> {warn_f}</p>
-            <p><strong>Files with errors:</strong> {err_f}</p>
             <p><strong>Parts:</strong> {pro_type_counts.get("PRT", 0)}</p>
             <p><strong>Assemblies:</strong> {pro_type_counts.get("ASM", 0)}</p>
             <p><strong>Drawings:</strong> {pro_type_counts.get("DRW", 0)}</p>
+            <p><strong>Visible issues:</strong> {visible_issues}</p>
+            <p><strong>Models with warnings:</strong> {warn_f}</p>
+            <p><strong>Models with errors:</strong> {err_f}</p>
           </div>
           <div class="mq-overall">
             <div class="mq-overall-label">Overall grade</div>
@@ -400,8 +408,14 @@ def generate_summary_div(master_xml_path, model_checks_xml_path):
     agg_total = agg_pass + agg_warn + agg_err
     overall_letter = "N/A" if agg_total == 0 else calculate_grade([agg_pass, agg_warn, agg_err])[0]
 
+    visible_issues = agg_warn + agg_err
     return generate_div_content(
-        categories, category_descriptions, file_stats, pro_type_counts, overall_letter
+        categories,
+        category_descriptions,
+        file_stats,
+        pro_type_counts,
+        visible_issues,
+        overall_letter,
     )
 
 
