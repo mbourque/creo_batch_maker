@@ -27,6 +27,59 @@ def category_dom_id(category_name: str) -> str:
     return f"mq-cat-{digest}"
 
 
+def _check_hidden_from_report(check_el: ET.Element) -> bool:
+    hide = check_el.find("hideFromReport")
+    return hide is not None and (hide.text or "").strip() == "Y"
+
+
+def _check_stat(check_el: ET.Element) -> str:
+    stat_el = check_el.find("stat")
+    return stat_el.text if stat_el is not None else ""
+
+
+def _file_report_check_stats(file_element: ET.Element) -> list[str]:
+    """Non-INFO, report-visible check stats for one master.xml File entry."""
+    stats: list[str] = []
+    for check in file_element.findall(".//check"):
+        if _check_hidden_from_report(check):
+            continue
+        stat = _check_stat(check)
+        if stat == "INFO":
+            continue
+        stats.append(stat)
+    return stats
+
+
+def scan_file_stats(master_root: ET.Element) -> tuple[int, int, int]:
+    """Counts File entries with at least one non-INFO, report-visible check."""
+    total_files = 0
+    files_with_warning = 0
+    files_with_error = 0
+    for file_element in master_root.findall("File"):
+        stats = _file_report_check_stats(file_element)
+        if not stats:
+            continue
+        total_files += 1
+        if any(s == "WARNING" for s in stats):
+            files_with_warning += 1
+        if any(s == "ERROR" for s in stats):
+            files_with_error += 1
+    return total_files, files_with_warning, files_with_error
+
+
+def scan_pro_type_counts(master_root: ET.Element) -> dict[str, int]:
+    """Count report File entries by master.xml ProType (PRT, ASM, DRW)."""
+    counts = {"PRT": 0, "ASM": 0, "DRW": 0}
+    for file_element in master_root.findall("File"):
+        if not _file_report_check_stats(file_element):
+            continue
+        pro_el = file_element.find("ProType")
+        pro = (pro_el.text or "").strip().upper() if pro_el is not None else ""
+        if pro in counts:
+            counts[pro] += 1
+    return counts
+
+
 def calculate_grade(sizes: list[int]) -> tuple[str, str]:
     total = sum(sizes)
     if total == 0:
@@ -121,14 +174,21 @@ _MQ_DASHBOARD_CSS = """
 </style>"""
 
 
-def generate_adjusted_summary_shell(category_descriptions: dict[str, str]) -> str:
+def generate_adjusted_summary_shell(
+    category_descriptions: dict[str, str],
+    pro_type_counts: dict[str, int] | None = None,
+) -> str:
     """
     Dashboard shell for the full report: counts and grades are filled by client-side JS
     from remaining visible ERROR/WARNING rows.
     """
+    pt = pro_type_counts or {}
+    prt_n = pt.get("PRT", 0)
+    asm_n = pt.get("ASM", 0)
+    drw_n = pt.get("DRW", 0)
     parts = [
         _MQ_DASHBOARD_CSS,
-        """
+        f"""
 <div class="mq-dashboard">
   <h1 class="mq-page-title" id="mq-page-title">Your score</h1>
   <div class="mq-grid">
@@ -140,6 +200,9 @@ def generate_adjusted_summary_shell(category_descriptions: dict[str, str]) -> st
             <p><strong>Files scanned:</strong> <span id="mq-stat-models">0</span></p>
             <p><strong>Models with warnings:</strong> <span id="mq-stat-warn-models">0</span></p>
             <p><strong>Models with errors:</strong> <span id="mq-stat-err-models">0</span></p>
+            <p><strong>Parts:</strong> <span id="mq-stat-parts">{prt_n}</span></p>
+            <p><strong>Assemblies:</strong> <span id="mq-stat-assemblies">{asm_n}</span></p>
+            <p><strong>Drawings:</strong> <span id="mq-stat-drawings">{drw_n}</span></p>
           </div>
           <div class="mq-overall">
             <div class="mq-overall-label">Overall grade</div>
@@ -212,37 +275,6 @@ def generate_summary_div(master_xml_path, model_checks_xml_path):
     model_tree = ET.parse(model_checks_xml_path)
     model_root = model_tree.getroot()
 
-    def _check_hidden_from_report(check_el):
-        hide = check_el.find("hideFromReport")
-        return hide is not None and (hide.text or "").strip() == "Y"
-
-    def _check_stat(check_el):
-        stat_el = check_el.find("stat")
-        return stat_el.text if stat_el is not None else ""
-
-    def scan_file_stats(master_root):
-        """Counts File entries with at least one non-INFO, report-visible check."""
-        total_files = 0
-        files_with_warning = 0
-        files_with_error = 0
-        for file_element in master_root.findall("File"):
-            stats = []
-            for check in file_element.findall(".//check"):
-                if _check_hidden_from_report(check):
-                    continue
-                stat = _check_stat(check)
-                if stat == "INFO":
-                    continue
-                stats.append(stat)
-            if not stats:
-                continue
-            total_files += 1
-            if any(s == "WARNING" for s in stats):
-                files_with_warning += 1
-            if any(s == "ERROR" for s in stats):
-                files_with_error += 1
-        return total_files, files_with_warning, files_with_error
-
     def categorize_checks(master_root, model_root):
         categories = {}
         model_check_mapping = {}
@@ -264,11 +296,13 @@ def generate_summary_div(master_xml_path, model_checks_xml_path):
                     categories[category][stat] += 1
         return categories
 
-    def generate_div_content(categories, category_descriptions, file_stats, overall_letter):
+    def generate_div_content(categories, category_descriptions, file_stats, pro_type_counts, overall_letter):
         total_f, warn_f, err_f = file_stats
+        grade_class = grade_css_class(overall_letter)
+        grade_letter = html.escape(overall_letter)
         parts = [
             _MQ_DASHBOARD_CSS,
-            """
+            f"""
 <div class="mq-dashboard">
   <h1 class="mq-page-title">YOUR SCORE</h1>
   <div class="mq-grid">
@@ -277,23 +311,16 @@ def generate_summary_div(master_xml_path, model_checks_xml_path):
         <h2>Model Quality Report</h2>
         <div class="mq-hero-top">
           <div class="mq-stats">
-            <p><strong>Files scanned:</strong> """,
-            str(total_f),
-            """</p>
-            <p><strong>Files with warnings:</strong> """,
-            str(warn_f),
-            """</p>
-            <p><strong>Files with errors:</strong> """,
-            str(err_f),
-            """</p>
+            <p><strong>Files scanned:</strong> {total_f}</p>
+            <p><strong>Files with warnings:</strong> {warn_f}</p>
+            <p><strong>Files with errors:</strong> {err_f}</p>
+            <p><strong>Parts:</strong> {pro_type_counts.get("PRT", 0)}</p>
+            <p><strong>Assemblies:</strong> {pro_type_counts.get("ASM", 0)}</p>
+            <p><strong>Drawings:</strong> {pro_type_counts.get("DRW", 0)}</p>
           </div>
           <div class="mq-overall">
             <div class="mq-overall-label">Overall grade</div>
-            <div class="mq-grade-ring """,
-            grade_css_class(overall_letter),
-            """">""",
-            html.escape(overall_letter),
-            """</div>
+            <div class="mq-grade-ring {grade_class}">{grade_letter}</div>
           </div>
         </div>
         <div class="mq-scale">
@@ -365,6 +392,7 @@ def generate_summary_div(master_xml_path, model_checks_xml_path):
     category_descriptions = get_category_descriptions(model_checks_xml_path)
     categories = categorize_checks(master_root, model_root)
     file_stats = scan_file_stats(master_root)
+    pro_type_counts = scan_pro_type_counts(master_root)
 
     agg_pass = sum(c["PASS"] for c in categories.values())
     agg_warn = sum(c["WARNING"] for c in categories.values())
@@ -372,7 +400,9 @@ def generate_summary_div(master_xml_path, model_checks_xml_path):
     agg_total = agg_pass + agg_warn + agg_err
     overall_letter = "N/A" if agg_total == 0 else calculate_grade([agg_pass, agg_warn, agg_err])[0]
 
-    return generate_div_content(categories, category_descriptions, file_stats, overall_letter)
+    return generate_div_content(
+        categories, category_descriptions, file_stats, pro_type_counts, overall_letter
+    )
 
 
 def write_summary_html_file(master_xml_path: str, model_checks_xml_path: str, output_path: str) -> str:

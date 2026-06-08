@@ -191,9 +191,14 @@
             'Model Complexity',
             'Model Integrity'
         ];
+        var MQ_MODEL_FILTER_ORDER = ['PRT', 'ASM', 'DRW'];
 
         function isCategoryFilterMode(mode) {
             return MQ_CATEGORY_FILTER_ORDER.indexOf(mode) !== -1;
+        }
+
+        function isModelFilterMode(mode) {
+            return MQ_MODEL_FILTER_ORDER.indexOf(mode) !== -1;
         }
 
         function categoriesPresentInDom() {
@@ -231,6 +236,46 @@
             }
         }
 
+        function proTypesPresentInDom() {
+            var present = {};
+            var rows = document.querySelectorAll('.mq-issue-row');
+            for (var i = 0; i < rows.length; i++) {
+                var pro = (rows[i].getAttribute('data-mq-pro-type') || '').toUpperCase();
+                if (pro) { present[pro] = true; }
+            }
+            return present;
+        }
+
+        function syncModelFilterOptions() {
+            var sel = document.getElementById('sidebar-view-filter');
+            if (!sel) { return; }
+            var optgroup = document.getElementById('sidebar-model-filter-group');
+            if (!optgroup) { return; }
+
+            var present = proTypesPresentInDom();
+            var options = optgroup.getElementsByTagName('option');
+            for (var j = options.length - 1; j >= 0; j--) {
+                var opt = options[j];
+                if (!present[opt.value]) {
+                    opt.parentNode.removeChild(opt);
+                }
+            }
+
+            if (!optgroup.getElementsByTagName('option').length && optgroup.parentNode) {
+                optgroup.parentNode.removeChild(optgroup);
+            }
+
+            if (isModelFilterMode(sel.value) && !present[sel.value]) {
+                sel.value = 'all';
+                document.body.setAttribute('data-mq-view-filter', 'all');
+            }
+        }
+
+        function syncViewFilterOptions() {
+            syncCategoryFilterOptions();
+            syncModelFilterOptions();
+        }
+
         function openPopup(event, url) {
             const x = event.screenX;
             const y = event.screenY;
@@ -253,6 +298,9 @@
             if (mode === 'error') { return stat === 'ERROR'; }
             if (mode === 'flagged') { return flagged; }
             if (mode === 'unflagged') { return !flagged; }
+            if (isModelFilterMode(mode)) {
+                return (fileListEl.getAttribute('data-mq-pro-type') || '').toUpperCase() === mode;
+            }
             return true;
         }
 
@@ -371,6 +419,9 @@
             var warnModels = {};
             var errModels = {};
             var allModels = {};
+            var partsModels = {};
+            var asmModels = {};
+            var drwModels = {};
             var byCategory = {};
 
             for (var i = 0; i < rows.length; i++) {
@@ -378,8 +429,14 @@
                 var stat = (row.getAttribute('data-mq-stat') || '').toUpperCase();
                 var cat = row.getAttribute('data-mq-category') || '';
                 var model = row.getAttribute('data-mq-model') || '';
+                var proType = (row.getAttribute('data-mq-pro-type') || '').toUpperCase();
                 if (!byCategory[cat]) { byCategory[cat] = { warn: 0, err: 0 }; }
-                if (model) { allModels[model] = true; }
+                if (model) {
+                    allModels[model] = true;
+                    if (proType === 'PRT') { partsModels[model] = true; }
+                    else if (proType === 'ASM') { asmModels[model] = true; }
+                    else if (proType === 'DRW') { drwModels[model] = true; }
+                }
                 if (stat === 'WARNING') {
                     warnIssues++;
                     byCategory[cat].warn++;
@@ -395,10 +452,16 @@
             var modelsEl = document.getElementById('mq-stat-models');
             var warnModelsEl = document.getElementById('mq-stat-warn-models');
             var errModelsEl = document.getElementById('mq-stat-err-models');
+            var partsEl = document.getElementById('mq-stat-parts');
+            var asmEl = document.getElementById('mq-stat-assemblies');
+            var drwEl = document.getElementById('mq-stat-drawings');
             if (issuesEl) { issuesEl.textContent = String(warnIssues + errIssues); }
             if (modelsEl) { modelsEl.textContent = String(Object.keys(allModels).length); }
             if (warnModelsEl) { warnModelsEl.textContent = String(Object.keys(warnModels).length); }
             if (errModelsEl) { errModelsEl.textContent = String(Object.keys(errModels).length); }
+            if (partsEl) { partsEl.textContent = String(Object.keys(partsModels).length); }
+            if (asmEl) { asmEl.textContent = String(Object.keys(asmModels).length); }
+            if (drwEl) { drwEl.textContent = String(Object.keys(drwModels).length); }
             mqSetGradeRing(
                 document.getElementById('mq-overall-grade'),
                 mqGradeFromCounts(0, warnIssues, errIssues)
@@ -466,7 +529,7 @@
             }
             removeEmptyCheckSections();
             scoreViewAdjusted = true;
-            syncCategoryFilterOptions();
+            syncViewFilterOptions();
             recalculateAdjustedSummary();
             applyViewFilter();
         }
@@ -485,7 +548,7 @@
             });
             removeEmptyCheckSections();
             scoreViewAdjusted = true;
-            syncCategoryFilterOptions();
+            syncViewFilterOptions();
             recalculateAdjustedSummary();
             applyViewFilter();
         }
@@ -523,7 +586,7 @@
                 sidebarItem.parentNode.removeChild(sidebarItem);
             });
             scoreViewAdjusted = true;
-            syncCategoryFilterOptions();
+            syncViewFilterOptions();
             recalculateAdjustedSummary();
             applyViewFilter();
         }
@@ -681,7 +744,7 @@
             function initReportUi() {
                 initPersistedReportState();
                 restoreViewFilterFromDom();
-                syncCategoryFilterOptions();
+                syncViewFilterOptions();
                 initSidebarNavHighlight();
                 initSaveHelpDialog();
                 applyViewFilter();
@@ -707,6 +770,11 @@
             <option value="error">Show errors</option>
             <option value="flagged">Show flagged</option>
             <option value="unflagged">Show unflagged</option>
+            <optgroup label="By model" id="sidebar-model-filter-group">
+                <option value="PRT">Parts</option>
+                <option value="ASM">Assemblies</option>
+                <option value="DRW">Drawings</option>
+            </optgroup>
             <optgroup label="By category" id="sidebar-category-filter-group">
                 <option value="Consistency">Consistency</option>
                 <option value="Design Intent Strength">Design Intent Strength</option>
@@ -760,6 +828,7 @@
                  id="{{ file.file_list_id | escape }}"
                  data-mq-stat="{{ file.stat }}"
                  data-mq-category="{{ file.category | e }}"
+                 data-mq-pro-type="{{ file.pro_type | e }}"
                  data-mq-model="{{ file.display_name | e }}">
                 {% if file.image_url %}
                     {% if file.model_href %}

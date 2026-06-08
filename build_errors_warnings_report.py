@@ -21,7 +21,11 @@ import markdown
 from jinja2 import Environment, FileSystemLoader
 from PIL import Image, ImageDraw
 
-from make_html_summary import generate_adjusted_summary_shell, get_category_descriptions
+from make_html_summary import (
+    generate_adjusted_summary_shell,
+    get_category_descriptions,
+    scan_pro_type_counts,
+)
 
 
 def _app_bundle_dir() -> str:
@@ -607,7 +611,9 @@ def create_html_report(
     model_checks_path: str,
 ) -> None:
     category_descriptions = get_category_descriptions(model_checks_path)
-    summary_div = generate_adjusted_summary_shell(category_descriptions)
+    master_root = ET.parse(master_xml_path).getroot()
+    pro_type_counts = scan_pro_type_counts(master_root)
+    summary_div = generate_adjusted_summary_shell(category_descriptions, pro_type_counts)
 
     env = Environment(loader=FileSystemLoader(bundle_dir))
     template = env.get_template("report_template.html.j2")
@@ -659,6 +665,7 @@ def create_html_report(
                         ),
                         "file_list_id": safe_file_list_id(check_name, file_info.get("model") or ""),
                         "category": description_data["category"],
+                        "pro_type": (file_info.get("pro_type") or "").strip().upper(),
                     }
                 )
 
