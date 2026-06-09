@@ -22,6 +22,10 @@
             <Name>Geometry Quality</Name>
             <Description>Evaluates the mathematical accuracy and validity of the model's geometry, ensuring that it is reliable for downstream processes such as manufacturing, verification, or simulation. Good geometry quality prevents errors from cascading into subsequent stages of product development.</Description>
         </Category>
+        <Category>
+            <Name>MBD Readyness</Name>
+            <Description>Evaluates Product Manufacturing Information (PMI) for Model-Based Definition (MBD) readiness, ensuring annotations, GDT, datums, and manufacturing data are complete, associated, standards-compliant, and usable downstream.</Description>
+        </Category>
     </Categories>
 
     <!-- PART REPORT CONFIGURATION -->
@@ -45,6 +49,9 @@ You need to take the geometry factor into account when making your accuracy sett
 If you are using relative accuracy, you must consider the bounding box diagonal length when making your accuracy settings.
 
 **Note** that coarse accuracy settings often lead to inaccurate calculations, but this is not always the case. If you have reviewed the geometry and do not observe geom checks or regeneration issues, then the coarse accuracy setting may be acceptable.
+<![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/gaps.html" target="_HELP">Help on this topic...</a></p>
+]]>
         </why>
     </Check>
     <Check>
@@ -76,6 +83,9 @@ Cuts outside the model are often caused by over-built sketches for cuts that int
 An unattached feature creates solid material that is not connected to the main solid. All parts should have no more than one solid body. If more than one solid body is present, this may indicate that you need an assembly.
 
 Note that sometimes unattached features are acceptable, because later features connect the solids so the part has a single solid volume. Similar to cuts outside the model, unattached features are often caused by over-built geometry that sometimes intersects the main solid, although in the current state it does not. Consider redesigning the feature with references such asup to surfaceso the solid material always intersects the model. Or perhaps you can add a sketch reference that ensures the sketch is attached to the main solid.
+<![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/bury.html" target="_HELP">Help on this topic...</a></p>
+]]>
         </why>
     </Check>
     <Check>
@@ -84,7 +94,11 @@ Note that sometimes unattached features are acceptable, because later features c
         <Description>Checks for features that depend on chamfer geometry as parent references within the model. Chamfers are typically finishing features added later in the design process, and using them as references for downstream features can weaken design intent and create unstable parent-child relationships. If a chamfer is modified, removed, or reordered, dependent features may fail to regenerate or produce unexpected geometry changes. This check helps encourage more robust and maintainable modeling practices by reducing dependencies on cosmetic or finishing features. Check behavior and reporting are controlled by the CHAMFER_CHILD settings in the check.mch configuration file.</Description>
         <ModelCheckName>CHAMFER_CHILD</ModelCheckName>
         <ModelCheckOptions>YNEW W W E E Y</ModelCheckOptions>
-        <why>Creating child features that reference chamfered features is problematic because it can lead to unstable models and complicate future design changes. Chamfers should be added later in the model tree to maintain the integrity and flexibility of the design, ensuring that primary features remain robust and modifications are easier to manage. </why>
+        <why>Creating child features that reference chamfered features is problematic because it can lead to unstable models and complicate future design changes. Chamfers should be added later in the model tree to maintain the integrity and flexibility of the design, ensuring that primary features remain robust and modifications are easier to manage.
+<![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/child.html" target="_HELP">Help on this topic...</a></p>
+]]>
+        </why>
         <display>Y</display>
         <enabled>Y</enabled>         
     </Check>
@@ -131,7 +145,10 @@ Note that sometimes unattached features are acceptable, because later features c
         <ModelCheckName>DATUM_RENAME</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
-        <enabled>Y</enabled>         
+        <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/datums.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
     </Check>
     <Check>
         <Name>Material Density Definition</Name>
@@ -152,7 +169,10 @@ Note that sometimes unattached features are acceptable, because later features c
         <ModelCheckName>DEFAULT_CHILD</ModelCheckName>
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
-        <enabled>Y</enabled>         
+        <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/datums.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
     </Check>
     <Check>
         <Name>Draft Angles</Name>
@@ -172,7 +192,11 @@ Note that sometimes unattached features are acceptable, because later features c
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
-        <why>Draft features can vary significantly as both their dimensions and their parent’s dimensions change. Because of the potentially significant changes in their geometry, it is unwise to reference their edges or surfaces. Since the internal structure and nature of the draft’s geometry can vary significantly with small changes, referencing the draft’s geometry is unreliable if changes are anticipated. Drafts are similarly complex features whose resulting geometry can vary significantly with small changes.</why>
+        <why>Draft features can vary significantly as both their dimensions and their parent’s dimensions change. Because of the potentially significant changes in their geometry, it is unwise to reference their edges or surfaces. Since the internal structure and nature of the draft’s geometry can vary significantly with small changes, referencing the draft’s geometry is unreliable if changes are anticipated. Drafts are similarly complex features whose resulting geometry can vary significantly with small changes.
+<![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/child.html" target="_HELP">Help on this topic...</a></p>
+]]>
+        </why>
     </Check>
     <Check>
         <Name>Datum Axes Information</Name>
@@ -235,6 +259,9 @@ Note that sometimes unattached features are acceptable, because later features c
         <ModelCheckName>EARLY_CHAMFER</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
         <why>Using chamfers too early in the design model tree can lead to significant problems, particularly if they are used as references for constructing other features, because this practice can compromise the integrity of the model, complicate future design modifications, and create dependencies that make the design less flexible and more difficult to manage.
+<![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/early.html" target="_HELP">Help on this topic...</a></p>
+]]>
         </why>
         <display>Y</display>
         <enabled>Y</enabled>         
@@ -246,7 +273,10 @@ Note that sometimes unattached features are acceptable, because later features c
         <ModelCheckName>EARLY_COSMETIC</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
         <display>Y</display>
-        <enabled>Y</enabled>         
+        <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/early.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
     </Check>
     <Check>
         <Name>Early Draft Features</Name>
@@ -257,6 +287,9 @@ Note that sometimes unattached features are acceptable, because later features c
         <display>Y</display>
         <enabled>Y</enabled>
         <why>Using drafts too early in the design model tree can lead to significant problems, particularly if they are used as references for constructing other features, because this practice can compromise the integrity of the model, complicate future design modifications, and create dependencies that make the design less flexible and more difficult to manage.
+<![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/early.html" target="_HELP">Help on this topic...</a></p>
+]]>
         </why>
     </Check>
     <Check>
@@ -266,7 +299,10 @@ Note that sometimes unattached features are acceptable, because later features c
         <ModelCheckName>EARLY_ROUND</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
         <display>Y</display>
-        <enabled>Y</enabled>         
+        <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/early.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
     </Check>
     <Check>
         <Name>Edge References</Name>
@@ -314,7 +350,11 @@ Layers can only organize view items such as datums, surface quilts, and componen
         <Description>Checks for parameters that exist in the model but are not part of the approved company parameter standards or required metadata definitions. Extra or unnecessary parameters can increase model complexity, create confusion, introduce inconsistent metadata, and interfere with automation, drawings, Windchill integration, BOM generation, ERP mapping, and downstream manufacturing processes. Obsolete or duplicate parameters may also make models more difficult to maintain and troubleshoot over time. This check helps ensure that models contain only approved and necessary parameter data according to company standards. Approved and unwanted parameter definitions are typically configured in the start.mcs file using PRT_PARAMETER, ASM_PARAMETER, DRW_PARAMETER, PRT_PARAM_UNWANTED, ASM_PARAM_UNWANTED, and related entries, while check behavior and reporting are controlled by the EXTRA_PARAMS settings in the check.mch configuration file.</Description>
         <ModelCheckName>EXTRA_PARAMS</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <why>Including extra parameters in a model can lead to significant problems, such as increased complexity, potential for errors, confusion during modifications, and difficulties in maintaining the model, all of which can hinder efficient design and development.</why>
+        <why>Including extra parameters in a model can lead to significant problems, such as increased complexity, potential for errors, confusion during modifications, and difficulties in maintaining the model, all of which can hinder efficient design and development.
+<![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/param.html" target="_HELP">Help on this topic...</a></p>
+]]>
+        </why>
         <display>Y</display>
         <enabled>Y</enabled>             
     </Check>
@@ -395,6 +435,9 @@ Models or drawings that reference models with geom checks risk inheriting a simi
 
 ### Resolving geom checks
 Since an issue may propagate through the associative chain of references between models, first focus on the models at the top of the dependency chain. Beginning with the isolated occurrences is a good strategy because fixing them may also resolve the geom checks in their downstream models.
+<![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/geomchk.html" target="_HELP">Help on this topic...</a></p>
+]]>
         </why>
     </Check>
     <Check>
@@ -431,7 +474,10 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckName>IMPORT_FEAT</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
         <display>Y</display>
-        <enabled>Y</enabled>         
+        <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/external.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
     </Check>
     <Check>
         <Name>Incomplete Features</Name>
@@ -467,7 +513,10 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckName>LAYER_DISPSTAT</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y W W Y</ModelCheckOptions>
         <display>Y</display>
-        <enabled>Y</enabled>         
+        <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/layer.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
     </Check>
     <Check>
         <Name>Multiple Layer Items</Name>
@@ -480,6 +529,9 @@ Since an issue may propagate through the associative chain of references between
         <why>Layers are used in models and drawings to control which view items are displayed. Models and drawings with many pieces of information can be difficult to work with if all of the information is turned on at the same time. By organizing view items into different layers, you can select which layers are displayed, hidden, or isolated so you can focus on the desired information.
             Understanding the number of layers in your models and the occurrence of layers without entities is a good starting point for assessing how effectively you are using layers. A high level view of how layers are being used is also helpful for very specialized types of CAD data conversion projects.
             Note: Layers can only organize view items such as datums, surface quilts, and components. The hiding or isolation of specific features within a part’s solid or within a surface’s quilt is not possible with layers. Instead, simplified representations should be created to control the presence of specific features.
+<![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/layer.html" target="_HELP">Help on this topic...</a></p>
+]]>
         </why>
     </Check>
     <Check>
@@ -488,12 +540,18 @@ Since an issue may propagate through the associative chain of references between
         <Description>Checks whether datum-related layers are properly configured to use the correct blanked or hidden display state according to company standards. Datum layers commonly contain datum planes, axes, coordinate systems, points, and other reference geometry that may clutter the model display if left visible during normal modeling and detailing workflows. Properly blanking datum layers improves model readability, reduces visual complexity, and helps maintain consistent display practices across parts, assemblies, and drawings. Incorrect datum layer visibility settings can make models difficult to navigate and may interfere with downstream drafting, manufacturing, or inspection processes. Datum layer definitions and approved display states are typically configured in the start.mcs file using PRT_LAYER, ASM_LAYER, DRW_LAYER, and related layer configuration entries, while check behavior and reporting are controlled by the LAYER_DTM_BLANK settings in the check.mch configuration file.</Description>
         <ModelCheckName>LAYER_DTM_BLANK</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y W W Y</ModelCheckOptions>
-        <why>Blank datum layers in a model can lead to significant problems, including difficulty in understanding the model structure, challenges in making accurate modifications, and potential errors in downstream processes, as hidden datums can obscure the true design intent and dependencies.</why>
+        <why>Blank datum layers in a model can lead to significant problems, including difficulty in understanding the model structure, challenges in making accurate modifications, and potential errors in downstream processes, as hidden datums can obscure the true design intent and dependencies.
+<![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/layer.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
         <display>Y</display>
         <enabled>Y</enabled>
         <why>Layers are used in models and drawings to control which view items are displayed. Models and drawings with many pieces of information can be difficult to work with if all of the information is turned on at the same time. By organizing view items into different layers, you can select which layers are displayed, hidden, or isolated so you can focus on the desired information.
             Understanding the number of layers in your models and the occurrence of layers without entities is a good starting point for assessing how effectively you are using layers. A high level view of how layers are being used is also helpful for very specialized types of CAD data conversion projects.
             Note: Layers can only organize view items such as datums, surface quilts, and components. The hiding or isolation of specific features within a part’s solid or within a surface’s quilt is not possible with layers. Instead, simplified representations should be created to control the presence of specific features.
+<![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/layer.html" target="_HELP">Help on this topic...</a></p>
+]]>
         </why>
     </Check>
     <Check>
@@ -507,6 +565,9 @@ Since an issue may propagate through the associative chain of references between
         <why>Layers are used in models and drawings to control which view items are displayed. Models and drawings with many pieces of information can be difficult to work with if all of the information is turned on at the same time. By organizing view items into different layers, you can select which layers are displayed, hidden, or isolated so you can focus on the desired information.
             Understanding the number of layers in your models and the occurrence of layers without entities is a good starting point for assessing how effectively you are using layers. A high level view of how layers are being used is also helpful for very specialized types of CAD data conversion projects.
             Note: Layers can only organize view items such as datums, surface quilts, and components. The hiding or isolation of specific features within a part’s solid or within a surface’s quilt is not possible with layers. Instead, simplified representations should be created to control the presence of specific features.
+<![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/layer.html" target="_HELP">Help on this topic...</a></p>
+]]>
         </why>
     </Check>
     <Check>
@@ -520,6 +581,9 @@ Since an issue may propagate through the associative chain of references between
         <why>Layers are used in models and drawings to control which view items are displayed. Models and drawings with many pieces of information can be difficult to work with if all of the information is turned on at the same time. By organizing view items into different layers, you can select which layers are displayed, hidden, or isolated so you can focus on the desired information.
             Understanding the number of layers in your models and the occurrence of layers without entities is a good starting point for assessing how effectively you are using layers. A high level view of how layers are being used is also helpful for very specialized types of CAD data conversion projects.
             Note: Layers can only organize view items such as datums, surface quilts, and components. The hiding or isolation of specific features within a part’s solid or within a surface’s quilt is not possible with layers. Instead, simplified representations should be created to control the presence of specific features.
+<![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/layer.html" target="_HELP">Help on this topic...</a></p>
+]]>
         </why>
     </Check>
     <Check>
@@ -529,7 +593,10 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckName>LAYER_MOVE</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
-        <enabled>Y</enabled>         
+        <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/layer.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
     </Check>
     <Check>
         <Name>Layer Placement</Name>
@@ -538,7 +605,10 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckName>LAYER_PLACE</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y W W Y</ModelCheckOptions>
         <display>Y</display>
-        <enabled>Y</enabled>         
+        <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/layer.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
     </Check>
     <Check>
         <Name>Layer Status</Name>
@@ -551,6 +621,9 @@ Since an issue may propagate through the associative chain of references between
         <why>Layers are used in models and drawings to control which view items are displayed. Models and drawings with many pieces of information can be difficult to work with if all of the information is turned on at the same time. By organizing view items into different layers, you can select which layers are displayed, hidden, or isolated so you can focus on the desired information.
             Understanding the number of layers in your models and the occurrence of layers without entities is a good starting point for assessing how effectively you are using layers. A high level view of how layers are being used is also helpful for very specialized types of CAD data conversion projects.
             Note: Layers can only organize view items such as datums, surface quilts, and components. The hiding or isolation of specific features within a part’s solid or within a surface’s quilt is not possible with layers. Instead, simplified representations should be created to control the presence of specific features.
+<![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/layer.html" target="_HELP">Help on this topic...</a></p>
+]]>
         </why>
     </Check>
     <Check>
@@ -596,7 +669,10 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckName>MERGE_FEAT</ModelCheckName>
         <ModelCheckOptions>YNEW W W N E Y</ModelCheckOptions>
         <display>Y</display>
-        <enabled>Y</enabled>         
+        <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/merge.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
     </Check>
     <Check>
         <Name>Minimum and Maximum Tolerance Information</Name>
@@ -694,7 +770,12 @@ Since an issue may propagate through the associative chain of references between
         <Category>Model Complexity</Category>
         <Description>Checks for parameters that exist in the model but are not actively used by relations, drawings, family tables, programs, notes, or downstream processes. Unused parameters can increase model complexity, create confusion, clutter metadata, and make models more difficult to maintain and troubleshoot. Removing unnecessary parameters helps improve model clarity, consistency, and overall data quality while reducing the risk of outdated or misleading information remaining in the design. Parameter usage and cleanup standards are typically managed through parameter definitions in the start.mcs file, while check behavior and reporting are controlled by the PARAM_UNUSED settings in the check.mch configuration file.</Description>
         <ModelCheckName>PARAM_UNUSED</ModelCheckName>
-        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions><why>Unused parameters in a model can lead to confusion, increased complexity, and potential errors during the design process. Ensuring that all parameters are necessary and utilized helps maintain model clarity, simplifies modifications, and enhances the overall efficiency and accuracy of the design.</why>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <why>Unused parameters in a model can lead to confusion, increased complexity, and potential errors during the design process. Ensuring that all parameters are necessary and utilized helps maintain model clarity, simplifies modifications, and enhances the overall efficiency and accuracy of the design.
+<![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/param.html" target="_HELP">Help on this topic...</a></p>
+]]>
+        </why>
         <display>Y</display>
         <enabled>Y</enabled>         
     </Check>
@@ -714,7 +795,10 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckName>PLANE_CHILD</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
         <display>Y</display>
-        <enabled>Y</enabled>         
+        <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/datums.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
     </Check>
     <Check>
         <Name>Plane Parent Features</Name>
@@ -723,7 +807,10 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckName>PLANE_PARENT</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
-        <enabled>Y</enabled>         
+        <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/datums.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
     </Check>
     <Check>
         <Name>Model Version</Name>
@@ -781,6 +868,9 @@ Retrieval and regeneration issues in models with family tables are more serious 
 - Selection of unstable/unreliable references
 - Geometry issues with referenced geometry
 - General error messages
+<![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/regenerr.html" target="_HELP">Help on this topic...</a></p>
+]]>
         </why>
         <display>Y</display>
         <enabled>Y</enabled>         
@@ -876,7 +966,11 @@ Retrieval and regeneration issues in models with family tables are more serious 
         <ModelCheckOptions>YNEW W W E E Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
-        <why>Round features can vary significantly as both their dimensions and their parent’s dimensions change. Because of the potentially significant changes in their geometry, it is unwise to reference their edges or surfaces. Since the internal structure and nature of the round’s geometry can vary significantly with small changes, referencing the geometry is unreliable if changes are anticipated. Rounds are similarly complex features whose resulting geometry can vary significantly with small changes.</why>
+        <why>Round features can vary significantly as both their dimensions and their parent’s dimensions change. Because of the potentially significant changes in their geometry, it is unwise to reference their edges or surfaces. Since the internal structure and nature of the round’s geometry can vary significantly with small changes, referencing the geometry is unreliable if changes are anticipated. Rounds are similarly complex features whose resulting geometry can vary significantly with small changes.
+<![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/child.html" target="_HELP">Help on this topic...</a></p>
+]]>
+        </why>
     </Check>
     <Check>
         <Name>Rule Check Information</Name>
@@ -894,7 +988,10 @@ Retrieval and regeneration issues in models with family tables are more serious 
         <ModelCheckName>SHARP_EDGES</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
         <display>Y</display>
-        <enabled>Y</enabled>         
+        <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/sharp.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
     </Check>
     <Check>
         <Name>Short Edges</Name>
@@ -952,7 +1049,11 @@ When a model has small geometry, the equivalent absolute accuracy should be two 
         <Description>Checks for unbend and bend-back features used within sheet metal parts. Unbend features are commonly used to temporarily flatten bends so additional geometry such as cuts, holes, or forms can be created in the flat condition before rebending the part. Improper use, excessive use, or failed unbend features can create unstable models, incorrect flat patterns, regeneration issues, and downstream manufacturing problems. This check helps ensure that unbend operations are used correctly and consistently to maintain accurate sheet metal behavior and manufacturable geometry. Sheet metal standards and related configuration settings are managed through ModelCHECK sheet metal configuration files, while check behavior and reporting are controlled by the SHTMTL_UNBENDS settings in the check.mch configuration file.</Description>
         <ModelCheckName>SHTMTL_UNBENDS</ModelCheckName>
         <ModelCheckOptions>YNEW W W N E Y</ModelCheckOptions>
-        <why>Missing unbend features in sheet metal parts can lead to significant issues, such as inaccuracies in flat pattern development, difficulties in verifying part dimensions, and challenges during manufacturing, all of which compromise the overall quality and functionality of the final product.</why>
+        <why>Missing unbend features in sheet metal parts can lead to significant issues, such as inaccuracies in flat pattern development, difficulties in verifying part dimensions, and challenges during manufacturing, all of which compromise the overall quality and functionality of the final product.
+<![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/unbend.html" target="_HELP">Help on this topic...</a></p>
+]]>
+        </why>
         <display>Y</display>
         <enabled>Y</enabled>         
     </Check>
@@ -972,7 +1073,11 @@ When a model has small geometry, the equivalent absolute accuracy should be two 
         <Description>Checks and reports information related to simplified representations used within the model or assembly. Simplified representations are commonly used to improve performance, reduce memory usage, simplify large assemblies, and control which components or features are displayed for different design, review, manufacturing, or simulation purposes. Improperly managed simplified representations can lead to missing geometry, incomplete assemblies, incorrect downstream exports, and confusion during collaboration or manufacturing processes. This check helps ensure that simplified representations are properly defined, named, and maintained according to company standards. Simplified representation naming and configuration rules are typically managed in the start.mcs file using PRT_SIMPREP_NAME and related entries, while check behavior and reporting are controlled by the SIMPREP_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>SIMPREP_INFO</ModelCheckName>
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
-        <why>Incorrectly defined or unused simplified representations in a model can cause misunderstandings, inaccuracies, and inefficiencies during the design process. Properly managing simplified representations helps organize work in large assemblies, reduces excess regeneration, and ensures clarity, accuracy, and efficiency in the design and review stages.</why>
+        <why>Incorrectly defined or unused simplified representations in a model can cause misunderstandings, inaccuracies, and inefficiencies during the design process. Properly managing simplified representations helps organize work in large assemblies, reduces excess regeneration, and ensures clarity, accuracy, and efficiency in the design and review stages.
+<![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/simprep.html" target="_HELP">Help on this topic...</a></p>
+]]>
+        </why>
         <display>Y</display>
         <enabled>Y</enabled>         
     </Check>
@@ -983,7 +1088,10 @@ When a model has small geometry, the equivalent absolute accuracy should be two 
         <ModelCheckName>SIMPREP_NAME</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
         <display>Y</display>
-        <enabled>Y</enabled>         
+        <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/simprep.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
     </Check>
     <Check>
         <Name>Sketch Items</Name>
@@ -1013,7 +1121,10 @@ Imported sketch geometry can lead to many sketched entities. Even if you have to
         <ModelCheckName>SLA_INFO</ModelCheckName>
         <ModelCheckOptions>YNEW N N N N Y</ModelCheckOptions>
         <display>Y</display>
-        <enabled>Y</enabled>         
+        <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/sla.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
     </Check>
     <Check>
         <Name>Small Cylindrical Surfaces</Name>
@@ -1022,7 +1133,10 @@ Imported sketch geometry can lead to many sketched entities. Even if you have to
         <ModelCheckName>SMALL_CYLSRF</ModelCheckName>
         <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
         <display>Y</display>
-        <enabled>Y</enabled>         
+        <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/small.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
     </Check>
     <Check>
         <Name>Surface Edges</Name>
@@ -1031,7 +1145,10 @@ Imported sketch geometry can lead to many sketched entities. Even if you have to
         <ModelCheckName>SRF_EDGES</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
         <display>Y</display>
-        <enabled>Y</enabled>         
+        <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/gaps.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
     </Check>
     <Check>
         <Name>Start Part Checks</Name>
@@ -1040,7 +1157,10 @@ Imported sketch geometry can lead to many sketched entities. Even if you have to
         <ModelCheckName>STARTCHECK</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y N W Y</ModelCheckOptions>
         <display>Y</display>
-        <enabled>Y</enabled>         
+        <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/start.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
     </Check>
     <Check>
         <Name>Start Part Layer Check</Name>
@@ -1049,8 +1169,11 @@ Imported sketch geometry can lead to many sketched entities. Even if you have to
         <ModelCheckName>STARTLAYR</ModelCheckName>
         <ModelCheckOptions>YNEW W W E E Y</ModelCheckOptions>
         <display>Y</display>
-        <enabled>Y</enabled> 
-    </Check>    
+        <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/layer.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
+    </Check>
     <Check>
         <Name>Suppressed Features</Name>
         <Category>Model Integrity</Category>
@@ -1115,7 +1238,11 @@ Suppressed features are appropriate if they are only used by particular instance
         <Description>Checks for references or dependencies between the current model and external models, assemblies, sketches, geometry, or copied data located outside the model itself. External dependencies can be useful for top-down design workflows, but unmanaged or unnecessary external references can weaken model stability, increase complexity, create regeneration failures, and make models difficult to modify, reuse, or transfer between projects. Broken or unintended external dependencies may also cause downstream issues in assemblies, manufacturing, Windchill, and data management processes. This check helps identify external references so they can be reviewed and managed according to company modeling practices. External reference behavior and related standards are typically controlled through Creo configuration settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the EXTERNAL_DEPS settings in the check.mch configuration file.</Description>
         <ModelCheckName>EXTERNAL_DEPS</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <why>External dependencies in a model can lead to significant problems, such as increased complexity, reduced model stability, and challenges in maintaining and updating designs. Properly managing external dependencies is crucial for ensuring the integrity and reliability of the model, as well as facilitating efficient collaboration and modification processes. </why>
+        <why>External dependencies in a model can lead to significant problems, such as increased complexity, reduced model stability, and challenges in maintaining and updating designs. Properly managing external dependencies is crucial for ensuring the integrity and reliability of the model, as well as facilitating efficient collaboration and modification processes.
+<![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/external.html" target="_HELP">Help on this topic...</a></p>
+]]>
+        </why>
         <display>Y</display>
         <enabled>Y</enabled>         
     </Check>
@@ -1164,7 +1291,10 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckName>DIM_OVERWRITE</ModelCheckName>
         <ModelCheckOptions>YNEW E E N E Y</ModelCheckOptions>
         <display>Y</display>
-        <enabled>Y</enabled>         
+        <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/dimensions.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
     </Check>
     <Check>
         <Name>Draft Geometry</Name>
@@ -1173,7 +1303,10 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckName>DRAFT_GEOM</ModelCheckName>
         <ModelCheckOptions>YNEW W W N E Y</ModelCheckOptions>
         <display>Y</display>
-        <enabled>Y</enabled>         
+        <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/draftgeom.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
     </Check>
     <Check>
         <Name>Drawing Layers Information</Name>
@@ -1216,45 +1349,31 @@ Suppressed features are appropriate if they are only used by particular instance
         <Category>Design Intent Strength</Category>
         <Description>Checks for model surfaces that are not referenced by dimensions, GDT annotations, notes, surface finish symbols, inspection annotations, or other manufacturing and documentation annotations. Unannotated surfaces may indicate incomplete model-based definition (MBD) practices, missing manufacturing requirements, undocumented inspection criteria, or incomplete engineering communication. Surfaces lacking proper annotation can create ambiguity during manufacturing, quality inspection, assembly, and downstream interpretation of the design intent. This check helps ensure that important surfaces are properly documented and associated with the required annotation information according to company MBD and drafting standards. Annotation requirements and related documentation practices are typically configured through Creo annotation settings and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the SRF_NOT_REF_BY_ANNTN settings in the check.mch configuration file.</Description>
         <ModelCheckName>SRF_NOT_REF_BY_ANNTN</ModelCheckName>
-        <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
+        <ModelCheckOptions>YNEW W E N W Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>   
-       <hideFromReport>Y</hideFromReport>                 
+       <hideFromReport>N</hideFromReport>                 
     </Check>
 
      <Check>
         <Name>Annotations Missing In Combination State</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>MBD Readyness</Category>
         <Description>Checks whether required annotations are included and properly displayed within defined combination states used for Model-Based Definition (MBD) workflows. Combination states control the visibility of annotations, views, geometry, and display settings used to communicate manufacturing, inspection, assembly, and engineering requirements directly within the 3D model. Missing annotations in combination states can result in incomplete documentation, incorrect manufacturing interpretation, inspection errors, failed design reviews, and downstream communication problems. This check helps ensure that all required dimensions, GDT annotations, notes, and manufacturing information are visible in the appropriate combination states according to company MBD standards. Combination state and annotation requirements are typically configured through Creo MBD settings and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the ANNTN_NOT_ON_COMB_STATE settings in the check.mch configuration file.</Description>
         <ModelCheckName>ANNTN_NOT_ON_COMB_STATE</ModelCheckName>
-        <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
+        <ModelCheckOptions>YNEW W E N W Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>            
-    </Check>
-
-    <Check>
-        <Name>Surfaces not referenced by Annotation</Name>
-        <Category>Design Intent Strength</Category>
-        <Description>Checks for model surfaces that are not referenced by dimensions, GDT annotations, notes, surface finish symbols, inspection annotations, or other engineering documentation annotations. Surfaces without associated annotations may indicate incomplete Model-Based Definition (MBD) practices, undocumented manufacturing requirements, missing inspection criteria, or insufficient communication of design intent. Unannotated surfaces can create ambiguity during manufacturing, quality inspection, assembly, and downstream engineering processes, increasing the risk of interpretation errors and nonconforming parts. This check helps ensure that important surfaces are properly documented and associated with the required annotation information according to company MBD and drafting standards. Annotation requirements and related documentation practices are typically configured through Creo annotation settings and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the SRF_NOT_REF_BY_ANNTN settings in the check.mch configuration file.</Description>
-        <ModelCheckName>SRF_NOT_REF_BY_ANNTN</ModelCheckName>
-        <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
-        <display>Y</display>
-        <enabled>Y</enabled>
-       <hideFromReport>Y</hideFromReport>                    
     </Check>
 
     <Check>
         <Name>Annotations missing a surface reference</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>MBD Readyness</Category>
         <Description>Checks for annotations that are not associated with or attached to specific model surfaces or geometry references. Annotations without valid surface references may indicate incomplete Model-Based Definition (MBD) practices, broken annotation associations, improperly placed dimensions, or unclear manufacturing and inspection requirements. Unreferenced annotations can create ambiguity during design review, manufacturing, quality inspection, and downstream interpretation of the model, increasing the risk of errors and inconsistent documentation. This check helps ensure that annotations remain properly connected to the intended geometry and accurately communicate design intent according to company MBD and drafting standards. Annotation association requirements and related documentation practices are typically configured through Creo annotation settings and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the ANNTN_MISSING_SURF_REF settings in the check.mch configuration file.</Description>
         <ModelCheckName>ANNTN_MISSING_SURF_REF</ModelCheckName>
-        <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
+        <ModelCheckOptions>YNEW W E N W Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>            
     </Check>
-
-
-
 
     <Check>
         <Name>Erased Views</Name>
@@ -1272,7 +1391,10 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckName>FORMAT_NAME</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
         <display>Y</display>
-        <enabled>Y</enabled>         
+        <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/drwformat.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
     </Check>
     <Check>
         <Name>Ignored Sheets</Name>
@@ -1407,7 +1529,10 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckName>REGEN_DIMS</ModelCheckName>
         <ModelCheckOptions>YNEW E E N E Y</ModelCheckOptions>
         <display>Y</display>
-        <enabled>Y</enabled>         
+        <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/regendims.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
     </Check>
     <Check>
         <Name>Sheet Size Information</Name>
@@ -1461,7 +1586,10 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckName>UNUSED_MODELS</ModelCheckName>
         <ModelCheckOptions>YNEW E E N E Y</ModelCheckOptions>
         <display>Y</display>
-        <enabled>Y</enabled>         
+        <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/unused.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
     </Check>
     <Check>
         <Name>Unused Sheets</Name>
@@ -2006,10 +2134,10 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Inactive annotations</Name>
-        <Category>Model Integrity</Category>
+        <Category>MBD Readyness</Category>
         <Description>Checks for annotations in the model or drawing that are currently inactive, suppressed, or not visible in the active display state. Inactive annotations may still exist in the model database but are not contributing to the current documentation, which can lead to incomplete communication of design intent, missed manufacturing requirements, or confusion during review and downstream processes. These conditions often arise from combination states, display configurations, legacy annotation practices, or incomplete cleanup of outdated annotation data. This check helps ensure that all required annotations are active, visible where intended, and properly contributing to the model-based definition or drawing. Annotation activation and display rules are typically managed through Creo annotation settings and ModelCHECK MBD/drafting configuration files, while check behavior and reporting are controlled by the ANNTN_INACTIVE settings in the check.mch configuration file.</Description>
         <ModelCheckName>ANNTN_INACTIVE</ModelCheckName>
-        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <ModelCheckOptions>YNEW W E N Y Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
     </Check>
@@ -2143,6 +2271,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <why>A buried feature has geometry that is entirely surrounded (or enclosed) by another feature’s geometry. For example, a cut feature may be completely filled by one or more features. Or a solid feature, such as a protrusion, may be completely surrounded by geometry from one or more other features.
         The design intent of a buried feature should be questioned since it is being replaced by geometry from other features.
         Often buried features indicate a model that was modified when undesired geometry was cut away or an undesired region was filled in to start over. This may feel like a pragmatic solution, but it is only a short term solution. When the undesired design intent is left behind (or buried by geometry from new features), it makes the model unnecessarily complex. Good design intent should be understandable and the designer should make changes by modifying and redesigning the existing design intent. Leaving features that do not contribute to the design intent is confusing for new designers.
+<![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/bury.html" target="_HELP">Help on this topic...</a></p>
+]]>
         </why>
         <display>Y</display>
         <enabled>Y</enabled>
@@ -2189,6 +2320,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/gaps.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
     </Check>
 
     <Check>
@@ -2320,6 +2454,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
+        <why><![CDATA[
+<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/param.html" target="_HELP">Help on this topic...</a></p>
+]]></why>
     </Check>
 
     <Check>
@@ -2421,17 +2558,17 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Annotation on Multiple Combined States</Name>
-        <Category>Consistency</Category>
+        <Category>MBD Readyness</Category>
         <Description>Checks for annotations that exist across multiple combined states in the model and verifies that they remain consistent, properly managed, and correctly displayed in each applicable state. Annotations used in combined states (such as simplified representations, configurations, or display states) must remain aligned with design intent to ensure that critical information such as dimensions, notes, GDT, and manufacturing instructions is not missing, duplicated, or inconsistently shown across states. Inconsistencies can lead to incomplete documentation, misinterpretation during manufacturing or inspection, and downstream data quality issues. This check helps ensure that annotations are correctly controlled and consistently represented across all combined states of the model. Combined state annotation rules and display management are typically governed by Creo annotation and representation settings, while check behavior and reporting are controlled by the ANNTN_ON_MULT_COMB_STATE settings in the check.mch configuration file</Description>
         <ModelCheckName>ANNTN_ON_MULT_COMB_STATE</ModelCheckName>
-        <ModelCheckOptions>YNEW W W N Y</ModelCheckOptions>
+        <ModelCheckOptions>YNEW W E N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
     </Check>
 
     <Check>
         <Name>Annotation Semantic Reference Text Verification</Name>
-        <Category>Consistency</Category>
+        <Category>MBD Readyness</Category>
         <Description>Checks whether annotation semantic reference text in the model is valid, properly defined, and correctly linked to its referenced model entities such as geometry, features, or parameters. Semantic references are used to maintain associative annotation behavior, ensuring that annotations update correctly when the underlying model changes. Invalid, broken, or missing semantic reference text can result in lost associativity, incorrect annotation placement, or outdated manufacturing and inspection information, which can compromise model-based definition integrity and downstream processes. This check helps ensure that all semantic references are correctly maintained, functional, and consistent with the current model state. Semantic reference validation rules and annotation associativity behavior are typically managed through Creo annotation and MBD settings, while check behavior and reporting are controlled by the ANNTN_SEM_REF_TEXT_VERIFY settings in the check.mch configuration file.</Description>
         <ModelCheckName>ANNTN_SEM_REF_TEXT_VERIFY</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y</ModelCheckOptions>
@@ -2454,7 +2591,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Category>Consistency</Category>
         <Description>Checks whether combined state names in the model follow the required company naming conventions and are consistently defined across the model. Combined states are used to control display configurations such as simplified representations, annotations, views, and model settings, and inconsistent or nonstandard naming can lead to confusion, poor data management, incorrect configuration usage, and downstream issues in documentation, manufacturing, and PLM systems. This check helps ensure that all combined states are properly named, standardized, and aligned with company-defined naming rules for clarity and consistency. Combined state naming rules and validation behavior are typically managed through Creo representation settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the COMB_STATE_NAME settings in the check.mch configuration file.</Description>
         <ModelCheckName>COMB_STATE_NAME</ModelCheckName>
-        <ModelCheckOptions>YNEW W W N Y</ModelCheckOptions>
+        <ModelCheckOptions>YNEW W E N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
     </Check>

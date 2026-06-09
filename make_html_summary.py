@@ -99,14 +99,18 @@ def _model_check_category_map(model_checks_xml_path: str) -> dict[str, str]:
 
 def scan_visible_issue_summary(master_root: ET.Element, model_checks_xml_path: str) -> dict:
     """
-    Counts matching the report's visible ERROR/WARNING rows (for baking the dashboard at build time).
+    Counts for the report score dashboard at build time.
+
+    PASS totals are fixed batch baselines (like files scanned). WARNING/ERROR match
+    visible issue rows and decrease when the user removes sections in the browser.
     """
     model_check_mapping = _model_check_category_map(model_checks_xml_path)
+    pass_issues = 0
     warn_issues = 0
     err_issues = 0
     warn_models: set[str] = set()
     err_models: set[str] = set()
-    by_category: dict[str, dict[str, int]] = defaultdict(lambda: {"warn": 0, "err": 0})
+    by_category: dict[str, dict[str, int]] = defaultdict(lambda: {"pass": 0, "warn": 0, "err": 0})
 
     for file_element in master_root.findall("File"):
         model = (file_element.findtext("Model") or "").strip()
@@ -114,13 +118,16 @@ def scan_visible_issue_summary(master_root: ET.Element, model_checks_xml_path: s
             if _check_hidden_from_report(check):
                 continue
             stat = _check_stat(check)
-            if stat not in ("WARNING", "ERROR"):
+            if stat not in ("PASS", "WARNING", "ERROR"):
                 continue
             name = check.get("name") or ""
             if name not in model_check_mapping:
                 continue
             category = model_check_mapping[name]
-            if stat == "WARNING":
+            if stat == "PASS":
+                pass_issues += 1
+                by_category[category]["pass"] += 1
+            elif stat == "WARNING":
                 warn_issues += 1
                 if model:
                     warn_models.add(model)
@@ -131,8 +138,9 @@ def scan_visible_issue_summary(master_root: ET.Element, model_checks_xml_path: s
                     err_models.add(model)
                 by_category[category]["err"] += 1
 
-    overall_grade = calculate_grade([0, warn_issues, err_issues])[0]
+    overall_grade = calculate_grade([pass_issues, warn_issues, err_issues])[0]
     return {
+        "pass_issues": pass_issues,
         "warn_issues": warn_issues,
         "err_issues": err_issues,
         "warn_models": len(warn_models),
@@ -253,16 +261,18 @@ def generate_adjusted_summary_shell(
     asm_n = pt.get("ASM", 0)
     drw_n = pt.get("DRW", 0)
     summary = issue_summary or {}
+    pass_issues = summary.get("pass_issues", 0)
     visible_issues = summary.get("warn_issues", 0) + summary.get("err_issues", 0)
     warn_models = summary.get("warn_models", 0)
     err_models = summary.get("err_models", 0)
     overall_grade = summary.get("overall_grade", "A")
     by_category = summary.get("by_category") or {}
     baked_attr = ' data-mq-summary-baked="1"' if issue_summary else ""
+    pass_attr = f' data-mq-pass-issues="{pass_issues}"' if issue_summary else ""
     parts = [
         _MQ_DASHBOARD_CSS,
         f"""
-<div class="mq-dashboard"{baked_attr}>
+<div class="mq-dashboard"{baked_attr}{pass_attr}>
   <h1 class="mq-page-title" id="mq-page-title">Score</h1>
   <div class="mq-grid">
     <div class="mq-left">
@@ -284,19 +294,19 @@ def generate_adjusted_summary_shell(
         </div>
         <div class="mq-scale">
           <div class="mq-scale-title">Grading scale</div>
-          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-a"></span><div><strong>A</strong> — No remaining visible issues.</div></div>
-          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-b"></span><div><strong>B</strong> — Moderate warnings (5–25% of remaining issues), no errors.</div></div>
-          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-c"></span><div><strong>C</strong> — Higher warnings (&gt;25% of remaining issues), no errors.</div></div>
+          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-a"></span><div><strong>A</strong> — Warnings under 5% of checks, no errors.</div></div>
+          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-b"></span><div><strong>B</strong> — Moderate warnings (5–25% of checks), no errors.</div></div>
+          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-c"></span><div><strong>C</strong> — Higher warnings (&gt;25% of checks), no errors.</div></div>
           <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-d"></span><div><strong>D</strong> — Any remaining errors.</div></div>
         </div>
       </div>
       <div class="mq-rationale">
         <h3>How the grade works</h3>
-        <p>The score counts only ERROR and WARNING rows still shown in this report. Remove sections or models to reflect what you are tracking now.</p>
+        <p>Files scanned and PASS check totals stay fixed from the batch. Grades use PASS plus the WARNING and ERROR rows still shown; remove sections or models to update the score.</p>
         <ul>
-          <li><strong>Grade A:</strong> No remaining visible issues.</li>
-          <li><strong>Grade B:</strong> Warnings are 5% to 25% of remaining issues, no errors.</li>
-          <li><strong>Grade C:</strong> Warnings are over 25% of remaining issues, no errors.</li>
+          <li><strong>Grade A:</strong> Warnings under 5% of checks (PASS + visible issues), no errors.</li>
+          <li><strong>Grade B:</strong> Warnings are 5% to 25% of checks, no errors.</li>
+          <li><strong>Grade C:</strong> Warnings are over 25% of checks, no errors.</li>
           <li><strong>Grade D:</strong> Any remaining errors.</li>
         </ul>
       </div>
@@ -318,23 +328,26 @@ def generate_adjusted_summary_shell(
         cat_esc = html.escape(category, quote=False)
         desc_esc = html.escape(desc, quote=False)
         dom_id = category_dom_id(category)
-        counts = by_category.get(category, {"warn": 0, "err": 0})
+        counts = by_category.get(category, {"pass": 0, "warn": 0, "err": 0})
+        p = counts.get("pass", 0)
         w = counts.get("warn", 0)
         e = counts.get("err", 0)
-        total = w + e
-        letter = calculate_grade([0, w, e])[0] if total else "A"
+        total = p + w + e
+        letter = calculate_grade([p, w, e])[0] if total else "A"
+        g_pct = (p / total * 100) if total else 0.0
         y_pct = (w / total * 100) if total else 0.0
         r_pct = (e / total * 100) if total else 0.0
+        pass_attr_cat = f' data-mq-pass="{p}"' if issue_summary else ""
         empty_class = "" if (w + e) > 0 else " mq-cat-empty"
         parts.append(f"""
-      <div class="mq-cat-card{empty_class}" id="{dom_id}" data-mq-category="{cat_esc}">
+      <div class="mq-cat-card{empty_class}" id="{dom_id}" data-mq-category="{cat_esc}"{pass_attr_cat}>
         <div class="mq-cat-head">
           <h3 class="mq-cat-title">{cat_esc}</h3>
           <div class="mq-cat-badge {grade_css_class(letter)}" data-mq-role="badge">{html.escape(letter)}</div>
         </div>
         <p class="mq-cat-desc">{desc_esc}</p>
-        <div class="mq-stack" data-mq-role="stack" title="{y_pct:.2f}% warning, {r_pct:.2f}% error">
-          <span class="mq-seg-pass" data-mq-role="seg-pass" style="width:0%"></span>
+        <div class="mq-stack" data-mq-role="stack" title="{g_pct:.2f}% pass, {y_pct:.2f}% warning, {r_pct:.2f}% error">
+          <span class="mq-seg-pass" data-mq-role="seg-pass" style="width:{g_pct:.4f}%"></span>
           <span class="mq-seg-warn" data-mq-role="seg-warn" style="width:{y_pct:.4f}%"></span>
           <span class="mq-seg-err" data-mq-role="seg-err" style="width:{r_pct:.4f}%"></span>
         </div>

@@ -107,6 +107,8 @@
         body[data-mq-view-filter="Model Complexity"] .sidebar-check-nav:not([data-mq-category="Model Complexity"]) { display: none !important; }
         body[data-mq-view-filter="Model Integrity"] .check-section-wrapper:not([data-mq-category="Model Integrity"]),
         body[data-mq-view-filter="Model Integrity"] .sidebar-check-nav:not([data-mq-category="Model Integrity"]) { display: none !important; }
+        body[data-mq-view-filter="MBD Readyness"] .check-section-wrapper:not([data-mq-category="MBD Readyness"]),
+        body[data-mq-view-filter="MBD Readyness"] .sidebar-check-nav:not([data-mq-category="MBD Readyness"]) { display: none !important; }
         .file-list::after {
             content: "";
             display: table;
@@ -216,12 +218,14 @@
         let reportSessionDirty = false;
         var mqSummary = null;
         var mqCategoryCards = {};
+        var mqPassBaseline = { overall: 0, byCategory: {} };
         var MQ_CATEGORY_FILTER_ORDER = [
             'Consistency',
             'Design Intent Strength',
             'Geometry Quality',
             'Model Complexity',
-            'Model Integrity'
+            'Model Integrity',
+            'MBD Readyness'
         ];
         var MQ_MODEL_FILTER_ORDER = ['PRT', 'ASM', 'DRW'];
 
@@ -436,6 +440,20 @@
             }
         }
 
+        function mqInitPassBaseline() {
+            mqPassBaseline = { overall: 0, byCategory: {} };
+            var dash = document.querySelector('.mq-dashboard');
+            if (dash) {
+                mqPassBaseline.overall = parseInt(dash.getAttribute('data-mq-pass-issues') || '0', 10) || 0;
+            }
+            var cards = document.querySelectorAll('#mq-categories .mq-cat-card[data-mq-category]');
+            for (var i = 0; i < cards.length; i++) {
+                var card = cards[i];
+                var catName = card.getAttribute('data-mq-category') || '';
+                mqPassBaseline.byCategory[catName] = parseInt(card.getAttribute('data-mq-pass') || '0', 10) || 0;
+            }
+        }
+
         function mqInitCategoryCards() {
             mqCategoryCards = {};
             var cards = document.querySelectorAll('#mq-categories .mq-cat-card[data-mq-category]');
@@ -480,7 +498,7 @@
             if (errModelsEl) { errModelsEl.textContent = String(Object.keys(mqSummary.errModels).length); }
             mqSetGradeRing(
                 document.getElementById('mq-overall-grade'),
-                mqGradeFromCounts(0, warnIssues, errIssues)
+                mqGradeFromCounts(mqPassBaseline.overall, warnIssues, errIssues)
             );
             var titleEl = document.getElementById('mq-page-title');
             if (titleEl) {
@@ -492,19 +510,19 @@
                 var counts = mqSummary.byCategory[catName] || { warn: 0, err: 0 };
                 var w = counts.warn;
                 var e = counts.err;
-                var hasIssues = (w + e) > 0;
-                refs.card.classList.toggle('mq-cat-empty', !hasIssues);
-                if (!hasIssues) { continue; }
-                var letter = mqGradeFromCounts(0, w, e);
-                var total = w + e;
-                var yPct = (w / total) * 100;
-                var rPct = (e / total) * 100;
+                var pass = mqPassBaseline.byCategory[catName] || 0;
+                refs.card.classList.remove('mq-cat-empty');
+                var letter = mqGradeFromCounts(pass, w, e);
+                var total = pass + w + e;
+                var gPct = total ? (pass / total) * 100 : 0;
+                var yPct = total ? (w / total) * 100 : 0;
+                var rPct = total ? (e / total) * 100 : 0;
                 mqSetCategoryBadge(refs.badge, letter);
+                if (refs.segPass) { refs.segPass.style.width = gPct.toFixed(4) + '%'; }
                 if (refs.segWarn) { refs.segWarn.style.width = yPct.toFixed(4) + '%'; }
                 if (refs.segErr) { refs.segErr.style.width = rPct.toFixed(4) + '%'; }
-                if (refs.segPass) { refs.segPass.style.width = '0%'; }
                 if (refs.stack) {
-                    refs.stack.title = yPct.toFixed(2) + '% warning, ' + rPct.toFixed(2) + '% error';
+                    refs.stack.title = gPct.toFixed(2) + '% pass, ' + yPct.toFixed(2) + '% warning, ' + rPct.toFixed(2) + '% error';
                 }
                 if (refs.warnCount) { refs.warnCount.textContent = String(w); }
                 if (refs.errCount) { refs.errCount.textContent = String(e); }
@@ -834,6 +852,7 @@
             function initReportUi() {
                 initPersistedReportState();
                 restoreViewFilterFromDom();
+                mqInitPassBaseline();
                 mqInitCategoryCards();
                 var baked = document.querySelector('.mq-dashboard[data-mq-summary-baked="1"]');
                 var adjusted = document.body.getAttribute('data-mq-adjusted') === '1';
@@ -893,6 +912,7 @@
                 <option value="Geometry Quality">Geometry Quality</option>
                 <option value="Model Complexity">Model Complexity</option>
                 <option value="Model Integrity">Model Integrity</option>
+                <option value="MBD Readyness">MBD Readyness</option>
             </optgroup>
         </select>
     </div>

@@ -376,7 +376,6 @@ def get_display_name(file_path: str) -> str:
 # Single JPEG next to the report for all “no preview” thumbnails (avoids per-model files).
 _SHARED_PLACEHOLDER_JPEG = "_mc_no_preview.jpg"
 
-
 def more_info_html_basename(display_name: str) -> str:
     return re.sub(
         r"\.(prt|asm|drw)$",
