@@ -213,6 +213,7 @@
     <script defer>
         let hiddenSections = [];
         let scoreViewAdjusted = false;
+        let reportSessionDirty = false;
         var mqSummary = null;
         var mqCategoryCards = {};
         var MQ_CATEGORY_FILTER_ORDER = [
@@ -483,7 +484,7 @@
             );
             var titleEl = document.getElementById('mq-page-title');
             if (titleEl) {
-                titleEl.textContent = scoreViewAdjusted ? 'Your Adjusted Score' : 'Your Score';
+                titleEl.textContent = scoreViewAdjusted ? 'Adjusted Score' : 'Score';
             }
             for (var catName in mqCategoryCards) {
                 if (!mqCategoryCards.hasOwnProperty(catName)) { continue; }
@@ -511,9 +512,18 @@
             updateSaveButtonVisibility();
         }
 
+        function markReportSessionDirty() {
+            reportSessionDirty = true;
+        }
+
+        function clearReportSessionDirty() {
+            reportSessionDirty = false;
+        }
+
         function mqOnReportMutation(opts) {
             opts = opts || {};
             scoreViewAdjusted = true;
+            markReportSessionDirty();
             if (opts.syncFilters) { syncViewFilterOptions(); }
             mqApplySummaryToDom();
             if (opts.syncNav) { mqSyncSidebarNav(); }
@@ -527,6 +537,7 @@
             if (flagButton) { flagButton.classList.toggle('dimmed-button'); }
             var mode = document.body.getAttribute('data-mq-view-filter') || 'all';
             if (mode === 'flagged' || mode === 'unflagged') { mqSyncSidebarNav(); }
+            markReportSessionDirty();
             updateSaveButtonVisibility();
         }
 
@@ -722,6 +733,7 @@
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
+            clearReportSessionDirty();
         }
 
         function saveAdjustedReport() {
@@ -738,6 +750,8 @@
                             return writable.close();
                         });
                     });
+                }).then(function () {
+                    clearReportSessionDirty();
                 }).catch(function (err) {
                     if (err && err.name === 'AbortError') { return; }
                     downloadAdjustedReport();
@@ -745,6 +759,14 @@
                 return;
             }
             downloadAdjustedReport();
+        }
+
+        function initBeforeUnloadWarning() {
+            window.addEventListener('beforeunload', function (e) {
+                if (!reportSessionDirty) { return; }
+                e.preventDefault();
+                e.returnValue = '';
+            });
         }
 
         (function () {
@@ -805,7 +827,7 @@
                     return;
                 }
                 var titleEl = document.getElementById('mq-page-title');
-                if (titleEl && titleEl.textContent.trim() === 'Your Adjusted Score') {
+                if (titleEl && titleEl.textContent.trim() === 'Adjusted Score') {
                     scoreViewAdjusted = true;
                 }
             }
@@ -820,6 +842,7 @@
                 }
                 initSidebarNavHighlight();
                 initSaveHelpDialog();
+                initBeforeUnloadWarning();
                 var persistedFilter = document.body.getAttribute('data-mq-view-filter');
                 var sel = document.getElementById('sidebar-view-filter');
                 var mode = sel ? sel.value : 'all';
@@ -874,7 +897,7 @@
         </select>
     </div>
     <ul>
-        <li><a href="#summary">Your Score</a></li>
+        <li><a href="#summary">Score</a></li>
         <li><a href="#statistics">Statistics</a></li>
         <hr>
         {% for section in check_sections %}

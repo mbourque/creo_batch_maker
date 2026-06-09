@@ -527,6 +527,8 @@ HEALTH_CHECKS: list[tuple[str, str]] = [
 
     ("UNUSED_MODELS", "Unused Models"),
 
+    ("SHTMTL_UNBENDS", "Sheet Metal Unbend Features"),
+
 ]
 
 

@@ -263,7 +263,7 @@ def generate_adjusted_summary_shell(
         _MQ_DASHBOARD_CSS,
         f"""
 <div class="mq-dashboard"{baked_attr}>
-  <h1 class="mq-page-title" id="mq-page-title">Your Score</h1>
+  <h1 class="mq-page-title" id="mq-page-title">Score</h1>
   <div class="mq-grid">
     <div class="mq-left">
       <div class="mq-hero-card">
@@ -400,7 +400,7 @@ def generate_summary_div(master_xml_path, model_checks_xml_path):
             _MQ_DASHBOARD_CSS,
             f"""
 <div class="mq-dashboard">
-  <h1 class="mq-page-title">YOUR SCORE</h1>
+  <h1 class="mq-page-title">SCORE</h1>
   <div class="mq-grid">
     <div class="mq-left">
       <div class="mq-hero-card">
