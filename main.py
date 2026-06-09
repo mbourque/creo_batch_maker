@@ -661,10 +661,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         menubar.add_cascade(label="Settings", menu=general_settings_menu)
 
         self._configuration_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Configuration", menu=self._configuration_menu)
 
         help_menu = tk.Menu(menubar, tearoff=0)
-        help_menu.add_command(label="Documentation...", command=self._open_documentation)
-        help_menu.add_command(label="Check for updates...", command=self._on_check_for_updates)
         help_menu.add_command(label="About...", command=self._on_about)
         menubar.add_cascade(label="Help", menu=help_menu)
 
@@ -685,55 +684,24 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         except tk.TclError:
             pass
 
-    @staticmethod
-    def _menubar_cascade_index(menubar: tk.Menu, label: str) -> int | None:
-        try:
-            end = menubar.index("end")
-        except tk.TclError:
-            return None
-        if end is None:
-            return None
-        for i in range(end + 1):
-            try:
-                if menubar.type(i) == "cascade" and menubar.entrycget(i, "label") == label:
-                    return i
-            except tk.TclError:
-                continue
-        return None
-
     def _refresh_configuration_menu(self) -> None:
-        if self._configuration_menu is None or self._menubar is None:
+        if self._configuration_menu is None:
             return
         self._configuration_menu.delete(0, "end")
-        is_mc = self._is_modelcheck_task(self.task.get() or "")
-        settings_idx = self._menubar_cascade_index(self._menubar, "Configuration")
-
-        if is_mc:
-            if settings_idx is None:
-                help_idx = self._menubar_cascade_index(self._menubar, "Help")
-                if help_idx is not None:
-                    self._menubar.insert_cascade(
-                        help_idx, label="Configuration", menu=self._configuration_menu
-                    )
-                else:
-                    self._menubar.add_cascade(label="Configuration", menu=self._configuration_menu)
-            for option in self._settings_options:
-                if option == "Open configurations...":
-                    continue
-                self._configuration_menu.add_command(
-                    label=option,
-                    command=lambda o=option: self._on_settings_config_item(o),
-                )
-            self._configuration_menu.add_separator()
-            self._add_start_templates_cascade(self._configuration_menu)
-            self._configuration_menu.add_separator()
+        for option in self._settings_options:
+            if option == "Open configurations...":
+                continue
             self._configuration_menu.add_command(
-                label="Open configurations...",
-                command=self._on_open_settings_folder,
+                label=option,
+                command=lambda o=option: self._on_settings_config_item(o),
             )
-        else:
-            if settings_idx is not None:
-                self._menubar.delete(settings_idx)
+        self._configuration_menu.add_separator()
+        self._add_start_templates_cascade(self._configuration_menu)
+        self._configuration_menu.add_separator()
+        self._configuration_menu.add_command(
+            label="Open configurations...",
+            command=self._on_open_settings_folder,
+        )
 
     def _settings_fields_ready(self) -> tuple[bool, str]:
         wd = (self.working_directory.get() or "").strip()
@@ -1305,21 +1273,14 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         except OSError as exc:
             messagebox.showerror("Open failed", f"Could not open in Notepad:\n{target}\n\n{exc}")
 
-    def _open_documentation(self) -> None:
-        webbrowser.open(
-            "https://github.com/mbourque/creo_batch_maker/wiki/Documentation"
-        )
-
-    def _on_check_for_updates(self) -> None:
-        webbrowser.open("https://github.com/mbourque/creo_batch_maker")
-
     def _on_about(self) -> None:
         dialog = self._create_modal_toplevel("About")
 
         ctk.CTkLabel(dialog, text="Creo Batch Maker", font=ctk.CTkFont(size=16, weight="bold")).pack(
             anchor="w", padx=16, pady=(16, 8)
         )
-        ctk.CTkLabel(dialog, text="Created by Michael P. Bourque").pack(anchor="w", padx=16, pady=(0, 16))
+        ctk.CTkLabel(dialog, text="Created by Michael P. Bourque").pack(anchor="w", padx=16, pady=(0, 4))
+        ctk.CTkLabel(dialog, text="PDSVISION").pack(anchor="w", padx=16, pady=(0, 16))
 
         def close_dialog() -> None:
             dialog.destroy()

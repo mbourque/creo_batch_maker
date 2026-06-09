@@ -342,19 +342,27 @@ def _check_xml_basenames_in_folder(working_dir: str) -> set[str]:
     return basenames
 
 
+def _scanned_model_keys(master_root: ET.Element) -> set[str]:
+    """Casefolded ``Model`` names from every ``File`` entry in ``master.xml``."""
+    keys: set[str] = set()
+    for el in master_root.findall("File"):
+        model = (el.findtext("Model") or "").strip()
+        if model:
+            keys.add(model.casefold())
+    return keys
+
+
 def scan_skipped_models(working_dir: str, master_root: ET.Element) -> list[str]:
     """
     Models in the working folder that did not fully make it into the batch scan.
 
     Compares latest-rev top-level ``name.ext`` models with matching check XML and
-    ``master.xml`` entries.
+    ``master.xml`` entries. Family-table instances may have check XML but no separate
+    ``.prt`` / ``.asm`` on disk; any model listed in ``master.xml`` was scanned and
+    is not reported as skipped.
     """
     wd = os.path.normpath(os.path.abspath(working_dir))
-    in_master = {
-        (el.findtext("Model") or "").strip().casefold()
-        for el in master_root.findall("File")
-        if (el.findtext("Model") or "").strip()
-    }
+    scanned = _scanned_model_keys(master_root)
     xml_on_disk = _check_xml_basenames_in_folder(wd)
     models_on_disk = _latest_logical_models_on_disk(wd)
 
@@ -365,11 +373,10 @@ def scan_skipped_models(working_dir: str, master_root: ET.Element) -> list[str]:
         xml_base = _check_xml_basename_for_display(display)
         if not xml_base:
             continue
-        master_key = display.upper().casefold()
         if xml_base.casefold() not in xml_on_disk:
             skipped[display_cf] = display
             continue
-        if master_key not in in_master:
+        if display_cf not in scanned:
             skipped[display_cf] = display
 
     for pattern in ("**/*.p.xml", "**/*.a.xml", "**/*.d.xml"):
@@ -379,7 +386,7 @@ def scan_skipped_models(working_dir: str, master_root: ET.Element) -> list[str]:
             if not display:
                 continue
             display_cf = display.casefold()
-            if display_cf in skipped:
+            if display_cf in skipped or display_cf in scanned:
                 continue
             if display_cf not in models_on_disk:
                 skipped[display_cf] = display
@@ -488,10 +495,6 @@ HEALTH_CHECKS: list[tuple[str, str]] = [
 
     ("INCOMPLETE_FEAT", "Incomplete features"),
 
-    ("IMPORT_FEAT", "Import features"),
-
-    ("EXTERNAL_DEPS", "External references"),
-
     ("BURIED_FEAT", "Buried features"),
 
     ("MIS_COMPONENTS", "Missing components"),
@@ -503,6 +506,26 @@ HEALTH_CHECKS: list[tuple[str, str]] = [
     ("PACK_COMPONENTS", "Packaged components"),
 
     ("GEN_COMPONENTS", "Generic components placed"),
+
+    ("EDGE_REFERENCES", "Edge References"),
+
+    ("CIRCULAR_REFS", "Circular References"),
+
+    ("WEAK_SKETCHER_DIMS", "Weak dimensions"),
+
+    ("GLOBAL_INTF", "Global Interferences"),
+
+    ("INSERT_MODE", "Insert Mode Usage"),
+
+    ("SUP_FEATURES", "Suppressed Features"),
+
+    ("FAILED_FEATURES", "Failed Features"),
+
+    ("FIXED_COMPONENTS", "Fixed components"),
+
+    ("STARTPARM", "Missing Parameters"),
+
+    ("UNUSED_MODELS", "Unused Models"),
 
 ]
 
@@ -772,7 +795,7 @@ def _esc(text: Any) -> str:
 
 _LIST_PREVIEW_LIMIT = 20
 
-_FAMILY_TABLE_PREVIEW_LIMIT = 10
+_FAMILY_TABLE_PREVIEW_LIMIT = 5
 
 
 def _comma_separated_list_html(names: list[str], *, span_class: str) -> str:
@@ -941,9 +964,7 @@ def generate_statistics_html(stats: BatchStatistics, *, embedded: bool = False) 
 
   <div class="mq-section">
 
-    <h2>Model health flags</h2>
-
-    <p class="mq-section-note">Count of models with a positive check result (not a sum of internal item counts).</p>
+    <h2>At a glance</h2>
 
     {''.join(health_rows)}
 
@@ -1001,7 +1022,7 @@ def generate_statistics_html(stats: BatchStatistics, *, embedded: bool = False) 
 
   <div class="mq-section">
 
-    <h2>Complexity snapshot</h2>
+    <h2>Model Complexity</h2>
 
     {''.join(snapshot_parts)}
 
