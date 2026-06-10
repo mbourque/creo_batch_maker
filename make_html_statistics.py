@@ -763,6 +763,14 @@ _MQ_STATS_CSS = """
 
 .mq-health-count { width: 48px; text-align: right; font-weight: 600; color: #0f172a; }
 
+.mq-stats-embedded button.mq-health-jump {
+  display: flex; align-items: center; gap: 10px; width: 100%; margin-bottom: 8px;
+  border: none; background: transparent; text-align: left; font: inherit; color: inherit;
+  padding: 4px 6px; border-radius: 6px; cursor: pointer;
+}
+.mq-stats-embedded button.mq-health-jump:hover { background: #f1f5f9; }
+.mq-stats-embedded button.mq-health-jump:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+
 .mq-inst-names { line-height: 1.45; }
 
 .mq-skipped-names { color: #334155; }
@@ -934,11 +942,14 @@ def generate_statistics_html(stats: BatchStatistics, *, embedded: bool = False) 
     health_rows = []
 
     ranked_health = sorted(
-        ((stats.health_counts.get(label, 0), label) for _, label in HEALTH_CHECKS),
-        key=lambda item: (-item[0], item[1].casefold()),
+        (
+            (stats.health_counts.get(label, 0), check_name, label)
+            for check_name, label in HEALTH_CHECKS
+        ),
+        key=lambda item: (-item[0], item[2].casefold()),
     )
 
-    for count, label in ranked_health:
+    for count, check_name, label in ranked_health:
 
         if count == 0:
 
@@ -946,17 +957,26 @@ def generate_statistics_html(stats: BatchStatistics, *, embedded: bool = False) 
 
         bar_w = (count / health_max * 100) if health_max else 0
 
-        health_rows.append(f"""
-
-        <div class="mq-health-bar">
-
+        bar_inner = f"""
           <div class="mq-health-label">{_esc(label)}</div>
-
           <div class="mq-health-track"><div class="mq-health-fill" style="width:{bar_w:.0f}%"></div></div>
+          <div class="mq-health-count">{count}</div>"""
 
-          <div class="mq-health-count">{count}</div>
+        if embedded:
 
-        </div>""")
+            health_rows.append(
+                f"""
+        <button type="button" class="mq-health-bar mq-health-jump" data-mq-health-check="{_esc(check_name)}">{bar_inner}
+        </button>"""
+            )
+
+        else:
+
+            health_rows.append(
+                f"""
+        <div class="mq-health-bar">{bar_inner}
+        </div>"""
+            )
 
     health_section = ""
 

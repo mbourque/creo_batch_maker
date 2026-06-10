@@ -1346,7 +1346,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Surfaces not Annotated</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>MBD Readyness</Category>
         <Description>Checks for model surfaces that are not referenced by dimensions, GDT annotations, notes, surface finish symbols, inspection annotations, or other manufacturing and documentation annotations. Unannotated surfaces may indicate incomplete model-based definition (MBD) practices, missing manufacturing requirements, undocumented inspection criteria, or incomplete engineering communication. Surfaces lacking proper annotation can create ambiguity during manufacturing, quality inspection, assembly, and downstream interpretation of the design intent. This check helps ensure that important surfaces are properly documented and associated with the required annotation information according to company MBD and drafting standards. Annotation requirements and related documentation practices are typically configured through Creo annotation settings and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the SRF_NOT_REF_BY_ANNTN settings in the check.mch configuration file.</Description>
         <ModelCheckName>SRF_NOT_REF_BY_ANNTN</ModelCheckName>
         <ModelCheckOptions>YNEW W E N W Y</ModelCheckOptions>
@@ -2114,7 +2114,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Duplicate annotation elements</Name>
-        <Category>Model Integrity</Category>
+        <Category>MBD Readyness</Category>
         <Description>Checks for duplicate geometric tolerance (GTOL) annotation elements within the model or drawing and identifies cases where multiple instances of the same tolerance definition exist. Duplicate GTOL annotations can occur due to copy/paste operations, repeated annotation creation, inconsistent detailing practices, or incomplete cleanup of legacy annotation data. These redundancies can create confusion in manufacturing and inspection interpretation, introduce conflicting requirements, and reduce overall clarity and quality of the model-based definition or drawing. This check helps ensure that geometric tolerances are unique, properly managed, and consistently applied according to company drafting and MBD standards. GTOL annotation rules and quality requirements are typically configured through Creo annotation settings and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the AE_GTOL_DUPLICATE settings in the check.mch configuration file.</Description>
         <ModelCheckName>AE_GTOL_DUPLICATE</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
@@ -2124,7 +2124,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Duplicate surface-finish annotation elements</Name>
-        <Category>Model Integrity</Category>
+        <Category>MBD Readyness</Category>
         <Description>Checks for duplicate surface finish annotation elements within a model or drawing and identifies cases where multiple instances of the same surface finish requirement exist. Duplicate surface finish annotations can occur due to repeated detailing, copy/paste errors, inconsistent annotation practices, or incomplete cleanup of legacy data. These redundancies can create confusion in manufacturing interpretation, lead to conflicting surface quality requirements, and reduce clarity in model-based definition or drawing documentation. This check helps ensure that surface finish requirements are uniquely defined, properly managed, and consistently applied according to company drafting and MBD standards. Surface finish annotation rules and quality requirements are typically configured through Creo annotation settings and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the AE_SF_DUPLICATE settings in the check.mch configuration file.</Description>
         <ModelCheckName>AE_SF_DUPLICATE</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
@@ -2598,12 +2598,12 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Ignore Annotation</Name>
-        <Category>Consistency</Category>
+        <Category>MBD Readyness</Category>
         <Description>Checks whether annotations marked to be ignored are properly excluded from ModelCHECK evaluations and ensures that only approved annotation exclusions are applied according to company standards. This allows certain annotations to be intentionally bypassed during checking to avoid unnecessary warnings, but improper or excessive use of ignore settings can hide valid issues, reduce model quality control, and lead to incomplete validation of critical design information. This check helps ensure that ignored annotations are intentional, controlled, and compliant with predefined rules for annotation management. Annotation exclusion rules and validation behavior are typically managed through Creo annotation settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the IGNORE_ANNTN settings in the check.mch configuration file.</Description>
         <ModelCheckName>IGNORE_ANNTN</ModelCheckName>
         <ModelCheckOptions>YN N N N Y</ModelCheckOptions>
         <display>Y</display>
-        <enabled>N</enabled>
+        <enabled>Y</enabled>
     </Check>
 
     <Check>

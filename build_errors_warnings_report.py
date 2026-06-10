@@ -729,6 +729,7 @@ def create_html_report(
         check_sections.append(
             {
                 "class": f"check-section-{check_index}",
+                "model_check_name": check_name,
                 "name": description_data["name"],
                 "description": description_data["description"],
                 "category": description_data["category"],

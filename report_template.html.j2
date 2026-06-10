@@ -386,6 +386,50 @@
             mqSyncSidebarNav();
         }
 
+        function setViewFilterAll() {
+            var sel = document.getElementById('sidebar-view-filter');
+            if (sel) { sel.value = 'all'; }
+            document.body.removeAttribute('data-mq-view-filter');
+            mqSyncSidebarNav();
+        }
+
+        function jumpToHealthCheck(checkName) {
+            if (!checkName) { return; }
+            setViewFilterAll();
+            var attr = checkName.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+            var target = document.querySelector('.check-section-wrapper[data-mq-check-name="' + attr + '"][data-mq-section-stat="ERROR"]')
+                || document.querySelector('.check-section-wrapper[data-mq-check-name="' + attr + '"]');
+            if (!target || !document.body.contains(target)) { return; }
+            var heading = target.querySelector('.check-title h2');
+            var hash = heading && heading.id ? heading.id : target.id.replace(/^wrapper-/, '');
+            if (hash) {
+                window.location.hash = hash;
+                var sb = document.querySelector('.sidebar');
+                if (sb) {
+                    var links = sb.querySelectorAll('ul a[href^="#"]');
+                    for (var j = 0; j < links.length; j++) {
+                        var li = links[j].closest ? links[j].closest('li') : links[j].parentNode;
+                        if (li) { li.classList.remove('sidebar-nav-active'); }
+                    }
+                    var activeLink = sb.querySelector('ul a[href="#' + escapeCssSelector(hash) + '"]');
+                    if (activeLink) {
+                        var ali = activeLink.closest ? activeLink.closest('li') : activeLink.parentNode;
+                        if (ali) { ali.classList.add('sidebar-nav-active'); }
+                    }
+                }
+            }
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function initHealthCheckJumps() {
+            var bars = document.querySelectorAll('.mq-health-jump[data-mq-health-check]');
+            for (var i = 0; i < bars.length; i++) {
+                bars[i].addEventListener('click', function () {
+                    jumpToHealthCheck(this.getAttribute('data-mq-health-check'));
+                });
+            }
+        }
+
         function mqEmptySummary() {
             return { warnIssues: 0, errIssues: 0, warnModels: {}, errModels: {}, byCategory: {} };
         }
@@ -860,6 +904,7 @@
                     syncViewFilterOptions();
                 }
                 initSidebarNavHighlight();
+                initHealthCheckJumps();
                 initSaveHelpDialog();
                 initBeforeUnloadWarning();
                 var persistedFilter = document.body.getAttribute('data-mq-view-filter');
@@ -944,7 +989,8 @@
     <a id="{{ section.class }}"></a>
     <div class="check-section-wrapper" id="wrapper-{{ section.class }}"
          data-mq-section-stat="{{ 'ERROR' if section.stat_type == 'ERRORS' else 'WARNING' }}"
-         data-mq-category="{{ section.category | e }}">
+         data-mq-category="{{ section.category | e }}"
+         data-mq-check-name="{{ section.model_check_name | e }}">
         <div class="check-header">
             <div class="check-title">
                 <h2 id="{{ section.class }}"><span class="bold-text">{{ section.stat_type }}:</span> {{ section.count }} {{ section.name }}</h2>
