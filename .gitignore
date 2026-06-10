@@ -13,3 +13,8 @@ main.spec
 .gitignore
 package_cad_assessment_tool.bat
 *.zip
+*.ps1
+*.dxc
+models/
+push_settings_to_creo.bat
+developer_notes.md
