@@ -23,7 +23,7 @@
             <Description>Evaluates the mathematical accuracy and validity of the model's geometry, ensuring that it is reliable for downstream processes such as manufacturing, verification, or simulation. Good geometry quality prevents errors from cascading into subsequent stages of product development.</Description>
         </Category>
         <Category>
-            <Name>MBD Readyness</Name>
+            <Name>MBD Readiness</Name>
             <Description>Evaluates Product Manufacturing Information (PMI) for Model-Based Definition (MBD) readiness, ensuring annotations, GDT, datums, and manufacturing data are complete, associated, standards-compliant, and usable downstream.</Description>
         </Category>
     </Categories>
@@ -31,7 +31,7 @@
     <!-- PART REPORT CONFIGURATION -->
     <Check>
         <Name>Accuracy Information</Name>
-        <Category>Consistency</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks and reports the geometric accuracy settings used within the model, including relative or absolute accuracy definitions that control how precisely geometry is calculated and regenerated. Proper accuracy settings are critical for maintaining stable geometry, reliable Boolean operations, successful feature regeneration, accurate mass properties, and high-quality downstream manufacturing, simulation, and data exchange processes. Accuracy values that are too loose can create gaps, failed geometry, and regeneration problems, while excessively tight accuracy can negatively impact performance and model complexity. This check helps ensure that model accuracy settings are appropriate and consistent with company standards and intended model usage. Accuracy limits and related standards are typically configured in the constant.mcn file using settings such as ACCURACY_LOW, ACCURACY_UPP, MIN_ABS_ACCURACY, and MAX_ABS_ACCURACY, while check behavior and reporting are controlled by the ACCURACY_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>ACCURACY_INFO</ModelCheckName>
         <ModelCheckOptions>YNEW W W W W Y</ModelCheckOptions>
@@ -56,7 +56,7 @@ If you are using relative accuracy, you must consider the bounding box diagonal 
     </Check>
     <Check>
         <Name>Additional Check Parameters</Name>
-        <Category>Model Complexity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether additional parameters and metadata have been configured to appear in ModelCHECK reports and validation output. Additional check parameters are commonly used to expose important model information such as materials, units, model names, lifecycle states, custom metadata, and other values that support reporting, metrics, troubleshooting, and downstream automation processes. Properly configured check parameters improve visibility into model quality and help organizations monitor compliance with company standards. This check helps ensure that required reporting parameters are consistently included and available within the ModelCHECK environment. Additional reporting parameters are typically configured in the start.mcs file using PRT_ADD_CHK_PARAM, ASM_ADD_CHK_PARAM, and related entries, while check behavior and reporting are controlled by the ADD_CHK_PARAM settings in the check.mch configuration file.</Description>
         <ModelCheckName>ADD_CHK_PARAM</ModelCheckName>
         <ModelCheckOptions>YN N N N N Y</ModelCheckOptions>
@@ -82,7 +82,7 @@ Cuts outside the model are often caused by over-built sketches for cuts that int
 ### Unattached features:
 An unattached feature creates solid material that is not connected to the main solid. All parts should have no more than one solid body. If more than one solid body is present, this may indicate that you need an assembly.
 
-Note that sometimes unattached features are acceptable, because later features connect the solids so the part has a single solid volume. Similar to cuts outside the model, unattached features are often caused by over-built geometry that sometimes intersects the main solid, although in the current state it does not. Consider redesigning the feature with references such asup to surfaceso the solid material always intersects the model. Or perhaps you can add a sketch reference that ensures the sketch is attached to the main solid.
+Note that sometimes unattached features are acceptable, because later features connect the solids so the part has a single solid volume. Similar to cuts outside the model, unattached features are often caused by over-built geometry that sometimes intersects the main solid, although in the current state it does not. Consider redesigning the feature with references such as up to surface so the solid material always intersects the model. Or perhaps you can add a sketch reference that ensures the sketch is attached to the main solid.
 <![CDATA[
 <p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/bury.html" target="_HELP">Help on this topic...</a></p>
 ]]>
@@ -104,7 +104,7 @@ Note that sometimes unattached features are acceptable, because later features c
     </Check>
     <Check>
         <Name>Child Features Existence</Name>
-        <Category>Consistency</Category>
+        <Category>Design Intent Strength</Category>
         <Description>Checks whether required child features exist and maintain valid parent-child relationships within the model. Child features are dependent on parent geometry, references, or features for their placement and definition, and missing or broken child relationships can lead to regeneration failures, unstable geometry, and inconsistent model behavior during design changes. Properly managed feature dependencies help maintain strong design intent, predictable updates, and overall model integrity. This check helps identify missing or invalid child feature relationships so models remain stable, maintainable, and compliant with company modeling practices. Parent-child relationship behavior and related standards are managed through model design practices and ModelCHECK configuration settings, while check behavior and reporting are controlled by the CHILDREN_EXIST settings in the check.mch configuration file.</Description>
         <ModelCheckName>CHILDREN_EXIST</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y E E Y</ModelCheckOptions>
@@ -131,7 +131,7 @@ Note that sometimes unattached features are acceptable, because later features c
     </Check>
     <Check>
         <Name>Cylindrical Diameters</Name>
-        <Category>Model Integrity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether cylindrical features such as holes, shafts, pins, or round cut geometry use approved or standardized diameter values according to company and manufacturing standards. Controlling cylindrical diameters helps ensure manufacturability, tooling compatibility, standard hardware usage, and consistency across designs. Incorrect, nonstandard, or excessively precise diameters can create machining difficulties, increase manufacturing cost, complicate inspection, and reduce compatibility with standard components and downstream automation processes. This check helps identify cylindrical geometry that may need to be adjusted to approved standard sizes or tolerances. Standard diameter values are typically configured through external hole and diameter definition files referenced by the start.mcs configuration, while check behavior and reporting are controlled by the CYL_DIAMS settings in the check.mch configuration file.</Description>
         <ModelCheckName>CYL_DIAMS</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -152,7 +152,7 @@ Note that sometimes unattached features are acceptable, because later features c
     </Check>
     <Check>
         <Name>Material Density Definition</Name>
-        <Category>Geometry Quality</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether materials assigned to the model contain valid and properly defined density values used for mass property calculations and downstream analysis. Accurate material density is critical for correct weight calculations, center of gravity results, simulation accuracy, structural analysis, manufacturing estimates, and BOM data. Missing, incorrect, or unrealistic density values can lead to inaccurate mass properties, poor engineering decisions, and downstream manufacturing or performance issues. This check helps ensure that all assigned materials contain appropriate density definitions that comply with company and engineering standards. Material assignments and approved material definitions are typically managed through Creo material libraries and ModelCHECK material settings, while check behavior and reporting are controlled by the DEF_DENSITY settings in the check.mch configuration file.</Description>
         <ModelCheckName>DEF_DENSITY</ModelCheckName>
         <ModelCheckOptions>YNEW E E N N Y</ModelCheckOptions>
@@ -187,7 +187,7 @@ Note that sometimes unattached features are acceptable, because later features c
     <Check>
         <Name>Draft Child Features</Name>
         <Category>Design Intent Strength</Category>
-        <Description>model. Draft features are often added later in the design process to satisfy manufacturing requirements, and using them as references for downstream features can weaken design intent and create unstable parent-child relationships. Changes to draft geometry may cause dependent features to fail, regenerate incorrectly, or produce unexpected geometry changes during future modifications. This check helps encourage stronger and more maintainable modeling practices by reducing dependencies on manufacturing-specific finishing features. Draft feature standards and related modeling practices are typically configured through ModelCHECK geometry settings and company modeling standards, while check behavior and reporting are controlled by the DRAFT_CHILD settings in the check.mch configuration file.</Description>
+        <Description>Draft features are often added later in the design process to satisfy manufacturing requirements, and using them as references for downstream features can weaken design intent and create unstable parent-child relationships. Changes to draft geometry may cause dependent features to fail, regenerate incorrectly, or produce unexpected geometry changes during future modifications. This check helps encourage stronger and more maintainable modeling practices by reducing dependencies on manufacturing-specific finishing features. Draft feature standards and related modeling practices are typically configured through ModelCHECK geometry settings and company modeling standards, while check behavior and reporting are controlled by the DRAFT_CHILD settings in the check.mch configuration file.</Description>
         <ModelCheckName>DRAFT_CHILD</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
         <display>Y</display>
@@ -313,7 +313,7 @@ Note that sometimes unattached features are acceptable, because later features c
         <why>Using edge references in a model can lead to significant problems, such as increased susceptibility to errors when geometry changes, difficulty in maintaining
             design intent, and challenges in updating the model, as edge references can create unstable dependencies that compromise the robustness of the design.
 
-Edge references are not recommended since future changes to the design intent may cause the edge to disappear and in turn, the feature that references the now non-existant edge will likely fail. An edge is one type of geometric entity that represents the boundary of an internal surface or face on a solid, or the boundary of a surface or a surface’s internal patch. If an edge disappears, then features that referenced the edge will fail to regenerate. Because of the risk of an edge disappearing, edges are usually considered unstable and weak choices for references.
+Edge references are not recommended since future changes to the design intent may cause the edge to disappear and in turn, the feature that references the now non existant edge will likely fail. An edge is one type of geometric entity that represents the boundary of an internal surface or face on a solid, or the boundary of a surface or a surface’s internal patch. If an edge disappears, then features that referenced the edge will fail to regenerate. Because of the risk of an edge disappearing, edges are usually considered unstable and weak choices for references.
 
 Always consider alternate reference types before selecting an edge. Usually an alternate reference such as a surface or an intent object are more robust. Ensure you do not accidentally select an edge when another type of reference would be more robust under change. It is a good practice to use the Query Select option when selecting a reference and to carefully observe the selection. Fortunately, beginning with Pro/ENGINEER Wildfire 4.0 surfaces are selected by default, reducing the chance of accidentally selecting an edge.
 
@@ -360,7 +360,7 @@ Layers can only organize view items such as datums, surface quilts, and componen
     </Check>
     <Check>
         <Name>Family Table Information</Name>
-        <Category>Model Integrity</Category>
+        <Category>Model Complexity</Category>
         <Description>Checks and reports information related to family tables used within the model. Family tables are commonly used to create configurable variations of parts or assemblies from a single generic model by controlling dimensions, parameters, features, materials, and other design options. Properly managed family tables improve standardization, reuse, automation, and design efficiency while reducing duplicate models and maintenance effort. Poorly structured or inconsistent family tables can create configuration errors, incorrect BOM data, regeneration problems, and downstream manufacturing or data management issues. This check helps ensure that family table information is properly defined and maintained according to company standards. Family table requirements and related standards are typically configured in the start.mcs file using PRT_FT_PARAMETER and related entries, while check behavior and reporting are controlled by the FAMILY_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>FAMILY_INFO</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -369,8 +369,8 @@ Layers can only organize view items such as datums, surface quilts, and componen
     </Check>
     <Check>
         <Name>Feature Information</Name>
-        <Category>Consistency</Category>
-        <Description>features, surface features, reference geometry, patterns, manufacturing features, and other parametric elements that define the model structure. Properly managed features improve design intent, model stability, readability, maintainability, and downstream manufacturing and inspection workflows. Poorly organized, unnecessary, or unstable features can increase model complexity, create regeneration problems, and make future modifications more difficult. This check helps provide visibility into feature usage and overall model structure to support company modeling standards and quality practices. Feature-related standards and configuration settings are typically managed through the start.mcs file and related ModelCHECK configuration files, while check behavior and reporting are controlled by the FEATURE_INFO settings in the check.mch configuration file.</Description>
+        <Category>Model Complexity</Category>
+        <Description>Checks and reports information about features, surface features, surface features, reference geometry, patterns, manufacturing features, and other parametric elements that define the model structure. Properly managed features improve design intent, model stability, readability, maintainability, and downstream manufacturing and inspection workflows. Poorly organized, unnecessary, or unstable features can increase model complexity, create regeneration problems, and make future modifications more difficult. This check helps provide visibility into feature usage and overall model structure to support company modeling standards and quality practices. Feature-related standards and configuration settings are typically managed through the start.mcs file and related ModelCHECK configuration files, while check behavior and reporting are controlled by the FEATURE_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>FEATURE_INFO</ModelCheckName>
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
@@ -442,7 +442,7 @@ Since an issue may propagate through the associative chain of references between
     </Check>
     <Check>
         <Name>Geometric Tolerances</Name>
-        <Category>Model Integrity</Category>
+        <Category>MBD Readiness</Category>
         <Description>Checks whether geometric tolerances are properly defined and applied to features within the model according to engineering and manufacturing requirements. Geometric tolerances control allowable variation in form, orientation, location, and profile to ensure that parts assemble correctly, function as intended, and can be manufactured and inspected accurately. Missing, incorrect, or inconsistent geometric tolerances can lead to fitment problems, inspection failures, manufacturing defects, and downstream quality issues. This check helps ensure that tolerance definitions comply with company drafting and manufacturing standards. Approved geometric tolerance standards are typically configured in the start.mcs file using PRT_TOL_TYPE, ASM_TOL_TYPE, and related tolerance configuration entries, while check behavior and reporting are controlled by the GEOMETRIC_TOL settings in the check.mch configuration file.</Description>
         <ModelCheckName>GEOMETRIC_TOL</ModelCheckName>
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
@@ -540,10 +540,6 @@ Since an issue may propagate through the associative chain of references between
         <Description>Checks whether datum-related layers are properly configured to use the correct blanked or hidden display state according to company standards. Datum layers commonly contain datum planes, axes, coordinate systems, points, and other reference geometry that may clutter the model display if left visible during normal modeling and detailing workflows. Properly blanking datum layers improves model readability, reduces visual complexity, and helps maintain consistent display practices across parts, assemblies, and drawings. Incorrect datum layer visibility settings can make models difficult to navigate and may interfere with downstream drafting, manufacturing, or inspection processes. Datum layer definitions and approved display states are typically configured in the start.mcs file using PRT_LAYER, ASM_LAYER, DRW_LAYER, and related layer configuration entries, while check behavior and reporting are controlled by the LAYER_DTM_BLANK settings in the check.mch configuration file.</Description>
         <ModelCheckName>LAYER_DTM_BLANK</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y W W Y</ModelCheckOptions>
-        <why>Blank datum layers in a model can lead to significant problems, including difficulty in understanding the model structure, challenges in making accurate modifications, and potential errors in downstream processes, as hidden datums can obscure the true design intent and dependencies.
-<![CDATA[
-<p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/layer.html" target="_HELP">Help on this topic...</a></p>
-]]></why>
         <display>Y</display>
         <enabled>Y</enabled>
         <why>Layers are used in models and drawings to control which view items are displayed. Models and drawings with many pieces of information can be difficult to work with if all of the information is turned on at the same time. By organizing view items into different layers, you can select which layers are displayed, hidden, or isolated so you can focus on the desired information.
@@ -557,7 +553,7 @@ Since an issue may propagate through the associative chain of references between
     <Check>
         <Name>External Items in Layers</Name>
         <Category>Consistency</Category>
-        <Description>Checks whether externally referenced items, imported entities, or external geometry references are placed on layers within the model. External items may include copied geometry, imported curves, external references, shared data, or linked entities originating from outside the current model. Poorly managed external layer content can create confusion, weaken model maintainability, complicate visibility management, and introduce downstream issues during regeneration, data exchange, manufacturing, or collaboration workflows. This check helps identify externally sourced items that may require review, cleanup, or standardization to maintain organized and reliable layer structure. Layer organization standards and external item management practices are typically configured in the start.mcs file using PRT_LAYER, ASM_LAYER, DRW_LAYER, and related layer configuration entries, while check behavior and reporting are controlled by the LAYER_EXT_ITEMS settings in the check.mch configuration file</Description>
+        <Description>Checks whether externally referenced items, imported entities, or external geometry references are placed on layers within the model. External items may include copied geometry, imported curves, external references, shared data, or linked entities originating from outside the current model. Poorly managed external layer content can create confusion, weaken model maintainability, complicate visibility management, and introduce downstream issues during regeneration, data exchange, manufacturing, or collaboration workflows. This check helps identify externally sourced items that may require review, cleanup, or standardization to maintain organized and reliable layer structure. Layer organization standards and external item management practices are typically configured in the start.mcs file using PRT_LAYER, ASM_LAYER, DRW_LAYER, and related layer configuration entries, while check behavior and reporting are controlled by the LAYER_EXT_ITEMS settings in the check.mch configuration file.</Description>
         <ModelCheckName>LAYER_EXT_ITEMS</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y W W Y</ModelCheckOptions>
         <display>Y</display>
@@ -588,7 +584,7 @@ Since an issue may propagate through the associative chain of references between
     </Check>
     <Check>
         <Name>Layer Movement</Name>
-        <Category>Model Complexity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether model items are automatically moved to the correct layers according to company layer management standards. Layer movement rules are commonly used to organize datums, curves, annotations, surfaces, and other entities into standardized layers to improve model readability, visibility control, downstream drawing management, and manufacturing workflows. Incorrect or inconsistent layer assignment can create visual clutter, reduce organization, and make models more difficult to maintain and interpret. This check helps ensure that model entities are consistently organized using approved layer movement and cleanup rules. Layer movement definitions are typically configured in the start.mcs file using PRT_LAYER_MOVE, ASM_LAYER_MOVE, DRW_LAYER_MOVE, and related entries, while check behavior and reporting are controlled by the LAYER_MOVE settings in the check.mch configuration file.</Description>
         <ModelCheckName>LAYER_MOVE</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
@@ -600,7 +596,7 @@ Since an issue may propagate through the associative chain of references between
     </Check>
     <Check>
         <Name>Layer Placement</Name>
-        <Category>Model Complexity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether layers and their associated model entities are placed and organized according to company-defined layer structure and modeling standards. Proper layer placement improves model readability, visibility management, drawing organization, manufacturing workflows, and downstream automation processes by ensuring that datums, annotations, curves, surfaces, construction geometry, and other entities are consistently organized. Incorrectly placed layers or improperly assigned entities can create visual clutter, inconsistent display behavior, and difficulties during design review, detailing, inspection, and manufacturing. This check helps maintain clean, standardized, and well-organized models across projects and teams. Layer placement standards are typically configured in the start.mcs file using PRT_LAYER, ASM_LAYER, DRW_LAYER, and related layer management entries, while check behavior and reporting are controlled by the LAYER_PLACE settings in the check.mch configuration file.</Description>
         <ModelCheckName>LAYER_PLACE</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y W W Y</ModelCheckOptions>
@@ -612,7 +608,7 @@ Since an issue may propagate through the associative chain of references between
     </Check>
     <Check>
         <Name>Layer Status</Name>
-        <Category>Model Complexity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether layers within the model have the correct status and behavior according to company layer management standards. Layer status controls how layers behave in the model, including visibility, blanking, activation, and organizational state for datums, annotations, curves, surfaces, construction geometry, and other entities. Incorrect layer status settings can create visual clutter, hide important information, reduce model readability, and cause downstream issues in drawings, manufacturing, inspection, and data exchange workflows. This check helps ensure that layers are consistently managed and maintained according to approved modeling and display practices. Layer status definitions and standards are typically configured in the start.mcs file using PRT_LAYER, ASM_LAYER, DRW_LAYER, and related layer configuration entries, while check behavior and reporting are controlled by the LAYER_STATUS settings in the check.mch configuration file.</Description>
         <ModelCheckName>LAYER_STATUS</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y W W Y</ModelCheckOptions>
@@ -628,7 +624,7 @@ Since an issue may propagate through the associative chain of references between
     </Check>
     <Check>
         <Name>Layout Information</Name>
-        <Category>Model Complexity</Category>
+        <Category>Design Intent Strength</Category>
         <Description>Checks and reports information related to layouts used within the model. Layouts are commonly used to define high-level design intent, control geometry placement, manage top-down design relationships, and coordinate dimensions, references, and assembly structure across multiple models. Properly managed layouts improve consistency, parametric control, collaboration, and downstream manufacturing or assembly workflows. Poorly organized or unstable layouts can create weak external references, regeneration problems, dependency issues, and difficulties during future design modifications. This check helps ensure that layouts are properly defined and maintained according to company modeling standards. Layout-related standards and external reference management practices are typically configured through Creo layout settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the LAYOUT_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>LAYOUT_INFO</ModelCheckName>
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
@@ -637,7 +633,7 @@ Since an issue may propagate through the associative chain of references between
     </Check>
     <Check>
         <Name>Lower Tolerance Limits</Name>
-        <Category>Model Integrity</Category>
+        <Category>MBD Readiness</Category>
         <Description>Checks whether feature dimensions and tolerances use valid and acceptable lower tolerance limits according to company engineering and manufacturing standards. Proper lower tolerance definitions are critical for ensuring part fit, function, manufacturability, inspection accuracy, and assembly performance. Incorrect, excessively tight, or unrealistic lower tolerance limits can increase manufacturing cost, create inspection difficulties, cause fitment problems, and lead to rejected or nonfunctional parts. This check helps identify tolerance definitions that may violate company standards or create downstream production and quality issues. Tolerance standards and approved tolerance types are typically configured in the start.mcs file using PRT_TOL_TYPE, ASM_TOL_TYPE, and related tolerance configuration entries, while check behavior and reporting are controlled by the LOW_TOLERANCE settings in the check.mch configuration file.</Description>
         <ModelCheckName>LOW_TOLERANCE</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -646,7 +642,7 @@ Since an issue may propagate through the associative chain of references between
     </Check>
     <Check>
         <Name>Material Information</Name>
-        <Category>Model Integrity</Category>
+        <Category>Consistency</Category>
         <Description>Checks and reports information related to materials assigned to the model, including material names, material properties, density definitions, and associated manufacturing or engineering metadata. Properly managed material information is critical for accurate mass properties, simulation results, manufacturing processes, BOM generation, cost estimation, and downstream integration with Windchill, ERP, and inspection systems. Missing, incorrect, or inconsistent material assignments can lead to inaccurate calculations, manufacturing errors, poor analysis results, and downstream documentation problems. This check helps ensure that materials are properly assigned and comply with company-approved standards and material libraries. Approved material names and related material standards are typically configured in the start.mcs file using MATERIAL_NAME entries and related material configuration settings, while check behavior and reporting are controlled by the MATERIAL_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>MATERIAL_INFO</ModelCheckName>
         <ModelCheckOptions>YNEW E E N N Y</ModelCheckOptions>
@@ -676,7 +672,7 @@ Since an issue may propagate through the associative chain of references between
     </Check>
     <Check>
         <Name>Minimum and Maximum Tolerance Information</Name>
-        <Category>Geometry Quality</Category>
+        <Category>MBD Readiness</Category>
         <Description>Checks whether feature dimensions and tolerances use valid minimum and maximum tolerance values according to company engineering and manufacturing standards. Proper tolerance ranges are critical for ensuring part fit, function, manufacturability, interchangeability, and inspection accuracy. Incorrect, inconsistent, or unrealistic tolerance limits can increase manufacturing cost, create assembly problems, lead to inspection failures, and reduce overall product quality. This check helps identify dimensions and tolerance definitions that may violate approved engineering practices or downstream manufacturing requirements. Tolerance standards and approved tolerance types are typically configured in the start.mcs file using PRT_TOL_TYPE, ASM_TOL_TYPE, and related tolerance configuration entries, while check behavior and reporting are controlled by the MINMAXTOL_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>MINMAXTOL_INFO</ModelCheckName>
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
@@ -721,7 +717,7 @@ Since an issue may propagate through the associative chain of references between
     </Check>
     <Check>
         <Name>Parameter Information</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>Consistency</Category>
         <Description>Checks and reports information related to model parameters used within the part, assembly, or drawing. Parameters are commonly used to store critical metadata such as part numbers, descriptions, materials, project information, lifecycle states, and manufacturing data. Missing, incorrect, or inconsistent parameter information can cause problems in drawings, BOMs, Windchill, ERP integration, manufacturing, and downstream automation processes. This check helps verify that required parameter data exists and is used consistently according to company standards. Parameter requirements and validation rules are typically configured in the start.mcs file using PRT_PARAMETER, ASM_PARAMETER, and DRW_PARAMETER entries, while check behavior and reporting are controlled by the PARAM_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>PARAM_INFO</ModelCheckName>
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
@@ -730,7 +726,7 @@ Since an issue may propagate through the associative chain of references between
     </Check>
     <Check>
         <Name>Required Parameter Notes</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether required parameter notes are present and correctly associated with the model or drawing. Parameter notes are commonly used to display important metadata such as part numbers, materials, descriptions, revisions, or manufacturing information on drawings and related documentation. Missing or incorrect parameter notes can lead to incomplete drawings, communication issues, and downstream manufacturing or inspection errors. This check helps ensure that required parameter-driven notes are consistently included according to company standards. Required parameter note definitions are typically configured in the start.mcs file using PRT_PARAM_NOTE_REQ, ASM_PARAM_NOTE_REQ, or DRW_PARAM_NOTE_REQ entries, while check behavior and reporting are controlled by the PARAM_NOTE_REQ settings in the check.mch configuration file.</Description>
         <ModelCheckName>PARAM_NOTE_REQ</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
@@ -739,7 +735,7 @@ Since an issue may propagate through the associative chain of references between
     </Check>
     <Check>
         <Name>Unacceptable Parameter Notes</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>Consistency</Category>
         <Description>Checks for parameter-driven notes that are not allowed by company standards. Unacceptable parameter notes may include obsolete information, prohibited text, duplicate metadata, incorrect formatting, or notes that conflict with approved drawing and documentation practices. Invalid parameter notes can create confusion, introduce manufacturing or inspection errors, and reduce drawing consistency and data quality. This check helps ensure that only approved parameter notes are used within models and drawings. Unacceptable parameter note definitions are typically configured in the start.mcs file using PRT_PARAM_NOTE_UNACC, ASM_PARAM_NOTE_UNACC, or DRW_PARAM_NOTE_UNACC entries, while check behavior and reporting are controlled by the PARAM_NOTE_UNACC settings in the check.mch configuration file.</Description>
         <ModelCheckName>PARAM_NOTE_UNACC</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
@@ -748,7 +744,7 @@ Since an issue may propagate through the associative chain of references between
     </Check>
     <Check>
         <Name>Parameter Renaming</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether parameter names comply with company naming standards and identifies parameters that should be renamed to approved names. Standardized parameter naming improves model consistency, automation reliability, searchability, and integration with drawings, Windchill, ERP systems, and downstream processes. Incorrect or inconsistent parameter names can lead to duplicate metadata, failed automation, mapping issues, and confusion across design teams. Parameter rename rules are typically configured in the start.mcs file using PRT_PARAM_RENAME, ASM_PARAM_RENAME, and DRW_PARAM_RENAME entries, while check behavior and reporting are controlled by the PARAM_RENAME settings in the check.mch configuration file.</Description>
         <ModelCheckName>PARAM_RENAME</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y N Y Y</ModelCheckOptions>
@@ -757,7 +753,7 @@ Since an issue may propagate through the associative chain of references between
     </Check>
     <Check>
         <Name>Parameter Spelling</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>Consistency</Category>
         <Description>Checks parameter names and related parameter text for spelling issues that may violate company standards or introduce inconsistent metadata. Misspelled parameter names can cause automation failures, incorrect mappings, reporting issues, search problems, and confusion across design, manufacturing, Windchill, and ERP systems. Consistent spelling improves data quality, model maintainability, and downstream process reliability. Parameter spelling validation may use configured dictionaries, approved lists, or naming standards defined within the ModelCHECK configuration environment, while check behavior and reporting are controlled by the PARAM_SPELL settings in the check.mch configuration file.</Description>
         <ModelCheckName>PARAM_SPELL</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
@@ -767,7 +763,7 @@ Since an issue may propagate through the associative chain of references between
     </Check>
     <Check>
         <Name>Unused Parameters</Name>
-        <Category>Model Complexity</Category>
+        <Category>Consistency</Category>
         <Description>Checks for parameters that exist in the model but are not actively used by relations, drawings, family tables, programs, notes, or downstream processes. Unused parameters can increase model complexity, create confusion, clutter metadata, and make models more difficult to maintain and troubleshoot. Removing unnecessary parameters helps improve model clarity, consistency, and overall data quality while reducing the risk of outdated or misleading information remaining in the design. Parameter usage and cleanup standards are typically managed through parameter definitions in the start.mcs file, while check behavior and reporting are controlled by the PARAM_UNUSED settings in the check.mch configuration file.</Description>
         <ModelCheckName>PARAM_UNUSED</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -781,7 +777,7 @@ Since an issue may propagate through the associative chain of references between
     </Check>
     <Check>
         <Name>Parameter Checks</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether required model parameters are present, correctly defined, properly formatted, and compliant with company standards. Parameters are commonly used to store critical design and business information such as part numbers, materials, descriptions, lifecycle states, and manufacturing data. Missing, invalid, or incorrectly formatted parameters can lead to errors in drawings, BOMs, Windchill, ERP integration, automation workflows, manufacturing, and downstream documentation processes. This check helps ensure that parameter data is complete, accurate, and consistently applied throughout the model. Parameter validation requirements are typically configured in the start.mcs file using PRT_PARAMETER, ASM_PARAMETER, and DRW_PARAMETER entries, while check behavior and reporting are controlled by the PARAMCHECK settings in the check.mch configuration file.</Description>
         <ModelCheckName>PARAMCHECK</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y N W Y</ModelCheckOptions>
@@ -814,7 +810,7 @@ Since an issue may propagate through the associative chain of references between
     </Check>
     <Check>
         <Name>Model Version</Name>
-        <Category>Model Complexity</Category>
+        <Category>Consistency</Category>
         <Description>Checks the Creo version or build information associated with the model to help identify outdated, legacy, or incompatible files. Models created or last saved in older Creo versions may contain deprecated features, outdated data structures, regeneration differences, or compatibility issues that can affect performance, stability, and downstream processes. Monitoring model version information helps organizations maintain consistent CAD environments and supports upgrade, migration, and data management efforts. Version requirements are typically configured in the start.mcs file using PRT_PRO_VERSION and ASM_PRO_VERSION entries, while check behavior and reporting are controlled by the PRO_VERSION settings in the check.mch configuration file.</Description>
         <ModelCheckName>PRO_VERSION</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y W W Y</ModelCheckOptions>
@@ -951,7 +947,7 @@ Retrieval and regeneration issues in models with family tables are more serious 
     </Check>
     <Check>
         <Name>Renamed Symbols</Name>
-        <Category>Model Integrity</Category>
+        <Category>Consistency</Category>
         <Description>Checks for drawing or annotation symbols that have been renamed from their original or standard names. Renamed symbols can create inconsistencies in drawings, reduce standardization, and make models and documentation more difficult to interpret, maintain, or automate. Unexpected symbol names may also cause issues with downstream processes such as detailing, inspection, manufacturing documentation, and company drafting standards. This check helps ensure that symbols remain consistent and compliant with approved naming practices. Symbol naming standards and approved symbols are typically configured in the start.mcs file using DRW_SYMBOL and related entries, while check behavior and reporting are controlled by the RENAMED_SYMBOLS settings in the check.mch configuration file.</Description>
         <ModelCheckName>RENAMED_SYMBOLS</ModelCheckName>
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
@@ -974,7 +970,7 @@ Retrieval and regeneration issues in models with family tables are more serious 
     </Check>
     <Check>
         <Name>Rule Check Information</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>Consistency</Category>
         <Description>Checks and reports information related to custom RuleCHECK rules used within the model validation environment. RuleCHECK is commonly used to enforce company-specific modeling standards, design requirements, automation logic, and engineering practices that go beyond standard ModelCHECK functionality. This check helps expose rule-related information for review, reporting, and validation to ensure that custom rules are being applied consistently and functioning as intended. Improperly managed or undocumented rules can lead to inconsistent model quality, automation failures, and downstream manufacturing or data management issues. Rule definitions are typically configured through RuleCHECK configuration files and integrated ModelCHECK settings, while check behavior and reporting are controlled by the RULECHECK_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>RULECHECK_INFO</ModelCheckName>
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
@@ -1083,7 +1079,7 @@ When a model has small geometry, the equivalent absolute accuracy should be two 
     </Check>
     <Check>
         <Name>Simplified Representation Naming</Name>
-        <Category>Model Complexity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether simplified representations follow approved company naming conventions and naming patterns. Consistent naming of simplified representations improves organization, readability, searchability, and communication when working with large assemblies, manufacturing views, simulation setups, and downstream processes. Poorly named or inconsistent simplified representations can create confusion, lead to incorrect representation usage, and make assembly management more difficult. This check helps ensure that simplified representations are clearly named and standardized across the organization. Naming rules for simplified representations are typically configured in the start.mcs file using PRT_SIMPREP_NAME and related entries, while check behavior and reporting are controlled by the SIMPREP_NAME settings in the check.mch configuration file.</Description>
         <ModelCheckName>SIMPREP_NAME</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1116,7 +1112,7 @@ Imported sketch geometry can lead to many sketched entities. Even if you have to
     </Check>
     <Check>
         <Name>SLA Features Information</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks and reports information related to SLA or STL-based geometry and features used for stereolithography, additive manufacturing, or rapid prototyping workflows. SLA-related geometry may include tessellated models, exported print geometry, or additive manufacturing preparation data used in downstream 3D printing processes. Improperly defined or poor-quality SLA geometry can lead to print failures, inaccurate surfaces, mesh problems, manufacturing defects, and downstream translation issues. This check helps identify and review SLA-related model information to improve additive manufacturing readiness and geometry quality. SLA-related standards and configuration settings are managed within the ModelCHECK configuration environment, while check behavior and reporting are controlled by the SLA_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>SLA_INFO</ModelCheckName>
         <ModelCheckOptions>YNEW N N N N Y</ModelCheckOptions>
@@ -1198,7 +1194,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Unit Length</Name>
-        <Category>Model Complexity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether the model uses the correct length units required by company standards, such as millimeters, inches, or centimeters. Consistent unit systems are critical for maintaining accurate dimensions, mass properties, tolerances, manufacturing data, and interoperability with assemblies, drawings, simulations, CAM systems, and downstream data management tools. Incorrect length units can lead to scaling problems, manufacturing errors, assembly mismatches, and translation issues during export or collaboration. This check helps ensure that all models are created and maintained using approved unit standards. Required unit definitions are typically configured in the start.mcs file using PRT_UNITS_LENGTH and ASM_UNITS_LENGTH entries, while check behavior and reporting are controlled by the UNITS_LENGTH settings in the check.mch configuration file.</Description>
         <ModelCheckName>UNITS_LENGTH</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
@@ -1207,7 +1203,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Unit Mass</Name>
-        <Category>Model Integrity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether the model uses the correct mass units required by company standards, such as kilograms, pounds, or grams. Consistent mass units are critical for accurate mass properties, simulation results, manufacturing calculations, BOM data, and downstream integration with analysis, ERP, and data management systems. Incorrect mass units can lead to inaccurate weight calculations, assembly balance issues, simulation errors, and manufacturing or shipping problems. This check helps ensure that all models use approved and consistent mass unit definitions throughout the design process. Required mass unit standards are typically configured in the start.mcs file using PRT_UNITS_MASS and ASM_UNITS_MASS entries, while check behavior and reporting are controlled by the UNITS_MASS settings in the check.mch configuration file.</Description>
         <ModelCheckName>UNITS_MASS</ModelCheckName>
         <ModelCheckOptions>YNEW E E N N Y</ModelCheckOptions>
@@ -1225,7 +1221,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Cross-Section Information</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>Model Integrity</Category>
         <Description>Checks and reports information related to cross-sections created within the model. Cross-sections are commonly used to inspect internal geometry, communicate design intent, support detailing and manufacturing workflows, and analyze complex features or assemblies. Properly defined cross-sections improve model understanding, drawing clarity, inspection processes, and downstream manufacturing communication. Missing, inconsistent, or poorly managed cross-sections can reduce model usability and make internal geometry more difficult to review or validate. This check helps ensure that cross-sections are properly defined and maintained according to company standards. Cross-section requirements and related standards are typically configured within the ModelCHECK configuration environment and start.mcs file settings, while check behavior and reporting are controlled by the XSEC_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>XSEC_INFO</ModelCheckName>
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
@@ -1234,7 +1230,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>External Dependencies</Name>
-        <Category>Model Integrity</Category>
+        <Category>Design Intent Strength</Category>
         <Description>Checks for references or dependencies between the current model and external models, assemblies, sketches, geometry, or copied data located outside the model itself. External dependencies can be useful for top-down design workflows, but unmanaged or unnecessary external references can weaken model stability, increase complexity, create regeneration failures, and make models difficult to modify, reuse, or transfer between projects. Broken or unintended external dependencies may also cause downstream issues in assemblies, manufacturing, Windchill, and data management processes. This check helps identify external references so they can be reviewed and managed according to company modeling practices. External reference behavior and related standards are typically controlled through Creo configuration settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the EXTERNAL_DEPS settings in the check.mch configuration file.</Description>
         <ModelCheckName>EXTERNAL_DEPS</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1267,7 +1263,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Missing Standard Notes</Name>
-        <Category>Model Integrity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether required standard notes are present within the model or drawing according to company drafting and documentation standards. Standard notes are commonly used to communicate critical manufacturing instructions, material requirements, tolerances, inspection information, safety notices, and other standardized engineering data. Missing standard notes can lead to incomplete documentation, manufacturing errors, inspection issues, and inconsistent communication across downstream processes. This check helps ensure that all required notes are included and properly defined to maintain drawing quality and compliance with organizational standards. Standard note requirements are typically configured in the start.mcs file using standard note definitions and related drawing configuration entries, while check behavior and reporting are controlled by the STD_NOTES_MISSING settings in the check.mch configuration file.</Description>
         <ModelCheckName>STD_NOTES_MISSING</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
@@ -1277,7 +1273,7 @@ Suppressed features are appropriate if they are only used by particular instance
     <!-- DRAWING REPORT CONFIGURATION -->
     <Check>
         <Name>Boundary Representation Information</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks and reports information related to boundary representation (B-rep) geometry used within the model or drawing. Boundary representation defines the mathematical surfaces, edges, and topology that make up solid and surface geometry in Creo and is fundamental to accurate modeling, manufacturing, simulation, and downstream data exchange processes. Poorly defined or corrupted boundary representation geometry can lead to regeneration failures, invalid surfaces, geometry translation problems, manufacturing errors, and downstream interoperability issues with formats such as STEP or IGES. This check helps identify and review B-rep-related information to improve model integrity, geometry quality, and downstream reliability. Boundary representation quality standards and related geometry settings are typically managed through ModelCHECK geometry configuration files and Creo geometry validation settings, while check behavior and reporting are controlled by the BOUND_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>BOUND_INFO</ModelCheckName>
         <ModelCheckOptions>YNEW W W N E Y</ModelCheckOptions>
@@ -1298,7 +1294,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Draft Geometry</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>Consistency</Category>
         <Description>Checks for draft or manually created drawing geometry that is not directly associated with model geometry. Draft geometry may include manually sketched lines, notes, symbols, or annotation entities added directly within the drawing for clarification or cosmetic purposes. While draft geometry can be useful for supplemental documentation, excessive or improperly managed draft entities can reduce drawing associativity, create inconsistencies between the drawing and the model, and increase the risk of outdated or incorrect documentation during design changes. This check helps identify manually created drawing geometry so it can be reviewed and managed according to company drafting and documentation standards. Draft geometry standards and related drawing practices are typically configured through Creo detailing settings and ModelCHECK drawing configuration files, while check behavior and reporting are controlled by the DRAFT_GEOM settings in the check.mch configuration file.</Description>
         <ModelCheckName>DRAFT_GEOM</ModelCheckName>
         <ModelCheckOptions>YNEW W W N E Y</ModelCheckOptions>
@@ -1310,8 +1306,8 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Drawing Layers Information</Name>
-        <Category>Model Complexity</Category>
-        <Description>Checks and reports information related to layers used within drawings, including layer names, visibility states, organization, and assignment of drawing entities such as dimensions, annotations, symbols, notes, views, and reference geometry. Properly managed drawing layers improve drawing readability, visibility control, drafting consistency, manufacturing communication, and downstream inspection workflows. Poorly organized or inconsistent drawing layers can create visual clutter, hide important information, complicate revision management, and reduce overall drawing quality. This check helps ensure that drawing layers are properly defined and maintained according to company drafting standards. Drawing layer definitions and standards are typically configured in the start.mcs file using DRW_LAYER, DRW_LAYER_MOVE, DRW_LAYER_UNWANTED, and related entries, while check behavior and reporting are controlled by the DRAWING_LAYERS settings in the check.mch configuration file</Description>
+        <Category>Consistency</Category>
+        <Description>Checks and reports information related to layers used within drawings, including layer names, visibility states, organization, and assignment of drawing entities such as dimensions, annotations, symbols, notes, views, and reference geometry. Properly managed drawing layers improve drawing readability, visibility control, drafting consistency, manufacturing communication, and downstream inspection workflows. Poorly organized or inconsistent drawing layers can create visual clutter, hide important information, complicate revision management, and reduce overall drawing quality. This check helps ensure that drawing layers are properly defined and maintained according to company drafting standards. Drawing layer definitions and standards are typically configured in the start.mcs file using DRW_LAYER, DRW_LAYER_MOVE, DRW_LAYER_UNWANTED, and related entries, while check behavior and reporting are controlled by the DRAWING_LAYERS settings in the check.mch configuration file.</Description>
         <ModelCheckName>DRAWING_LAYERS</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y N E Y</ModelCheckOptions>
         <display>Y</display>
@@ -1319,7 +1315,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Drawing Parameters</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether required drawing parameters are present, correctly defined, properly formatted, and compliant with company drafting and documentation standards. Drawing parameters are commonly used to store and display critical metadata such as drawing numbers, descriptions, revisions, materials, project information, approval status, and manufacturing data. Missing, incorrect, or inconsistent drawing parameters can lead to incomplete title blocks, incorrect BOM data, failed Windchill or ERP integration, and downstream manufacturing or inspection issues. This check helps ensure that drawing metadata is complete, accurate, and consistently applied throughout the documentation process. Drawing parameter requirements and validation rules are typically configured in the start.mcs file using DRW_PARAMETER and related entries, while check behavior and reporting are controlled by the DRAWING_PARAMS settings in the check.mch configuration file.</Description>
         <ModelCheckName>DRAWING_PARAMS</ModelCheckName>
         <ModelCheckOptions>YNEW W W N E Y</ModelCheckOptions>
@@ -1328,7 +1324,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Drawing Naming</Name>
-        <Category>Model Complexity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether drawing names comply with company-defined naming standards and approved naming patterns. Consistent drawing naming improves organization, traceability, searchability, revision control, and communication across design, manufacturing, inspection, Windchill, and downstream data management systems. Incorrect or inconsistent drawing names can lead to duplicate documentation, revision confusion, incorrect model associations, and downstream manufacturing or ERP errors. This check helps ensure that drawings are clearly and consistently named according to organizational standards and documentation practices. Drawing naming rules are typically configured in the start.mcs file using DRW_MODEL_NAME and related drawing naming entries, while check behavior and reporting are controlled by the DRAWING_NAME settings in the check.mch configuration file.</Description>
         <ModelCheckName>DRAWING_NAME</ModelCheckName>
         <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
@@ -1337,7 +1333,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Default Views</Name>
-        <Category>Model Complexity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether drawings contain the required default views defined by company drafting standards and approved drawing templates. Default views commonly include standard orientations such as front, top, right, isometric, section, or auxiliary views that are necessary for clearly communicating part geometry, dimensions, manufacturing requirements, and inspection information. Missing or improperly configured default views can reduce drawing clarity, create interpretation errors, and lead to downstream manufacturing or assembly issues. This check helps ensure that drawings contain the expected standard views and maintain consistent documentation practices across the organization. Default drawing view requirements are typically configured through drawing templates, Creo detailing settings, and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the DEFAULT_VIEWS settings in the check.mch configuration file.</Description>
         <ModelCheckName>DEFAULT_VIEWS</ModelCheckName>
         <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
@@ -1346,7 +1342,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Surfaces not Annotated</Name>
-        <Category>MBD Readyness</Category>
+        <Category>MBD Readiness</Category>
         <Description>Checks for model surfaces that are not referenced by dimensions, GDT annotations, notes, surface finish symbols, inspection annotations, or other manufacturing and documentation annotations. Unannotated surfaces may indicate incomplete model-based definition (MBD) practices, missing manufacturing requirements, undocumented inspection criteria, or incomplete engineering communication. Surfaces lacking proper annotation can create ambiguity during manufacturing, quality inspection, assembly, and downstream interpretation of the design intent. This check helps ensure that important surfaces are properly documented and associated with the required annotation information according to company MBD and drafting standards. Annotation requirements and related documentation practices are typically configured through Creo annotation settings and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the SRF_NOT_REF_BY_ANNTN settings in the check.mch configuration file.</Description>
         <ModelCheckName>SRF_NOT_REF_BY_ANNTN</ModelCheckName>
         <ModelCheckOptions>YNEW W E N W Y</ModelCheckOptions>
@@ -1357,7 +1353,7 @@ Suppressed features are appropriate if they are only used by particular instance
 
      <Check>
         <Name>Annotations Missing In Combination State</Name>
-        <Category>MBD Readyness</Category>
+        <Category>MBD Readiness</Category>
         <Description>Checks whether required annotations are included and properly displayed within defined combination states used for Model-Based Definition (MBD) workflows. Combination states control the visibility of annotations, views, geometry, and display settings used to communicate manufacturing, inspection, assembly, and engineering requirements directly within the 3D model. Missing annotations in combination states can result in incomplete documentation, incorrect manufacturing interpretation, inspection errors, failed design reviews, and downstream communication problems. This check helps ensure that all required dimensions, GDT annotations, notes, and manufacturing information are visible in the appropriate combination states according to company MBD standards. Combination state and annotation requirements are typically configured through Creo MBD settings and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the ANNTN_NOT_ON_COMB_STATE settings in the check.mch configuration file.</Description>
         <ModelCheckName>ANNTN_NOT_ON_COMB_STATE</ModelCheckName>
         <ModelCheckOptions>YNEW W E N W Y</ModelCheckOptions>
@@ -1367,7 +1363,7 @@ Suppressed features are appropriate if they are only used by particular instance
 
     <Check>
         <Name>Annotations missing a surface reference</Name>
-        <Category>MBD Readyness</Category>
+        <Category>MBD Readiness</Category>
         <Description>Checks for annotations that are not associated with or attached to specific model surfaces or geometry references. Annotations without valid surface references may indicate incomplete Model-Based Definition (MBD) practices, broken annotation associations, improperly placed dimensions, or unclear manufacturing and inspection requirements. Unreferenced annotations can create ambiguity during design review, manufacturing, quality inspection, and downstream interpretation of the model, increasing the risk of errors and inconsistent documentation. This check helps ensure that annotations remain properly connected to the intended geometry and accurately communicate design intent according to company MBD and drafting standards. Annotation association requirements and related documentation practices are typically configured through Creo annotation settings and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the ANNTN_MISSING_SURF_REF settings in the check.mch configuration file.</Description>
         <ModelCheckName>ANNTN_MISSING_SURF_REF</ModelCheckName>
         <ModelCheckOptions>YNEW W E N W Y</ModelCheckOptions>
@@ -1377,7 +1373,7 @@ Suppressed features are appropriate if they are only used by particular instance
 
     <Check>
         <Name>Erased Views</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>Consistency</Category>
         <Description>Checks for drawing views that have been erased, hidden, or removed from active display within the drawing. Erased views may still exist in the drawing database even though they are no longer visible, and unmanaged erased views can increase drawing complexity, create confusion, affect performance, and complicate drawing maintenance or revision control. In some cases, erased views may indicate obsolete documentation, incomplete cleanup, or outdated design information that should be reviewed or permanently removed. This check helps ensure that drawing views are properly managed and that unnecessary or hidden views do not negatively affect drawing quality and maintainability. Drawing view management practices and related standards are typically configured through Creo detailing settings and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the ERASED_VIEWS settings in the check.mch configuration file.</Description>
         <ModelCheckName>ERASED_VIEWS</ModelCheckName>
         <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
@@ -1407,7 +1403,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Models Used in Drawing</Name>
-        <Category>Model Complexity</Category>
+        <Category>Consistency</Category>
         <Description>Checks and reports information about the models, parts, assemblies, and references used within the drawing. Drawings often reference multiple models for views, sections, details, BOMs, family tables, and assembly documentation, and properly managing these model references is critical for maintaining drawing accuracy, associativity, revision control, and downstream manufacturing communication. Missing, outdated, incorrect, or unnecessary model references can create drawing inconsistencies, broken views, BOM errors, and downstream data management or manufacturing problems. This check helps ensure that drawings reference the correct approved models and maintain proper model-to-drawing relationships according to company standards. Drawing model reference rules and related standards are typically configured through Creo drawing settings and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the MODELS_USED settings in the check.mch configuration file.</Description>
         <ModelCheckName>MODELS_USED</ModelCheckName>
         <ModelCheckOptions>YN Y Y Y N Y</ModelCheckOptions>
@@ -1497,7 +1493,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Overlapping Information</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>Consistency</Category>
         <Description>Checks for overlapping drawing information such as dimensions, notes, symbols, annotations, tables, views, balloons, or other entities that interfere with each other visually within the drawing. Overlapping information can reduce readability, create confusion, hide important manufacturing or inspection details, and increase the risk of interpretation errors during production and quality processes. Poorly organized drawing layouts may also violate company drafting standards and reduce overall documentation quality. This check helps identify crowded or conflicting drawing content so layouts can be cleaned up and presented more clearly. Drawing spacing rules and related detailing standards are typically configured through Creo detailing settings and ModelCHECK drawing configuration files, while check behavior and reporting are controlled by the OVERLAP_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>OVERLAP_INFO</ModelCheckName>
         <ModelCheckOptions>YNEW W W N E Y</ModelCheckOptions>
@@ -1506,7 +1502,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Drawing Parameters Existence</Name>
-        <Category>Model Complexity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether required parameters exist within the drawing and are properly defined according to company drafting and documentation standards. Drawing parameters are commonly used to store and display important metadata such as drawing numbers, descriptions, revisions, materials, approvals, project information, and manufacturing data. Missing or improperly defined parameters can lead to incomplete title blocks, incorrect BOM data, failed Windchill or ERP integration, and downstream manufacturing or inspection issues. This check helps ensure that all required drawing metadata is present, accurate, and consistently maintained throughout the documentation process. Required drawing parameter definitions are typically configured in the start.mcs file using DRW_PARAMETER and related entries, while check behavior and reporting are controlled by the PARAMS_EXIST settings in the check.mch configuration file.</Description>
         <ModelCheckName>PARAMS_EXIST</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1515,7 +1511,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Drawing Parameters Usage</Name>
-        <Category>Model Complexity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether drawing parameters are actively used and properly referenced within the drawing according to company drafting and documentation standards. Drawing parameters are commonly used to populate title blocks, notes, repeat regions, BOM tables, revision information, manufacturing instructions, and downstream metadata fields. Parameters that exist but are not properly used may indicate incomplete documentation, broken parameter links, outdated metadata, or unnecessary complexity within the drawing. Improper parameter usage can also lead to incorrect title block information, failed automation, Windchill or ERP integration issues, and downstream manufacturing or inspection errors. This check helps ensure that drawing parameters are correctly connected and used throughout the documentation process. Drawing parameter usage rules and related standards are typically configured in the start.mcs file using DRW_PARAMETER and related entries, while check behavior and reporting are controlled by the PARAMS_USED settings in the check.mch configuration file.</Description>
         <ModelCheckName>PARAMS_USED</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1524,7 +1520,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Regeneration of Dimensions</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>Model Integrity</Category>
         <Description>Checks whether drawing dimensions regenerate and update correctly after model changes, drawing updates, or regeneration operations. Dimensions that fail to regenerate properly may become disconnected, display incorrect values, lose associativity with model geometry, or create outdated manufacturing and inspection information within the drawing. Regeneration problems can lead to inaccurate documentation, revision inconsistencies, manufacturing errors, and downstream quality issues. This check helps ensure that dimensions remain fully associative, stable, and synchronized with the underlying model geometry throughout the design process. Dimension regeneration behavior and related detailing standards are typically configured through Creo drawing settings and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the REGEN_DIMS settings in the check.mch configuration file.</Description>
         <ModelCheckName>REGEN_DIMS</ModelCheckName>
         <ModelCheckOptions>YNEW E E N E Y</ModelCheckOptions>
@@ -1536,7 +1532,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Sheet Size Information</Name>
-        <Category>Model Complexity</Category>
+        <Category>Consistency</Category>
         <Description>Checks and reports information related to drawing sheet sizes used within the drawing package. Sheet size standards are important for maintaining consistent documentation layouts, print scaling, title block formatting, readability, plotting compatibility, and downstream manufacturing or archival processes. Incorrect or nonstandard sheet sizes can create printing issues, formatting inconsistencies, revision control problems, and difficulties with document management systems. This check helps ensure that drawings use approved sheet sizes and comply with company drafting and documentation standards. Approved sheet size definitions and related drawing format standards are typically configured through drawing templates, Creo detailing settings, and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the SHEET_SIZE_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>SHEET_SIZE_INFO</ModelCheckName>
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
@@ -1545,7 +1541,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Standard Detail Setup</Name>
-        <Category>Model Complexity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether the drawing uses the correct standard detail setup according to company drafting templates and documentation rules. The standard detail setup defines the baseline configuration for drawing behavior, including dimensioning standards, text styles, view settings, annotation rules, and general drafting environment settings. If the detail setup is incorrect or inconsistent, drawings may display inconsistent formatting, incorrect dimension behavior, nonstandard annotations, and downstream issues in manufacturing, inspection, and data management processes. This check helps ensure that drawings conform to the approved company-standard detailing environment for consistent and high-quality documentation. Standard detail setup definitions are typically configured in the start.mcs file using detail setup files (DTL) and related Creo configuration settings, while check behavior and reporting are controlled by the STD_DTL_SETUP settings in the check.mch configuration file.</Description>
         <ModelCheckName>STD_DTL_SETUP</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
@@ -1554,7 +1550,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Symbol Information</Name>
-        <Category>Model Complexity</Category>
+        <Category>Consistency</Category>
         <Description>Checks and reports information related to symbols used within the drawing, including their definitions, usage, placement, and compliance with company drafting standards. Drawing symbols are commonly used to communicate manufacturing requirements, welding information, surface finish, GDT elements, and other standardized annotations critical to design intent and downstream processes. Incorrect, missing, or inconsistently used symbols can lead to misinterpretation of manufacturing instructions, inspection errors, and reduced drawing clarity. This check helps ensure that all symbols are properly defined, consistently used, and aligned with company documentation standards. Symbol definitions and usage rules are typically configured through Creo symbol files and ModelCHECK drafting configuration settings, while check behavior and reporting are controlled by the SYMBOL_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>SYMBOL_INFO</ModelCheckName>
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
@@ -1563,7 +1559,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Table Cell Information</Name>
-        <Category>Model Complexity</Category>
+        <Category>Consistency</Category>
         <Description>Checks the contents, structure, and configuration of table cells within a drawing to ensure they comply with company drafting and documentation standards. Table cells are commonly used in BOMs, revision tables, notes, parameter-driven tables, and other structured documentation elements, where consistency in formatting, content, and layout is critical for readability and downstream use. Incorrect, inconsistent, or improperly configured table cells can lead to misinterpretation of data, formatting issues, failed automation, and downstream manufacturing or data management errors. This check helps ensure that all table cells are correctly defined, consistently formatted, and properly populated according to organizational standards. Table cell rules and formatting requirements are typically configured through Creo table definitions and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the TABLE_CELLS settings in the check.mch configuration file.</Description>
         <ModelCheckName>TABLE_CELLS</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
@@ -1581,7 +1577,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Unused Models</Name>
-        <Category>Model Complexity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether the drawing contains referenced models (parts or assemblies) that are not actually used in any drawing views, tables, annotations, or other downstream drawing elements. Unused models can increase drawing complexity, cause confusion about design intent, slow performance, and introduce maintenance risks when models are updated or replaced. They may also indicate leftover references from earlier design iterations or incomplete cleanup of drawing content. This check helps ensure that only relevant and actively used models are included in the drawing, improving clarity, efficiency, and data integrity. Model usage rules and reference management are typically controlled through Creo drawing setup and ModelCHECK configuration files, while check behavior and reporting are controlled by the UNUSED_MODELS settings in the check.mch configuration file.</Description>
         <ModelCheckName>UNUSED_MODELS</ModelCheckName>
         <ModelCheckOptions>YNEW E E N E Y</ModelCheckOptions>
@@ -1593,7 +1589,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Unused Sheets</Name>
-        <Category>Model Complexity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether the drawing contains sheets that exist but are not actively used for any meaningful content such as views, tables, notes, annotations, or manufacturing information. Unused sheets can increase drawing complexity, create confusion during review or revision, and lead to inefficient document management. They may also indicate incomplete cleanup from earlier design iterations or leftover template content that no longer serves a purpose. This check helps ensure that drawings only contain necessary and actively used sheets, improving clarity, organization, and maintainability. Sheet usage rules and drawing structure standards are typically configured through Creo drawing setup and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the UNUSED_SHEETS settings in the check.mch configuration file.</Description>
         <ModelCheckName>UNUSED_SHEETS</ModelCheckName>
         <ModelCheckOptions>YNEW E E N N Y</ModelCheckOptions>
@@ -1602,7 +1598,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>View Scale</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether drawing views use appropriate and standardized scale values according to company drafting and documentation rules. Proper view scaling is essential for maintaining drawing readability, ensuring correct representation of geometry, and supporting downstream manufacturing, inspection, and interpretation processes. Incorrect or inconsistent view scales can lead to misinterpretation of dimensions, poor drawing clarity, and noncompliance with drafting standards. This check helps ensure that all drawing views use approved scale values that maintain consistency and clarity across the drawing package. View scale requirements and acceptable scale values are typically configured through Creo drawing setup files and ModelCHECK drafting configuration settings, while check behavior and reporting are controlled by the VIEW_SCALE settings in the check.mch configuration file.</Description>
         <ModelCheckName>VIEW_SCALE</ModelCheckName>
         <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
@@ -1612,7 +1608,7 @@ Suppressed features are appropriate if they are only used by particular instance
     <!-- ASSEMBLY REPORT CONFIGURATION -->
     <Check>
         <Name>Assembly BOM</Name>
-        <Category>Model Complexity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether the assembly bill of materials (BOM) is correctly defined, structured, and synchronized with the assembly model. The BOM represents the hierarchical structure of components used in an assembly and is critical for manufacturing planning, procurement, cost estimation, configuration control, and downstream systems such as ERP and Windchill. Missing, incorrect, or inconsistent BOM data can lead to incorrect part counts, assembly errors, procurement mistakes, and manufacturing delays. This check helps ensure that the BOM accurately reflects the assembly structure and complies with company data management and documentation standards. BOM definitions and related configuration rules are typically controlled through Creo assembly settings, repeat region tables, and Windchill integration mappings, while check behavior and reporting are controlled by the ASM_BOM settings in the check.mch configuration file.</Description>
         <ModelCheckName>ASM_BOM</ModelCheckName>
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
@@ -1630,7 +1626,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Bulk Items</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>Consistency</Category>
         <Description>Checks for bulk items used within an assembly and verifies that they are properly defined and managed according to company modeling and manufacturing standards. Bulk items typically represent non-modeled or non-solid components such as grease, oil, adhesive, sealant, weld material, or other consumable or distributed materials that are not represented as discrete parts in the BOM. Improper or missing bulk item definitions can lead to inaccurate BOMs, incorrect cost calculations, missing manufacturing requirements, and downstream errors in procurement or production planning. This check helps ensure that all required bulk items are correctly included and consistently defined within the assembly structure. Bulk item definitions and related configuration rules are typically managed through Creo assembly settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the BULK_ITEMS settings in the check.mch configuration file.</Description>
         <ModelCheckName>BULK_ITEMS</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1639,7 +1635,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Frozen Components</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>Model Integrity</Category>
         <Description>Checks for components that have been frozen within an assembly and verifies that their usage aligns with company modeling and design control practices. Frozen components are typically locked in place to prevent updates or regeneration, which can help stabilize critical portions of an assembly during development. However, excessive or inappropriate use of frozen components can mask design issues, prevent necessary updates, weaken model associativity, and lead to inconsistencies between intended and actual design state. This check helps identify frozen components so they can be reviewed to ensure they are intentionally and appropriately used within the assembly. Component freeze behavior and related assembly control practices are typically managed through Creo assembly settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the FRZ_COMPONENTS settings in the check.mch configuration file.</Description>
         <ModelCheckName>FRZ_COMPONENTS</ModelCheckName>
         <ModelCheckOptions>YNEW E E N N Y</ModelCheckOptions>
@@ -1651,7 +1647,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Generic Components</Name>
-        <Category>Model Complexity</Category>
+        <Category>Model Integrity</Category>
         <Description>Checks whether generic family table components are used within an assembly and verifies that only appropriate instance models are placed in the design. Generic models are intended to serve as master templates for family table instances and are typically not meant to be assembled directly. Using generics in assemblies can lead to incorrect BOM data, inaccurate mass properties, invalid dimensions, and downstream manufacturing or documentation errors because the generic does not represent a specific producible configuration. This check helps ensure that assemblies use only valid family table instances, maintaining correct configuration control, design intent, and data integrity. Family table usage rules and component selection standards are typically configured through Creo family table settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the GEN_COMPONENTS settings in the check.mch configuration file.</Description>
         <ModelCheckName>GEN_COMPONENTS</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1704,7 +1700,7 @@ If the suppressed features are no longer needed, then they should be removed bef
     </Check>
     <Check>
         <Name>Packaged Components</Name>
-        <Category>Model Complexity</Category>
+        <Category>Model Integrity</Category>
         <Description>Checks for components in the assembly that are in a packaged state and verifies that they are properly managed according to company modeling and assembly practices. Packaged components are typically placed in an assembly without full constraint definition, allowing them to be positioned loosely during early design stages or layout development. While this can be useful for flexibility during conceptual design, improperly managed packaged components can lead to unstable assemblies, unclear design intent, regeneration inconsistencies, and downstream issues in BOM accuracy, manufacturing, and data management processes. This check helps ensure that packaged components are intentional, properly controlled, and transitioned to fully constrained states when required. Component packaging rules and assembly constraint practices are typically managed through Creo assembly settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the PACK_COMPONENTS settings in the check.mch configuration file.</Description>
         <ModelCheckName>PACK_COMPONENTS</ModelCheckName>
         <ModelCheckOptions>YNEW E E W W Y</ModelCheckOptions>
@@ -1714,7 +1710,7 @@ If the suppressed features are no longer needed, then they should be removed bef
     </Check>
     <Check>
         <Name>Unique Components</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>Model Complexity</Category>
         <Description>Checks for components in the assembly that are marked as unique instances and verifies that they are properly defined and managed according to company modeling and configuration control standards. Unique components are non-reusable, instance-specific parts that differ from other occurrences of the same model and are typically used when geometry, parameters, or configurations vary from standard instances. While unique components are sometimes necessary for special design cases, excessive or uncontrolled use can reduce reuse efficiency, increase data management complexity, complicate BOM structure, and introduce inconsistencies in manufacturing, costing, and downstream systems. This check helps ensure that unique components are used intentionally, properly documented, and aligned with company design and configuration management practices. Unique component rules and assembly management practices are typically configured through Creo assembly settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the UNQ_COMPONENTS settings in the check.mch configuration file.</Description>
         <ModelCheckName>UNQ_COMPONENTS</ModelCheckName>
         <ModelCheckOptions>YN Y Y Y Y Y</ModelCheckOptions>
@@ -1738,7 +1734,7 @@ Best practice methods and standards around reference control can help eliminate 
     </Check>
     <Check>
         <Name>Weak Sketcher Dimensions</Name>
-        <Category>Model Integrity</Category>
+        <Category>Design Intent Strength</Category>
         <Description>Checks for weak sketcher dimensions in parts and assemblies, where dimensions are not fully driving the sketch geometry or are automatically generated as non-driving references by Creo. Weak dimensions indicate that sketch geometry is not fully controlled by explicit constraints and design intent, making the model more vulnerable to unintended changes during edits, regeneration, or downstream use. In both part and assembly sketches, reliance on weak dimensions can lead to unstable geometry, inconsistent updates, and reduced model robustness. This check helps identify sketches that contain weak or non-driving dimensions so they can be converted into fully defined, intentional, and robust constraint systems. Sketch constraint standards are typically governed by Creo sketcher settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the WEAK_SKETCHER_DIMS settings in the check.mch configuration file.</Description>
         <ModelCheckName>WEAK_SKETCHER_DIMS</ModelCheckName>
         <ModelCheckOptions>YNEW E E E E Y</ModelCheckOptions>
@@ -1757,7 +1753,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <enabled>Y</enabled>
     </Check>
     <Check>
-        <Name>Incomplete Features</Name>
+        <Name>Incomplete Features Defined</Name>
         <Category>Model Integrity</Category>
         <Description>Checks for features in the model that are incomplete or not fully defined according to Creo’s feature definition requirements. Incomplete features may result from interrupted feature creation, missing inputs, failed references, unresolved geometry, or partially defined parameters. These features can cause regeneration failures, unstable model behavior, incorrect geometry output, and downstream issues in drawings, manufacturing, simulation, and data exchange. This check helps identify incomplete features so they can be repaired or completed to ensure a fully defined and stable model. Feature completion and model integrity rules are typically governed by Creo modeling standards and ModelCHECK configuration files, while check behavior and reporting are controlled by the AF_INCOMPLETE settings in the check.mch configuration file.</Description>
         <ModelCheckName>AF_INCOMPLETE</ModelCheckName>
@@ -1779,7 +1775,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Small Curves</Name>
-        <Category>Misc VDA Checks</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks for very small or tiny curve elements in the model that fall below acceptable geometric thresholds defined by company standards or VDA/quality guidelines. These tiny curve segments can indicate poor-quality geometry, imported data issues, over-detailed modeling, or unintended artifacts from operations such as trimming, blending, or surface intersection. Excessively small curve elements can negatively impact model performance, regeneration stability, downstream CAM operations, and data exchange robustness. This check helps identify and flag such small curve entities so the model can be cleaned, simplified, or repaired to improve geometric quality and manufacturability. Curve quality thresholds and VDA-related geometry limits are typically configured through ModelCHECK geometry and quality settings, while check behavior and reporting are controlled by the M1_TINY_ELMNT settings in the check.mch configuration file.</Description>
         <ModelCheckName>M1_TINY_ELMNT</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1789,7 +1785,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Identical Element Curves</Name>
-        <Category>Misc VDA Checks</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks for duplicate or identical curve elements within the model and reports instances where multiple geometric entities are effectively the same. Identical element curves can arise from redundant modeling operations, repeated imports, copy/paste geometry creation, or overlapping design intent that was not properly consolidated. These redundancies can increase model complexity, degrade performance, complicate downstream CAM or analysis workflows, and introduce confusion during design review or modification. This check helps identify duplicate curve geometry so the model can be cleaned, simplified, and optimized for better performance and maintainability. Geometry redundancy rules and VDA-related quality thresholds are typically configured through ModelCHECK geometry and quality settings, while check behavior and reporting are controlled by the M2_IDENTICAL_ELMNT settings in the check.mch configuration file.</Description>
         <ModelCheckName>M2_IDENTICAL_ELMNT</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1799,7 +1795,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Positional Discontinuity Curves (Gaps)</Name>
-        <Category>Misc VDA Checks</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks for positional continuity across connected surfaces or curves within a model. When enabled, ModelCHECK will verify that surfaces or curves are seamlessly connected at their boundaries without gaps or misalignments, ensuring a smooth and continuous transition between them. This helps maintain the geometric integrity and quality of the model.</Description>
         <ModelCheckName>M3A_POSITION_CONT</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1809,7 +1805,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Positional Discontinuity Topologies</Name>
-        <Category>Misc VDA Checks</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks for positional continuity across topological boundaries within a model. When enabled, ModelCHECK will verify that surfaces or curves are properly aligned at their topological boundaries, ensuring that there are no gaps or misalignments. This helps maintain the geometric integrity and ensures a smooth connection between adjacent surfaces or features.</Description>
         <ModelCheckName>M3A_POSITION_CONT_TOP</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1819,7 +1815,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Curves Tangential Angle Discontinuity</Name>
-        <Category>Misc VDA Checks</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks for tangential continuity across connected surfaces or curves within a model. When enabled, ModelCHECK will verify that the tangency between surfaces or curves is smooth and continuous at their boundaries, ensuring there are no abrupt changes in direction or angle, which is essential for maintaining the quality and smoothness of the model's geometry.</Description>
         <ModelCheckName>M3B_TANG_CONT</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1829,7 +1825,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Tangential Angle Discontinuity Topologies</Name>
-        <Category>Misc VDA Checks</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks for tangential continuity across topological boundaries within a model. When enabled, ModelCHECK will ensure that connected surfaces or curves maintain smooth tangency across their topological boundaries, preventing abrupt changes in direction or angle. This helps maintain the surface quality and smoothness in critical areas of the model.</Description>
         <ModelCheckName>M3B_TANG_CONT_TOP</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1839,7 +1835,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Curves with Curvature Discontinuity</Name>
-        <Category>Misc VDA Checks</Category>
+        <Category>Geometry Quality</Category>
         <Description>Number of curves with curvature discontinuity greater than some delta. Checks for curvature continuity across connected surfaces or curves within a model. When enabled, ModelCHECK will verify that the curvature transitions smoothly across boundaries without abrupt changes, ensuring that the connected surfaces or curves maintain a consistent curvature, which is important for the aesthetic and functional quality of the model.</Description>
         <ModelCheckName>M3C_CURV_CONT</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1849,7 +1845,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Surface Boundaries with Curvature Discontinuity</Name>
-        <Category>Misc VDA Checks</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks for curvature continuity across topological boundaries within a model. When enabled, ModelCHECK will verify that the curvature is smoothly continuous across these boundaries, ensuring that there are no abrupt changes in curvature, which is crucial for maintaining high-quality surface transitions and overall model integrity.</Description>
         <ModelCheckName>M3C_CURV_CONT_TOP</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1859,7 +1855,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Number of Curves with Polynomial Degree</Name>
-        <Category>Misc VDA Checks</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks the degree of polynomial used in defining curves or surfaces within a model. When enabled, ModelCHECK will verify that the polynomial degree is within the predefined acceptable range and report any deviations, ensuring that the curves or surfaces are appropriately defined for the intended design, analysis, or manufacturing processes.</Description>
         <ModelCheckName>M4_POLYN_DEG</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1869,7 +1865,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Number of Wavy Curves</Name>
-        <Category>Misc VDA Checks</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks for waviness in surfaces or curves within a model. When enabled, ModelCHECK will evaluate the smoothness of surfaces or curves, identifying and reporting any irregularities or deviations that cause waviness, ensuring that the model's surfaces are smooth and meet design quality standards.</Description>
         <ModelCheckName>M5_WAVINESS</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1879,7 +1875,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Number of Curves with Small Distance between Knot Vectors</Name>
-        <Category>Misc VDA Checks</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks the distance between knots in a spline or curve within a model. When enabled, ModelCHECK will verify that the spacing between knots meets predefined criteria and report any instances where the knot distance is too small, ensuring that the curve is smooth and free from issues that could affect the model's geometry or downstream processes.</Description>
         <ModelCheckName>M6_KNOT_DIST</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1889,7 +1885,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Number of Curves that Self Intersect</Name>
-        <Category>Curve Checks</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks the distance of a feature or element from itself to ensure it meets predefined minimum criteria. When enabled, ModelCHECK will identify and report any features that are too close to themselves, such as self-intersecting surfaces or curves, helping to prevent geometric issues that could complicate manufacturing or analysis.</Description>
         <ModelCheckName>C7_SELF_DIST</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1899,7 +1895,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Number of Drawing Text (Chars) that aren't IGES Compliant</Name>
-        <Category>Model Integrity</Category>
+        <Category>Consistency</Category>
         <Description>Checks for text elements in a model that may not conform to IGES (Initial Graphics Exchange Specification) standards. When enabled, ModelCHECK will verify that the text in the model is compatible with IGES export requirements and report any issues, ensuring that the model can be correctly translated into IGES format without losing or misrepresenting text information.</Description>
         <ModelCheckName>D28_IGES_TEXT</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1909,7 +1905,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Number of Face Segments with Small Edges</Name>
-        <Category>Model Complexity</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks for tiny segment edges within a model. When enabled, ModelCHECK will identify and report edges that are excessively short, below a predefined minimum length, helping to ensure that the model does not contain small, potentially problematic edges that could cause issues in manufacturing, analysis, or overall model quality.</Description>
         <ModelCheckName>SU8_TINY_SEG_EDGE</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1919,7 +1915,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Number of Surfaces with Curvature less than Some Number</Name>
-        <Category>Model Complexity</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks for curvature radii that are too small within a model. When enabled, ModelCHECK will identify and report instances where the curvature radius is below a predefined minimum threshold, helping to ensure that the model does not contain extremely tight curves that could cause issues in manufacturing, analysis, or functionality.</Description>
         <ModelCheckName>SU9_TINY_CURV_RAD</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1929,7 +1925,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Number of Surfaces where the Angle between Adjacent Surfaces is Outside Range</Name>
-        <Category>Model Complexity</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks the angle between edge curves at their junctions within a model. When enabled, ModelCHECK will verify that the angles between boundary curves meet predefined criteria and report any angles that are too sharp or do not conform to the design standards, helping to ensure smooth transitions and proper geometric relationships in the model.</Description>
         <ModelCheckName>SU10_BOUND_ANGLE</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1939,7 +1935,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Number of Surfaces with Reversed Normals</Name>
-        <Category>Model Complexity</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks for reversals in surface normals within a model. When enabled, ModelCHECK will identify and report instances where surface normals are oriented in opposite or incorrect directions, helping to ensure that the surfaces are consistently oriented and that the model is free from issues that could affect manufacturing, analysis, or rendering.</Description>
         <ModelCheckName>SU11_NORM_REVERSAL</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1949,7 +1945,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Number of Surfaces with Greater than X Patches</Name>
-        <Category>Model Complexity</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks the distribution of patches in a surface mesh to ensure they are evenly spaced. When enabled, ModelCHECK will verify that the distance between patches within a surface meets predefined criteria and report any inconsistencies, helping to ensure that the surface mesh is uniform and correctly defined.</Description>
         <ModelCheckName>SU12_PATCH_DIST</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1959,7 +1955,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Surfaces with Unoccupied Patch Rows</Name>
-        <Category>Model Complexity</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks for unoccupied patch rows in a surface mesh within a model. When enabled, ModelCHECK will identify and report any rows in the surface patch grid that lack patches or are not fully occupied, ensuring that the surface mesh is complete and properly defined. This helps maintain the integrity and accuracy of the surface geometry in the model.</Description>
         <ModelCheckName>SU13_UNOC_PATCH_ROW</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1968,18 +1964,8 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <hideFromReport>Y</hideFromReport>
     </Check>
     <Check>
-        <Name>Surfaces that have Boundary Curves within X of One Another</Name>
-        <Category>Model Complexity</Category>
-        <Description>Checks the penetration or distance between boundaries within a model. When enabled, ModelCHECK will verify that the distance between boundary elements (such as surfaces or edges) falls within the predefined acceptable range. It will report any instances where the boundaries are too close, too far apart, or overlapping, helping to ensure that the model's boundaries are properly spaced and do not interfere with each other according to the design intent.</Description>
-        <ModelCheckName>F14_BOUND_DIST</ModelCheckName>
-        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
-    </Check>
-    <Check>
         <Name>Surfaces that have Boundary Curves that Extend Greater than X from the Extremity of the Surface</Name>
-        <Category>Model Complexity</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks the proximity of a boundary curve to its associated surface within a model. When enabled, ModelCHECK will verify that the boundary curve is correctly positioned relative to the surface and report any deviations that exceed predefined criteria. This ensures that the boundary curves are accurately aligned with the surfaces, maintaining the intended design integrity.</Description>
         <ModelCheckName>F15_SURF_DIST</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1989,7 +1975,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>All Surfaces have Similar Orientation</Name>
-        <Category>Model Complexity</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks for similar orientation of curves or paths within a model. When enabled, ModelCHECK will verify that paths or curves have a consistent orientation relative to each other and report any inconsistencies, ensuring that the model's geometry follows the intended design directions and is free from orientation issues that could impact functionality or aesthetics.</Description>
         <ModelCheckName>F16_SIM_ORIENT</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1999,7 +1985,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Number of Faces with More than X Segments per Face</Name>
-        <Category>Model Complexity</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks the number of segments in a boundary curve within a model. When enabled, ModelCHECK will verify that the number of segments in the curve meets predefined criteria and report any instances where the segmentation is either too high or too low, helping to ensure smooth and accurate boundary definitions in the model.</Description>
         <ModelCheckName>F17_NUM_SEG</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -2009,7 +1995,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Number of Edges with at Least 3 Faces</Name>
-        <Category>Model Complexity</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks the number of faces connected to an edge within a model. When enabled, ModelCHECK will verify that the number of faces sharing an edge meets the predefined criteria and report any instances where this number is unusual or problematic. This helps ensure the model's geometry is correct and avoids potential issues in manufacturing or structural analysis.</Description>
         <ModelCheckName>T18_NUM_FACE</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -2019,7 +2005,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Number of Normals Improperly Oriented</Name>
-        <Category>Model Complexity</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks the orientation of surface normals to ensure they are consistent and correctly aligned within a model. When enabled, ModelCHECK will verify that similar surfaces have their normals oriented in the same direction and report any inconsistencies. This helps prevent issues related to surface orientation that could affect manufacturing, analysis, or the overall quality of the model.</Description>
         <ModelCheckName>T19_NORMAL_ORIENT</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -2029,7 +2015,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Number of Knife Edges</Name>
-        <Category>Model Complexity</Category>
+        <Category>Geometry Quality</Category>
         <Description>Identifies and reports the presence of knife edges in a model. When enabled, ModelCHECK will check for edges that are extremely sharp, resembling a knife edge, which could lead to manufacturing or structural issues. This check helps ensure that the model does not contain any problematic sharp edges that could compromise the design's integrity or manufacturability.</Description>
         <ModelCheckName>T20_KNIFE_EDGES</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -2039,7 +2025,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Number of Vertices Not in Line with Edges</Name>
-        <Category>Model Complexity</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks the distance between vertices and adjacent edges within a model. When enabled, ModelCHECK will verify that the distance between vertices and their neighboring edges meets the predefined criteria, and it will report any instances where the distance is too small or not as expected. This ensures proper geometric relationships within the model, helping to avoid potential issues in manufacturing or analysis.</Description>
         <ModelCheckName>SO21_DIST_VERT_EDGE</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -2049,7 +2035,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Number of Vertices Not in Line with Faces</Name>
-        <Category>Model Complexity</Category>
+        <Category>Geometry Quality</Category>
         <Description>Checks the distance between vertices and adjacent faces within a model. When enabled, ModelCHECK will verify that the distance between vertices and their neighboring faces meets the predefined criteria, and it will report any instances where the distance is too small or not as expected. This helps ensure proper geometric relationships within the model, avoiding potential issues in manufacturing or analysis.</Description>
         <ModelCheckName>SO22_DIST_VERT_FACE</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -2059,7 +2045,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Number of Imported Features</Name>
-        <Category>Model Complexity</Category>
+        <Category>Geometry Quality</Category>
         <Description>Identifies and reports any deletion of history within a model. When enabled, ModelCHECK will check for instances where feature history has been removed or altered, ensuring that the model's historical data is intact and that any deletions are intentional and compliant with design practices. This helps maintain the integrity of the model's construction history, which is crucial for understanding and modifying the design later on.</Description>
         <ModelCheckName>SO23_HIST_DELETE</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -2069,7 +2055,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Extra Geometrical Features</Name>
-        <Category>Model Complexity</Category>
+        <Category>Geometry Quality</Category>
         <Description>Identifies and reports the presence of extra or unnecessary geometry in a model. When enabled, ModelCHECK will check for and report any additional geometry that is not required for the intended design, helping to ensure that the model remains clean, efficient, and free from redundant elements.</Description>
         <ModelCheckName>SO24_EXTRA_GEOM</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -2079,7 +2065,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Number of Unintentional Cavities</Name>
-        <Category>Model Complexity</Category>
+        <Category>Geometry Quality</Category>
         <Description>Identifies and reports the presence of multiple internal cavities or voids (buried features) within a solid body. When enabled, ModelCHECK will check for these cavities and report them, ensuring that they are consistent with the design intent and do not pose any issues in manufacturing or analysis.</Description>
         <ModelCheckName>SO25_CAVITIES</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -2114,7 +2100,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Duplicate annotation elements</Name>
-        <Category>MBD Readyness</Category>
+        <Category>MBD Readiness</Category>
         <Description>Checks for duplicate geometric tolerance (GTOL) annotation elements within the model or drawing and identifies cases where multiple instances of the same tolerance definition exist. Duplicate GTOL annotations can occur due to copy/paste operations, repeated annotation creation, inconsistent detailing practices, or incomplete cleanup of legacy annotation data. These redundancies can create confusion in manufacturing and inspection interpretation, introduce conflicting requirements, and reduce overall clarity and quality of the model-based definition or drawing. This check helps ensure that geometric tolerances are unique, properly managed, and consistently applied according to company drafting and MBD standards. GTOL annotation rules and quality requirements are typically configured through Creo annotation settings and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the AE_GTOL_DUPLICATE settings in the check.mch configuration file.</Description>
         <ModelCheckName>AE_GTOL_DUPLICATE</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
@@ -2124,7 +2110,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Duplicate surface-finish annotation elements</Name>
-        <Category>MBD Readyness</Category>
+        <Category>MBD Readiness</Category>
         <Description>Checks for duplicate surface finish annotation elements within a model or drawing and identifies cases where multiple instances of the same surface finish requirement exist. Duplicate surface finish annotations can occur due to repeated detailing, copy/paste errors, inconsistent annotation practices, or incomplete cleanup of legacy data. These redundancies can create confusion in manufacturing interpretation, lead to conflicting surface quality requirements, and reduce clarity in model-based definition or drawing documentation. This check helps ensure that surface finish requirements are uniquely defined, properly managed, and consistently applied according to company drafting and MBD standards. Surface finish annotation rules and quality requirements are typically configured through Creo annotation settings and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the AE_SF_DUPLICATE settings in the check.mch configuration file.</Description>
         <ModelCheckName>AE_SF_DUPLICATE</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
@@ -2134,7 +2120,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Inactive annotations</Name>
-        <Category>MBD Readyness</Category>
+        <Category>MBD Readiness</Category>
         <Description>Checks for annotations in the model or drawing that are currently inactive, suppressed, or not visible in the active display state. Inactive annotations may still exist in the model database but are not contributing to the current documentation, which can lead to incomplete communication of design intent, missed manufacturing requirements, or confusion during review and downstream processes. These conditions often arise from combination states, display configurations, legacy annotation practices, or incomplete cleanup of outdated annotation data. This check helps ensure that all required annotations are active, visible where intended, and properly contributing to the model-based definition or drawing. Annotation activation and display rules are typically managed through Creo annotation settings and ModelCHECK MBD/drafting configuration files, while check behavior and reporting are controlled by the ANNTN_INACTIVE settings in the check.mch configuration file.</Description>
         <ModelCheckName>ANNTN_INACTIVE</ModelCheckName>
         <ModelCheckOptions>YNEW W E N Y Y</ModelCheckOptions>
@@ -2145,7 +2131,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     <Check>
         <Name>Failed Components</Name>
         <Category>Model Integrity</Category>
-        <Description>state due to missing references, invalid geometry, broken constraints, unresolved features, or other modeling failures. Failed components can compromise overall assembly integrity, lead to incorrect geometry, prevent successful regeneration, and cause cascading errors throughout dependent components, drawings, BOMs, and downstream manufacturing or simulation processes. These issues often arise from incomplete design changes, deleted references, external dependency failures, or incompatible model updates. This check helps ensure that all components in the assembly are fully functional, successfully regenerated, and consistent with the intended design state. Component regeneration rules and failure reporting are typically governed by Creo assembly diagnostics and ModelCHECK configuration files, while check behavior and reporting are controlled by the FAILED_COMPONENTS settings in the check.mch configuration file.</Description>
+        <Description>State due to missing references, invalid geometry, broken constraints, unresolved features, or other modeling failures. Failed components can compromise overall assembly integrity, lead to incorrect geometry, prevent successful regeneration, and cause cascading errors throughout dependent components, drawings, BOMs, and downstream manufacturing or simulation processes. These issues often arise from incomplete design changes, deleted references, external dependency failures, or incompatible model updates. This check helps ensure that all components in the assembly are fully functional, successfully regenerated, and consistent with the intended design state. Component regeneration rules and failure reporting are typically governed by Creo assembly diagnostics and ModelCHECK configuration files, while check behavior and reporting are controlled by the FAILED_COMPONENTS settings in the check.mch configuration file.</Description>
         <ModelCheckName>FAILED_COMPONENTS</ModelCheckName>
         <ModelCheckOptions>YNEW E E N Y Y</ModelCheckOptions>
         <display>Y</display>
@@ -2184,7 +2170,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Datum Planes</Name>
-        <Category>Geometry Quality</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether the model contains the correct set of datum planes as defined by the company template requirements and verifies that they are properly named, structured, and present in the model. Datum planes form the foundational reference geometry for sketches, features, assemblies, and downstream design intent, and missing or incorrect datum planes can lead to weak model structure, inconsistent referencing, regeneration instability, and difficulties in maintaining design standards across parts and assemblies. This check helps ensure that all required datum planes exist and conform to the expected template-based structure so that the model maintains a consistent and stable reference framework. Datum plane standards and template requirements are typically defined in the start model or template configuration files and enforced through ModelCHECK configuration settings, while check behavior and reporting are controlled by the TEMPLATE_DATUM_PLANES settings in the check.mch configuration file.</Description>
         <ModelCheckName>TEMPLATE_DATUM_PLANES</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
@@ -2194,7 +2180,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Children of External Failed components</Name>
-        <Category>Geometry Quality</Category>
+        <Category>Model Integrity</Category>
         <Description>Checks for external child components in an assembly that have failed due to issues with their external parent components and verifies their dependency status and integrity. These failures typically occur when external references, skeleton models, top-down design elements, or externally driven geometry are broken, missing, or no longer valid. When an external parent component fails, any dependent child components may also become unstable, fail to regenerate, or display incorrect geometry. This can lead to cascading assembly errors, broken design intent, inaccurate downstream manufacturing data, and unreliable simulation results. This check helps identify components impacted by external dependency failures so the root cause can be resolved and assembly integrity restored. External dependency rules and failure handling are typically managed through Creo external reference controls and ModelCHECK configuration files, while check behavior and reporting are controlled by the CHILD_EXT_FAILED_COMPONENTS settings in the check.mch configuration file.</Description>
         <ModelCheckName>CHILD_EXT_FAILED_COMPONENTS</ModelCheckName>
         <ModelCheckOptions>YNEW E E N Y Y</ModelCheckOptions>
@@ -2204,7 +2190,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Children of External Failed Features</Name>
-        <Category>Geometry Quality</Category>
+        <Category>Model Integrity</Category>
         <Description>Checks for external child features in a model that have failed due to issues with their external parent features and evaluates their dependency status within the feature structure. These failures typically arise in top-down design workflows where features reference external geometry, skeleton models, layouts, or other externally driven design elements. When an external parent feature becomes invalid, missing, or fails to regenerate, any dependent child features may also fail or produce incorrect geometry. This can result in broken design intent, regeneration errors, unstable model behavior, and downstream impacts on manufacturing, simulation, and documentation accuracy. This check helps identify external dependency failures at the feature level so they can be diagnosed and corrected to restore model integrity. External feature dependency rules and failure handling are typically managed through Creo external reference controls and ModelCHECK configuration files, while check behavior and reporting are controlled by the CHILD_EXT_FAILED_FEATURES settings in the check.mch configuration file.</Description>
         <ModelCheckName>CHILD_EXT_FAILED_FEATURES</ModelCheckName>
         <ModelCheckOptions>YNEW E E N Y Y</ModelCheckOptions>
@@ -2214,7 +2200,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Children of Failed components</Name>
-        <Category>Geometry Quality</Category>
+        <Category>Model Integrity</Category>
         <Description>Checks for child components in an assembly that have failed due to issues with their parent components and evaluates the impact of cascading failures within the assembly structure, where a parent component that fails to regenerate, loses references, or contains invalid geometry can cause dependent child components to also fail, become unstable, or generate incorrect positioning or geometry, leading to broken design intent, compromised assembly integrity, and downstream issues in manufacturing, simulation, BOM accuracy, and documentation, and this check helps identify affected child components so that the root cause in the parent component can be corrected and full assembly stability restored, while assembly dependency and failure propagation behavior are governed by Creo regeneration and reference handling mechanisms and ModelCHECK configuration settings controlled through the CHILD_FAILED_COMPONENTS check in the check.mch configuration file.</Description>
         <ModelCheckName>CHILD_FAILED_COMPONENTS</ModelCheckName>
         <ModelCheckOptions>YNEW E E N Y Y</ModelCheckOptions>
@@ -2224,7 +2210,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Children of Failed Features</Name>
-        <Category>Geometry Quality</Category>
+        <Category>Model Integrity</Category>
         <Description>Checks for child features in a model that have failed due to issues with their parent features and evaluates the propagation of those failures through the feature dependency chain within the model. When a parent feature becomes invalid, loses references, contains errors, or fails to regenerate, any dependent updatable child features may also fail or produce incorrect geometry, leading to cascading regeneration problems, broken design intent, and downstream issues in manufacturing, simulation, and documentation. This check helps identify affected child features so that the root cause in the parent feature can be corrected and overall model stability restored. Feature dependency behavior and failure propagation are governed by Creo modeling rules, while check behavior and reporting are controlled by the CHILD_FAILED_FEATURES settings in the check.mch configuration file.</Description>
         <ModelCheckName>CHILD_FAILED_FEATURES</ModelCheckName>
         <ModelCheckOptions>YNEW E E N Y Y</ModelCheckOptions>
@@ -2234,7 +2220,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Drawing Symbols</Name>
-        <Category>Model Integrity</Category>
+        <Category>Consistency</Category>
         <Description>Checks that all symbols used in the model or drawing conform to approved company or project standard symbol libraries and verifies that they are correctly applied and consistently defined across the documentation. Standard symbols are critical for communicating manufacturing, inspection, welding, GDT, and other engineering requirements, and the use of nonstandard or incorrectly applied symbols can lead to misinterpretation, production errors, and inconsistencies in downstream processes. This check helps ensure that only approved symbols are used and that they match the definitions and usage rules defined in the company’s symbol standards. Symbol validation rules and approved libraries are typically configured through Creo symbol file libraries and ModelCHECK configuration settings, while check behavior and reporting are controlled by the STD_SYMBOLS settings in the check.mch configuration file.</Description>
         <ModelCheckName>STD_SYMBOLS</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
@@ -2244,7 +2230,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Failed Features</Name>
-        <Category>Geometry Quality</Category>
+        <Category>Model Integrity</Category>
         <Description>Checks for features in the model that have failed to regenerate or execute properly due to missing references, invalid inputs, geometry errors, or broken dependencies, and evaluates their impact on overall model integrity and stability. Failed features can disrupt the feature regeneration sequence, create invalid or incomplete geometry, and cause cascading issues in dependent features, assemblies, drawings, and downstream processes such as manufacturing, simulation, and data exchange. This check helps identify all failed features so they can be diagnosed, corrected, or rebuilt to restore a fully functional and stable model. Feature regeneration rules and failure handling are governed by Creo modeling behavior and ModelCHECK configuration settings, while check behavior and reporting are controlled by the FAILED_FEATURES settings in the check.mch configuration file.</Description>
         <ModelCheckName>FAILED_FEATURES</ModelCheckName>
         <ModelCheckOptions>YNEW E E N Y Y</ModelCheckOptions>
@@ -2254,7 +2240,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Flexible Modeling Features</Name>
-        <Category>Geometry Quality</Category>
+        <Category>Design Intent Strength</Category>
         <Description>Checks for the presence of flexible modeling features within a part or assembly and verifies that their use complies with company design standards and intended modeling practices. Flexible modeling features allow geometry to be locally modified without fully redefining upstream features, which can be useful for design iteration and quick modifications, but if used excessively or inappropriately they can weaken design intent, create unpredictable regeneration behavior, introduce hidden dependencies, and complicate downstream manufacturing, simulation, and data management processes. This check helps ensure that flexible modeling is used intentionally and controlled so that model stability and consistency are maintained. Flexible modeling rules and feature usage standards are typically governed by Creo modeling practices and ModelCHECK configuration files, while check behavior and reporting are controlled by the FLEXIBLE_MODELING_FEATURES settings in the check.mch configuration file.</Description>
         <ModelCheckName>FLEXIBLE_MODELING_FEATURES</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
@@ -2337,7 +2323,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Material Card Densities</Name>
-        <Category>Geometry Quality</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether the material density assigned to the model is correctly defined and compliant with company-approved material standards and material card definitions. Material density is critical for accurate mass properties, inertia calculations, simulations, structural analysis, and downstream manufacturing and costing processes, and incorrect or missing density values can lead to significant errors in weight calculations, analysis results, and product documentation. This check helps ensure that the assigned material density matches approved material cards and remains consistent with engineering specifications and company material libraries. Material density validation rules and approved material definitions are typically managed through Creo material libraries and ModelCHECK configuration files, while check behavior and reporting are controlled by the MATERIAL_DENSITY settings in the check.mch configuration file.</Description>
         <ModelCheckName>MATERIAL_DENSITY</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
@@ -2348,7 +2334,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Model Detail Setup</Name>
-        <Category>Geometry Quality</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether the model is using the correct predefined standard detail setup and verifies compliance with company or project-specific detailing configurations. The detail setup controls core drafting behavior such as dimensioning rules, text styles, annotation display, tolerances, view display settings, and other model detailing parameters that directly affect drawing consistency and documentation quality. If the model does not match the required standard detail setup, it can result in inconsistent drafting behavior, nonstandard annotations, incorrect dimension display, and downstream issues in manufacturing, inspection, and data exchange. This check helps ensure that all models follow the approved detailing environment to maintain consistency, accuracy, and compliance with organizational standards. Detail setup definitions and configuration rules are typically managed through Creo detail setup files and ModelCHECK configuration settings, while check behavior and reporting are controlled by the MDL_STD_DTL_SETUP settings in the check.mch configuration file.</Description>
         <ModelCheckName>MDL_STD_DTL_SETUP</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
@@ -2357,8 +2343,8 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
 
     <Check>
-        <Name>Model has Mutli-bodies</Name>
-        <Category>Geometry Quality</Category>
+        <Name>Model Has Multiple Bodies</Name>
+        <Category>Model Complexity</Category>
         <Description>Checks whether the part model contains multiple solid bodies and reports cases where more than one body exists when a single-body design standard is expected according to company modeling guidelines. Multi-body parts can arise from Boolean operations, merges, imports, or intentional design strategies, but if not properly controlled they can introduce ambiguity in design intent, complicate mass property calculations, increase modeling complexity, and create issues in downstream processes such as manufacturing, CAM programming, simulation, and data management. This check helps ensure that multi-body usage is intentional, properly justified, and aligned with organizational standards for part structure. Multi-body modeling rules and part structure requirements are typically governed by Creo part modeling practices and ModelCHECK configuration files, while check behavior and reporting are controlled by the MULTIBODY_MODEL settings in the check.mch configuration file.</Description>
         <ModelCheckName>MULTIBODY_MODEL</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
@@ -2368,7 +2354,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Search for duplicate models</Name>
-        <Category>Geometry Quality</Category>
+        <Category>Consistency</Category>
         <Description>Checks the active model against existing models in the database by comparing geometry, topology, and key model properties to identify potential duplicates or near-duplicates. Duplicate models can lead to redundant data, confusion in design ownership, incorrect reuse of parts, and inefficiencies in data management systems such as Windchill or PLM databases. By identifying models that are geometrically or structurally similar, this check helps prevent unnecessary duplication, improves reuse of existing designs, and supports cleaner, more efficient model libraries. Duplicate detection rules and search behavior are typically configured through ModelCHECK database connectivity settings and company PLM integration standards, while check behavior and reporting are controlled by the SEARCH_DUP_MODELS settings in the check.mch configuration file.</Description>
         <ModelCheckName>SEARCH_DUP_MODELS</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
@@ -2378,7 +2364,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Simprep Master</Name>
-        <Category>Geometry Quality</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether the master representation of a simplified representation (SIMPRep) is correctly defined and consistently used within the model according to company standards. The SIMPRep master defines the full-detail version that governs all simplified configurations, and incorrect or inconsistent master definitions can lead to incorrect display states, missing geometry in simplified modes, inconsistent assembly behavior, and downstream errors in manufacturing, analysis, and documentation. This check helps ensure that the master representation is properly designated, structurally valid, and aligned with the intended simplification strategy for the model. SIMPRep standards and configuration rules are typically managed through Creo representation settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the SIMPREP_MASTER settings in the check.mch configuration file.</Description>
         <ModelCheckName>SIMPREP_MASTER</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
@@ -2388,7 +2374,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Validate Dimensions</Name>
-        <Category>Model Integrity</Category>
+        <Category>MBD Readiness</Category>
         <Description>Checks whether model dimensions are accurate, valid, and compliant with predefined company drafting and design standards. This includes verifying that dimensions correctly reflect the underlying geometry, follow proper dimensioning practices, and adhere to required tolerances, formatting rules, and annotation conventions. Incorrect or nonstandard dimensions can lead to manufacturing errors, inspection issues, misinterpretation of design intent, and downstream problems in documentation and data exchange. This check helps ensure that all model dimensions are reliable, consistent, and aligned with engineering requirements. Dimension validation rules and standards are typically managed through Creo detailing settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the VALIDATE_DIMENSIONS settings in the check.mch configuration file.</Description>
         <ModelCheckName>VALIDATE_DIMENSIONS</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
@@ -2398,7 +2384,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Validate Geometric Tolerance Values</Name>
-        <Category>Model Integrity</Category>
+        <Category>MBD Readiness</Category>
         <Description>Checks whether geometric tolerances (GTOL) in the model are correctly defined and comply with predefined company engineering and manufacturing standards. This includes validating that tolerance values are appropriate for the intended function, consistent with design requirements, and properly applied to the correct features without conflicts or over/under specification. Incorrect or inconsistent GTOL values can lead to manufacturing difficulty, inspection failures, part nonconformance, and downstream assembly or functional issues. This check helps ensure that all geometric tolerances are meaningful, correctly defined, and aligned with quality and design intent requirements. GTOL validation rules and tolerance standards are typically managed through Creo annotation settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the VALIDATE_GTOL_VALUES settings in the check.mch configuration file.</Description>
         <ModelCheckName>VALIDATE_GTOL_VALUES</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
@@ -2408,7 +2394,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Validate legacy Set datum and Set Datum Tag Annotation</Name>
-        <Category>Model Integrity</Category>
+        <Category>MBD Readiness</Category>
         <Description>Checks whether legacy set datum features and secondary datum target annotations (SDTAs) are correctly applied and compliant with predefined company standards for datum definition and annotation practices. This includes verifying that datum features and their associated targets are properly defined, consistently referenced, and conform to current modeling and drafting requirements, as legacy or incorrectly applied datum annotations can lead to ambiguity in inspection definitions, manufacturing errors, inconsistent GDT interpretation, and downstream quality issues. This check helps ensure that datum structures and secondary datum target annotations are valid, correctly implemented, and aligned with modern design intent and standards. Datum annotation rules and legacy compliance requirements are typically managed through Creo annotation settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the VALIDATE_SET_DATUM_AND_SDTA settings in the check.mch configuration file.</Description>
         <ModelCheckName>VALIDATE_SET_DATUM_AND_SDTA</ModelCheckName>
         <ModelCheckOptions>YNEW N N N Y Y</ModelCheckOptions>
@@ -2418,7 +2404,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Map Parameters</Name>
-        <Category>Model Integrity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether model parameters are correctly mapped from one predefined name to another according to company naming and standardization rules. This includes validating that renamed or legacy parameters are properly converted into the approved parameter names used for consistency across models, drawings, BOMs, and downstream systems such as Windchill or ERP. Incorrect or missing parameter mappings can lead to inconsistent metadata, broken automation, incorrect reporting, and data integration issues across engineering and manufacturing workflows. This check helps ensure that parameter naming conventions are standardized and consistently applied throughout the model. Parameter mapping rules and naming standards are typically managed through ModelCHECK configuration files and parameter definition settings in Creo, while check behavior and reporting are controlled by the PARAM_MAP settings in the check.mch configuration file.</Description>
         <ModelCheckName>PARAM_MAP</ModelCheckName>
         <ModelCheckOptions>YN N N N Y Y</ModelCheckOptions>
@@ -2428,7 +2414,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Unwanted Parameters</Name>
-        <Category>Model Integrity</Category>
+        <Category>Consistency</Category>
         <Description>Checks for parameters in the model that are not part of the approved company standard set or are explicitly marked as unwanted according to configuration rules. Unwanted parameters may include obsolete metadata, incorrectly created parameters, legacy naming conventions, or user-defined attributes that are not required for design, manufacturing, or downstream system integration such as BOM generation, Windchill, or ERP workflows. The presence of such parameters can lead to model clutter, confusion, inconsistent data management, and potential automation or reporting errors. This check helps ensure that only approved and necessary parameters exist in the model, supporting clean, standardized, and efficient data structures. Parameter control rules and approved/blocked parameter lists are typically managed through ModelCHECK configuration files and Creo parameter settings, while check behavior and reporting are controlled by the PARAM_UNWANTED settings in the check.mch configuration file.</Description>
         <ModelCheckName>PARAM_UNWANTED</ModelCheckName>
         <ModelCheckOptions>YN Y Y N Y Y</ModelCheckOptions>
@@ -2438,7 +2424,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Parent Difference</Name>
-        <Category>Consistency</Category>
+        <Category>Design Intent Strength</Category>
         <Description>Checks for features in the model whose parent-child relationships differ from expected design intent or from the original feature structure defined during model creation. This includes identifying cases where features have been reordered, reattached, or unintentionally linked to different parent features, which can occur due to edits, regeneration changes, or geometry modifications. Incorrect parent relationships can compromise model stability, lead to unexpected regeneration behavior, break downstream features, and create inconsistencies in design intent and documentation. This check helps ensure that the feature hierarchy remains consistent, predictable, and aligned with the intended modeling structure. Parent-child relationship rules and model integrity standards are typically governed by Creo feature dependency behavior and ModelCHECK configuration files, while check behavior and reporting are controlled by the PARENT_DIFF settings in the check.mch configuration file.</Description>
         <ModelCheckName>PARENT_DIFF</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
@@ -2448,7 +2434,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Missing Parameters</Name>
-        <Category>Model Integrity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether required start parameters are present in the model and verifies that all mandatory parameters defined by company standards are correctly created at the beginning of the modeling process. Mandatory parameters are not stored within ModelCHECK itself but are defined in external start configuration sources such as the start.mcs file and Creo start model templates (for example start.prt, start.asm, and start.drw), where required parameters are specified using entries like PRT_PARAMETER, ASM_PARAMETER, and DRW_PARAMETER. This check compares the active model against these predefined start definitions to ensure that all required parameters exist and have not been removed or omitted, helping maintain consistent model metadata, proper configuration control, and reliable downstream use in drawings, BOMs, and enterprise systems such as Windchill or ERP. Parameter requirements and validation behavior are controlled by the STARTPARM settings in the check.mch configuration file.</Description>
         <ModelCheckName>STARTPARM</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
@@ -2486,7 +2472,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Relation Update</Name>
-        <Category>Model Integrity</Category>
+        <Category>Design Intent Strength</Category>
         <Description>Checks for relations in the model that are outdated, incorrectly evaluated, or require regeneration to reflect the current state of the model geometry and parameters. Relations define parametric equations and dependencies between dimensions, features, and parameters, and if they are not updated correctly they can produce incorrect geometry, inconsistent design intent, regeneration failures, and downstream issues in drawings, manufacturing, and simulation. This check helps ensure that all relations are current, properly evaluated, and consistent with the active model state. Relation update behavior and validation rules are controlled by the RELATION_UPDATE settings in the check.mch configuration file.</Description>
         <ModelCheckName>RELATION_UPDATE</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
@@ -2496,7 +2482,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Unwanted Relations</Name>
-        <Category>Model Integrity</Category>
+        <Category>Consistency</Category>
         <Description>Checks for relations in the model that are not permitted or are considered unwanted according to predefined company criteria and configuration rules. Relations define parametric equations and dependencies between dimensions, features, and parameters, and unwanted relations may introduce unnecessary complexity, incorrect design behavior, regeneration instability, or conflicts with standard modeling practices. Excess or inappropriate relations can make models difficult to maintain, troubleshoot, and modify, and may also lead to unintended changes in geometry or downstream errors in drawings, manufacturing, and simulation. Not permitted relations are typically defined in external ModelCHECK configuration files such as the start.mcs file or site-specific relation rule lists, where allowed and disallowed expressions, keywords, and naming patterns are specified based on company standards and modeling governance. Relation filtering rules and validation behavior are controlled by the REL_UNWANTED settings in the check.mch configuration file.</Description>
         <ModelCheckName>REL_UNWANTED</ModelCheckName>
         <ModelCheckOptions>YN Y Y N Y Y</ModelCheckOptions>
@@ -2506,7 +2492,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Sheetmetal Feature Bend Table</Name>
-        <Category>Model Integrity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether the sheet metal bend table used for flat pattern generation in sheet metal parts adheres to predefined company standards and manufacturing requirements. The bend table defines critical parameters such as bend allowances, K-factors, and material-specific deformation behavior, which directly affect the accuracy of flat patterns used for manufacturing and downstream processes. Incorrect or nonstandard bend table definitions can lead to inaccurate flat patterns, forming issues, incorrect part dimensions, and manufacturing defects. This check helps ensure that sheet metal bend tables are correctly defined, consistent, and aligned with approved engineering and manufacturing standards. Bend table definitions and sheet metal rule settings are typically managed through Creo sheet metal configuration files and ModelCHECK settings, while check behavior and reporting are controlled by the SHTMTL_FBENDTAB settings in the check.mch configuration file..</Description>
         <ModelCheckName>SHTMTL_FBENDTAB</ModelCheckName>
         <ModelCheckOptions>YN Y Y N Y Y</ModelCheckOptions>
@@ -2516,7 +2502,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Sheetmetal K Factor</Name>
-        <Category>Model Integrity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether the K-factor used in sheet metal parts is correctly defined and complies with predefined company standards and manufacturing guidelines. The K-factor controls how sheet metal material stretches during bending and directly affects bend allowance, flat pattern accuracy, and final part dimensions. Incorrect or inconsistent K-factor values can lead to inaccurate flat patterns, assembly fit issues, forming defects, and downstream manufacturing and inspection problems. This check helps ensure that sheet metal K-factor values are consistent, properly defined, and aligned with approved material and process standards. K-factor definitions and sheet metal rules are typically managed through Creo sheet metal configuration settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the SHTMTL_KFACTOR settings in the check.mch configuration file.</Description>
         <ModelCheckName>SHTMTL_KFACTOR</ModelCheckName>
         <ModelCheckOptions>YN Y Y N Y Y</ModelCheckOptions>
@@ -2526,7 +2512,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Create View</Name>
-        <Category>Model Integrity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether standard views defined by company drawing or model templates are present in the model or drawing and ensures they conform to predefined view creation settings. Standard views typically include default orientations such as front, top, right, isometric, and other required engineering or manufacturing views that support consistent documentation and downstream usage. Missing or inconsistent views can lead to incomplete drawings, reduced clarity, and errors in manufacturing, inspection, and communication. Although this check can also be configured to automatically generate missing views, its primary purpose is validation against company standards to ensure consistency and completeness of view definitions. View creation rules and standard view definitions are typically managed through Creo drawing setup files and ModelCHECK configuration settings, while check behavior and reporting are controlled by the CREATE_VIEW settings in the check.mch configuration file.</Description>
         <ModelCheckName>CREATE_VIEW</ModelCheckName>
         <ModelCheckOptions>YN N N N Y Y</ModelCheckOptions>
@@ -2536,7 +2522,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Non standard scaled Drawing Views</Name>
-        <Category>Model Integrity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether drawing view scales comply with predefined company standards and validates that all views use acceptable, controlled scale values appropriate for consistent documentation and manufacturing interpretation. Nonstandard or inconsistent view scaling can lead to misinterpretation of geometry, unclear drawings, inspection errors, and downstream manufacturing issues, especially when views are scaled arbitrarily or inconsistently within the same drawing. This check helps ensure that all drawing views use approved scale values that maintain clarity, consistency, and compliance with drafting standards. View scaling rules and acceptable scale definitions are typically managed through Creo drawing setup files and ModelCHECK configuration settings, while check behavior and reporting are controlled by the VALIDATE_VIEW_SCALE settings in the check.mch configuration file.</Description>
         <ModelCheckName>VALIDATE_VIEW_SCALE</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
@@ -2546,7 +2532,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Always Report Layers</Name>
-        <Category>Model Integrity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether required layers are present in the model and reports any missing layers according to predefined company layer standards and configuration rules. Layers are used to organize model entities such as dimensions, annotations, datums, and geometry for clarity, control, and downstream processes like drawing management and manufacturing output. Missing or nonstandard layers can lead to inconsistent model organization, difficulty in data management, and issues in visualization or plotting. This check helps ensure that all required layers exist and conform to company layer naming and structure standards. Layer requirements and validation rules are typically defined through Creo layer configuration settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the REPT_LAYR_ALWAYS settings in the check.mch configuration file.</Description>
         <ModelCheckName>REPT_LAYR_ALWAYS</ModelCheckName>
         <ModelCheckOptions>YN Y Y N Y Y</ModelCheckOptions>
@@ -2558,7 +2544,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Annotation on Multiple Combined States</Name>
-        <Category>MBD Readyness</Category>
+        <Category>MBD Readiness</Category>
         <Description>Checks for annotations that exist across multiple combined states in the model and verifies that they remain consistent, properly managed, and correctly displayed in each applicable state. Annotations used in combined states (such as simplified representations, configurations, or display states) must remain aligned with design intent to ensure that critical information such as dimensions, notes, GDT, and manufacturing instructions is not missing, duplicated, or inconsistently shown across states. Inconsistencies can lead to incomplete documentation, misinterpretation during manufacturing or inspection, and downstream data quality issues. This check helps ensure that annotations are correctly controlled and consistently represented across all combined states of the model. Combined state annotation rules and display management are typically governed by Creo annotation and representation settings, while check behavior and reporting are controlled by the ANNTN_ON_MULT_COMB_STATE settings in the check.mch configuration file</Description>
         <ModelCheckName>ANNTN_ON_MULT_COMB_STATE</ModelCheckName>
         <ModelCheckOptions>YNEW W E N Y</ModelCheckOptions>
@@ -2568,7 +2554,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Annotation Semantic Reference Text Verification</Name>
-        <Category>MBD Readyness</Category>
+        <Category>MBD Readiness</Category>
         <Description>Checks whether annotation semantic reference text in the model is valid, properly defined, and correctly linked to its referenced model entities such as geometry, features, or parameters. Semantic references are used to maintain associative annotation behavior, ensuring that annotations update correctly when the underlying model changes. Invalid, broken, or missing semantic reference text can result in lost associativity, incorrect annotation placement, or outdated manufacturing and inspection information, which can compromise model-based definition integrity and downstream processes. This check helps ensure that all semantic references are correctly maintained, functional, and consistent with the current model state. Semantic reference validation rules and annotation associativity behavior are typically managed through Creo annotation and MBD settings, while check behavior and reporting are controlled by the ANNTN_SEM_REF_TEXT_VERIFY settings in the check.mch configuration file.</Description>
         <ModelCheckName>ANNTN_SEM_REF_TEXT_VERIFY</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y</ModelCheckOptions>
@@ -2598,7 +2584,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Ignore Annotation</Name>
-        <Category>MBD Readyness</Category>
+        <Category>MBD Readiness</Category>
         <Description>Checks whether annotations marked to be ignored are properly excluded from ModelCHECK evaluations and ensures that only approved annotation exclusions are applied according to company standards. This allows certain annotations to be intentionally bypassed during checking to avoid unnecessary warnings, but improper or excessive use of ignore settings can hide valid issues, reduce model quality control, and lead to incomplete validation of critical design information. This check helps ensure that ignored annotations are intentional, controlled, and compliant with predefined rules for annotation management. Annotation exclusion rules and validation behavior are typically managed through Creo annotation settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the IGNORE_ANNTN settings in the check.mch configuration file.</Description>
         <ModelCheckName>IGNORE_ANNTN</ModelCheckName>
         <ModelCheckOptions>YN N N N Y</ModelCheckOptions>
@@ -2628,7 +2614,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Part Density</Name>
-        <Category>Model Integrity</Category>
+        <Category>Consistency</Category>
         <Description>Checks whether the density assigned to the part model is correctly defined and compliant with the specified material properties and company-approved material standards. Part density is a critical property used for accurate mass calculations, inertia properties, simulation results, and downstream processes such as manufacturing, costing, and engineering analysis, and incorrect or missing density values can lead to significant errors in weight estimation and functional evaluation of the model. This check helps ensure that the assigned density matches the intended material definition and remains consistent with approved material libraries and engineering requirements. Material density validation rules and material property standards are typically managed through Creo material definitions and ModelCHECK configuration files, while check behavior and reporting are controlled by the PRT_DENSITY settings in the check.mch configuration file.</Description>
         <ModelCheckName>PRT_DENSITY</ModelCheckName>
         <ModelCheckOptions>YNEW E E N Y</ModelCheckOptions>
