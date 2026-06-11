@@ -89,21 +89,21 @@ ASM_PARAM_MAP  MC_PARAM1 MC_PARAM2
 
 ASM_TOL_TYPE         DIN/ISO
 
-ASM_COMMENT          Ensures that mass parameter is set to mass property value
-ASM_RELATION         MASS=mp_mass("")
-ASM_COMMENT          Ensures that volume parameter is set to mass property value
-ASM_RELATION         VOLUME=mp_volume("")
+! ASM_COMMENT          Ensures that mass parameter is set to mass property value
+! ASM_RELATION         MASS=mp_mass("")
+! ASM_COMMENT          Ensures that volume parameter is set to mass property value
+! ASM_RELATION         VOLUME=mp_volume("")
 
-ASM_LAYER_MOVE       DTMS         	DATUM_PLANES
-ASM_LAYER_MOVE       DTM_PLANES   	DATUM_PLANES
-ASM_LAYER_MOVE       DTM_CURVES   	DATUM_CURVES
-ASM_PARAM_RENAME     PDMRL      	PDMRL1
-ASM_PARAM_RENAME     PN       	PN1
-ASM_DATUM_RENAME     XY      		ADTM1
-ASM_DATUM_RENAME     XZ      		ADTM2
-ASM_DATUM_RENAME     ZY      		ADTM3
+! ASM_LAYER_MOVE       DTMS         	DATUM_PLANES
+! ASM_LAYER_MOVE       DTM_PLANES   	DATUM_PLANES
+! ASM_LAYER_MOVE       DTM_CURVES   	DATUM_CURVES
+! ASM_PARAM_RENAME     PDMRL      	PDMRL1
+! ASM_PARAM_RENAME     PN       	PN1
+! ASM_DATUM_RENAME     XY      		ADTM1
+! ASM_DATUM_RENAME     XZ      		ADTM2
+! ASM_DATUM_RENAME     ZY      		ADTM3
 
-ASM_PRO_VERSION      199632
+! ASM_PRO_VERSION      199632
 
 # ASSEMBLY INFORMATION
 
@@ -131,8 +131,8 @@ DRW_NOTE_HEIGHT      	0.2
 ! DRW_LAYER_MOVE	   DRAFT_ENTITY 	DRAFT_ENT 
 
 ! DRW_SYMBOL
-DRW_TABLE_CELLS      [1,1,BOM] [4,2,Rand]
-DRW_TABLE_CELLS      [1,2,Items]
+! DRW_TABLE_CELLS      [1,1,BOM] [4,2,Rand]
+! DRW_TABLE_CELLS      [1,2,Items]
 
 ! DRW_NOTE_UNACC       Prescient
 ! DRW_NOTE_UNACC       DQA
