@@ -54,8 +54,19 @@ CREO_BATCH_BASE = "creo-batch"
 CREO_BATCH_CHUNK_SIZE_DEFAULT = 10
 CREO_BATCH_CHUNK_SIZE_MIN = 1
 CREO_BATCH_CHUNK_SIZE_MAX = 10
-# GO writes this driver next to the chunk .dxc files in the working directory.
-CREO_BATCH_RUNNER_BASENAME = "creo-batch-run.ps1"
+# GO writes a task-specific driver next to the chunk .dxc files (legacy name cleaned on GO).
+CREO_BATCH_RUNNER_LEGACY_BASENAME = "creo-batch-run.ps1"
+CREO_BATCH_RUNNER_MODELCHECK_BASENAME = "creo-batch-modelcheck.ps1"
+CREO_BATCH_RUNNER_JPEG_3D_BASENAME = "creo-batch-jpeg3d.ps1"
+CREO_BATCH_RUNNER_JPEG_2D_BASENAME = "creo-batch-jpeg2d.ps1"
+CREO_BATCH_RUNNER_SCAN_TEMPLATES_BASENAME = "creo-batch-scan-templates.ps1"
+CREO_BATCH_RUNNER_BASENAMES = (
+    CREO_BATCH_RUNNER_LEGACY_BASENAME,
+    CREO_BATCH_RUNNER_MODELCHECK_BASENAME,
+    CREO_BATCH_RUNNER_JPEG_3D_BASENAME,
+    CREO_BATCH_RUNNER_JPEG_2D_BASENAME,
+    CREO_BATCH_RUNNER_SCAN_TEMPLATES_BASENAME,
+)
 # Generated runner: max time to wait for the expected output files of one chunk, in seconds.
 BATCH_OUTPUT_WAIT_TIMEOUT_DEFAULT = 120
 BATCH_OUTPUT_WAIT_TIMEOUT_MIN = 60
@@ -367,6 +378,15 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if self._is_scan_templates_task(task_display):
             return working_dir / "templates"
         return working_dir
+
+    def _batch_runner_basename_for_task(self, task_display: str) -> str:
+        if self._is_scan_templates_task(task_display):
+            return CREO_BATCH_RUNNER_SCAN_TEMPLATES_BASENAME
+        if self._is_jpeg_2d_plot_task(task_display):
+            return CREO_BATCH_RUNNER_JPEG_2D_BASENAME
+        if self._is_jpeg_3d_task(task_display):
+            return CREO_BATCH_RUNNER_JPEG_3D_BASENAME
+        return CREO_BATCH_RUNNER_MODELCHECK_BASENAME
 
     def _templates_dir_has_creo_models(self, working_dir_str: str | None = None) -> bool:
         wd = (working_dir_str if working_dir_str is not None else self.working_directory.get()).strip()
@@ -1563,13 +1583,14 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         kill = _app_bundle_dir() / "kill.bat"
         return ptc.is_file() and kill.is_file()
 
-    def _open_batch_artifacts_present(self, wdir: Path, *, scan_templates: bool) -> bool:
-        """True when the runner script and batch .dxc exist (same state as after a successful GO)."""
+    def _open_batch_artifacts_present(self, wdir: Path, task_display: str) -> bool:
+        """True when this task's runner script and batch .dxc exist (same state as after GO)."""
         try:
-            batch_dir = wdir / "templates" if scan_templates else wdir
-            if not (batch_dir / CREO_BATCH_RUNNER_BASENAME).is_file():
+            batch_dir = self._batch_dir_for_task(wdir, task_display)
+            runner = batch_dir / self._batch_runner_basename_for_task(task_display)
+            if not runner.is_file():
                 return False
-            if scan_templates:
+            if self._is_scan_templates_task(task_display):
                 return (batch_dir / SCAN_TEMPLATES_DXC_BASENAME).is_file()
             return any(p.is_file() for p in batch_dir.glob(f"{CREO_BATCH_BASE}-*.dxc"))
         except OSError:
@@ -1586,8 +1607,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return False
         try:
             wdir = Path(wd).expanduser().resolve()
-            scan_templates = self._is_scan_templates_task(self.task.get() or "")
-            if not self._open_batch_artifacts_present(wdir, scan_templates=scan_templates):
+            task_display = self.task.get() or ""
+            if not self._open_batch_artifacts_present(wdir, task_display):
                 return False
         except OSError:
             return False
@@ -2152,12 +2173,13 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                         p.unlink()
                     except OSError:
                         pass
-            runner = batch_dir / CREO_BATCH_RUNNER_BASENAME
-            if runner.is_file():
-                try:
-                    runner.unlink()
-                except OSError:
-                    pass
+            for name in CREO_BATCH_RUNNER_BASENAMES:
+                runner = batch_dir / name
+                if runner.is_file():
+                    try:
+                        runner.unlink()
+                    except OSError:
+                        pass
         except OSError:
             pass
 
@@ -2675,7 +2697,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         group_name_attr = _xml_attr_escape(group_name)
         ptcdbatch_bat = Path(loadpoint_raw) / "Parametric" / "bin" / "ptcdbatch.bat"
         kill_bat = _app_bundle_dir() / "kill.bat"
-        runner_ps1_path = batch_dir / CREO_BATCH_RUNNER_BASENAME
+        runner_basename = self._batch_runner_basename_for_task(task_display_raw)
+        runner_ps1_path = batch_dir / runner_basename
 
         if not ptcdbatch_bat.is_file():
             messagebox.showerror("File Not Found", f"Could not find:\n{ptcdbatch_bat}")
@@ -2789,7 +2812,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if scan_templates:
             num_templates = len(latest_files)
             success_detail = (
-                f"Created {SCAN_TEMPLATES_DXC_BASENAME} and {CREO_BATCH_RUNNER_BASENAME} in:\n"
+                f"Created {SCAN_TEMPLATES_DXC_BASENAME} and {runner_basename} in:\n"
                 f"{batch_dir.resolve()}\n\n"
                 f"Use Open Batch to run the runner in PowerShell (ModelCHECK on all templates; "
                 f"part → assembly → drawing; config from configs\\templates).\n"
@@ -2801,7 +2824,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 f"Created {num_chunks} chunk file(s): {CREO_BATCH_BASE}-1.dxc … "
                 f"{CREO_BATCH_BASE}-{num_chunks}.dxc\n"
                 f"Runner: {runner_ps1_path}\n\n"
-                f"Use Open Batch to run {CREO_BATCH_RUNNER_BASENAME} in PowerShell (skips chunks whose outputs exist; otherwise polls for output files, then kill.bat).\n"
+                f"Use Open Batch to run {runner_basename} in PowerShell (skips chunks whose outputs exist; otherwise polls for output files, then kill.bat).\n"
                 f"Wrote {len(config_files) + (1 if jpeg_config_pro else 0)} config file(s) and {len(latest_files)} model object(s) "
                 f"({self._chunk_size} per chunk; {types_label} in working directory)."
             )
@@ -2994,10 +3017,12 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return
 
         working_dir = Path(working_dir_raw).expanduser().resolve()
-        scan_templates = self._is_scan_templates_task(self.task.get() or "")
-        batch_dir = self._batch_dir_for_task(working_dir, self.task.get() or "")
-        runner_ps1 = batch_dir / CREO_BATCH_RUNNER_BASENAME
-        if not self._open_batch_artifacts_present(working_dir, scan_templates=scan_templates):
+        task_display = self.task.get() or ""
+        scan_templates = self._is_scan_templates_task(task_display)
+        batch_dir = self._batch_dir_for_task(working_dir, task_display)
+        runner_basename = self._batch_runner_basename_for_task(task_display)
+        runner_ps1 = batch_dir / runner_basename
+        if not self._open_batch_artifacts_present(working_dir, task_display):
             if not runner_ps1.is_file():
                 messagebox.showerror(
                     "File Not Found",
@@ -3019,7 +3044,6 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 )
             return
 
-        task_display = self.task.get() or ""
         if self._is_regular_modelcheck_task(task_display):
             ok, err, _ = self._update_sample_start_from_template_xml_if_present()
             if not ok:
