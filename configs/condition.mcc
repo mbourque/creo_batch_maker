@@ -1,6 +1,6 @@
-! Conditional file for ModelCHECK
-
 # SET CONFIG FILE
+IF (UNITS_LENGTH EQ MM) config=(default_checks.mch)(sample_start.mcs)(mm.mcn)(sample_status.mcq)
+IF (UNITS_LENGTH EQ INCH) config=(default_checks.mch)(sample_start.mcs)(inch.mcn)(sample_status.mcq)
 ELSE config=(default_checks.mch)(sample_start.mcs)(inch.mcn)(sample_status.mcq)
 
 # OVERRIDE CHECKS
