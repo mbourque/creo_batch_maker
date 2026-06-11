@@ -13,6 +13,11 @@
 ! =========================================================
 
 modelcheck_enabled yes
+! mcregen_verify_ft_insts yes
+save_display shaded_image
+! graphics win32_gdi
+display shaded
+
 
 ! =========================================================
 ! HEADLESS / AUTOMATION STABILITY
@@ -47,7 +52,7 @@ enable_auto_regen no
 ! =========================================================
 
 cleanup_drawing_dependencies yes
-save_display no
+! save_display no
 
 ! =========================================================
 ! PERFORMANCE / DISPLAY QUALITY
@@ -70,7 +75,7 @@ shade_with_materials no
 enable_transparency no
 enable_opengl_fbo no
 hlr_for_quilt no
-display_filled_patterns yes
+display_filled_patterns no
 
 ! =========================================================
 ! MODEL DISPLAY CLEANUP
@@ -97,6 +102,7 @@ intf3d_out_datums no
 ! =========================================================
 
 display_comps_to_assemble no
+freeze_failed_assy_comp yes
 
 ! =========================================================
 ! VIEW / SPIN / INTERACTION
@@ -125,6 +131,6 @@ display_dwg_tol_tags no
 ! =========================================================
 
 ! start_model_dir
-! template_part
-! template_assembly
+! template_part 
+! template_assembly 
 ! template_drawing

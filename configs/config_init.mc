@@ -145,7 +145,7 @@ CHECK_ALL_MODELS YN             Y
 SAVE_MC_PRE      YN             N
 
 # ASSEMBLY batch mode - run TOP only (N) or ALL LEVELS (Y)
-ASM_BATCH_ALL    YN                     Y
+ASM_BATCH_ALL    YN                     N
 
 # Run MC on all drawing sheets (Y) or current only (N)
 DRW_SHEET_ALL    YN	        Y	Y	Y	Y
@@ -218,3 +218,5 @@ PROGRAM          pro
 #HTML report creation
 HTML_FILE_OUTPUT  YN            Y       N       Y       Y
 
+# For Creo 12 Inseperable Assemblies
+MC_RUN_ON_ASM_COMP	YN	Y	
