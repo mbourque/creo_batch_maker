@@ -76,11 +76,15 @@ BATCH_OUTPUT_SETTLE_SEC = 5
 DEFAULT_MODELCHECK_TTD = "modelcheck.ttd"
 DEFAULT_MODELCHECK_DISPLAY = "ModelCHECK"
 SCAN_TEMPLATES_DISPLAY = "Scan Templates"
+CREATE_REPORT_DISPLAY = "Create Report"
 SCAN_TEMPLATES_DXC_BASENAME = "templates.dxc"
 JPEG_2D_PLOT_TTD = "plot_jpeg_a-size.ttd"
 JPEG_2D_PLOT_DISPLAY = "JPEG 2D Export to file, A Paper Size"
 JPEG_3D_TTD = "solid-raster_write_jpg.ttd"
 TASK_COMBOBOX_FONT = ("Segoe UI", 11)
+_START_OVER_FILE_SUFFIXES = frozenset(
+    {".ps1", ".dxc", ".xml", ".html", ".js", ".jpg", ".png", ".log", ".css"}
+)
 
 
 def _creo_model_name_pattern(extensions: tuple[str, ...]) -> re.Pattern[str]:
@@ -195,7 +199,7 @@ def _creo_loadpoint_has_parametric_dir(loadpoint: str) -> bool:
 
 
 def _working_directory_exists_as_dir(working_directory: str) -> bool:
-    """True if the path resolves to an existing directory (for Save / Open Batch / settings file)."""
+    """True if the path resolves to an existing directory (for Save / Report / settings file)."""
     s = (working_directory or "").strip()
     if not s:
         return False
@@ -227,14 +231,25 @@ def _path_contains_spaces(path: str) -> bool:
 
 
 def _summary_report_inputs_ok(working_directory: str) -> bool:
-    """True when master.xml exists in the working dir and bundled report assets exist."""
+    """True when ModelCHECK result XML exists and bundled report assets exist."""
     if not _working_directory_exists_as_dir(working_directory):
         return False
     try:
         wd = Path(working_directory.strip()).expanduser().resolve()
     except OSError:
         return False
-    if not (wd / "master.xml").is_file():
+    try:
+        has_xml = False
+        for entry in wd.iterdir():
+            if not entry.is_file():
+                continue
+            low = entry.name.lower()
+            if low.endswith((".p.xml", ".a.xml", ".d.xml")):
+                has_xml = True
+                break
+        if not has_xml:
+            return False
+    except OSError:
         return False
     bundle = _app_bundle_dir()
     return (bundle / "model_checks.xml").is_file() and (bundle / "report_template.html.j2").is_file()
@@ -280,6 +295,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         ]
         self._refresh_action_buttons_job: str | None = None
         self._activate_refresh_job: str | None = None
+        self._post_batch_task_refresh_job: str | None = None
+        self._last_create_report_available = False
         self._modal_dialog_depth = 0
         self._report_job_running = False
         self._post_map_refresh_done = False
@@ -307,13 +324,16 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         # repaint until the user interacts. Force one more refresh once the window
         # is actually on screen so action buttons reflect the loaded settings.
         self.bind("<Map>", self._on_first_window_map, add="+")
-        # Re-evaluate GO / Open Batch / Build / Report when returning to this app
+        # Re-evaluate GO / Report when returning to this app
         # (e.g. batch runner deleted chunk .dxc, or files changed in Explorer).
         self.bind("<Activate>", self._on_app_activate, add="+")
         self.protocol("WM_DELETE_WINDOW", self._on_exit)
 
     def _is_scan_templates_task(self, task_display: str) -> bool:
         return (task_display or "").strip() == SCAN_TEMPLATES_DISPLAY
+
+    def _is_create_report_task(self, task_display: str) -> bool:
+        return (task_display or "").strip() == CREATE_REPORT_DISPLAY
 
     def _is_modelcheck_task(self, task_display: str) -> bool:
         if self._is_scan_templates_task(task_display):
@@ -425,7 +445,33 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 return modelcheck
         return display_values[0]
 
+    def _working_directory_has_jpg_files(self, working_dir_str: str | None = None) -> bool:
+        """True if at least one .jpg exists in the working directory (top level only)."""
+        s = (working_dir_str if working_dir_str is not None else self.working_directory.get()).strip()
+        if not s:
+            return False
+        try:
+            d = Path(s).expanduser()
+            if not d.is_dir():
+                return False
+            for entry in d.iterdir():
+                if entry.is_file() and entry.suffix.casefold() == ".jpg":
+                    return True
+            return False
+        except OSError:
+            return False
+
+    def _create_report_task_available(self, working_dir_str: str | None = None) -> bool:
+        wd = (working_dir_str if working_dir_str is not None else self.working_directory.get()).strip()
+        if not wd or not _working_directory_exists_as_dir(wd):
+            return False
+        return self._working_directory_has_modelcheck_xml(wd) and self._working_directory_has_jpg_files(
+            wd
+        )
+
     def _go_model_source_ready(self, working_dir_str: str, task_display: str) -> bool:
+        if self._is_create_report_task(task_display):
+            return False
         if self._is_scan_templates_task(task_display):
             return self._templates_dir_has_creo_models(working_dir_str)
         return self._working_directory_has_creo_models(
@@ -484,14 +530,78 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 return display
         return None
 
+    def _maybe_advance_to_create_report_task(self) -> None:
+        if not self._create_report_task_available():
+            return
+        try:
+            values = tuple(self.task_select.cget("values") or ())
+        except tk.TclError:
+            values = ()
+        if CREATE_REPORT_DISPLAY not in values:
+            return
+        self.task.set(CREATE_REPORT_DISPLAY)
+        self._refresh_configuration_menu()
+        self._refresh_action_buttons()
+
+    def _update_create_report_task_list(self, *, advance_from_jpeg: bool = False) -> None:
+        """Rebuild the Task dropdown when Create Report eligibility changes."""
+        available = self._create_report_task_available()
+        if available == self._last_create_report_available:
+            if advance_from_jpeg and available:
+                self._maybe_advance_to_create_report_task()
+            return
+        self._last_create_report_available = available
+        prev_task = self.task.get() or ""
+        self._refresh_task_options()
+        if advance_from_jpeg and (
+            self._is_jpeg_3d_task(prev_task)
+            or self._is_jpeg_3d_task(self.task.get() or "")
+        ):
+            self._maybe_advance_to_create_report_task()
+
+    def _cancel_post_batch_task_refresh(self) -> None:
+        jid = self._post_batch_task_refresh_job
+        if jid is not None:
+            try:
+                self.after_cancel(jid)
+            except tk.TclError:
+                pass
+        self._post_batch_task_refresh_job = None
+
+    def _schedule_post_batch_task_refresh(self) -> None:
+        """Poll for new batch outputs so Create Report appears without restarting."""
+        self._cancel_post_batch_task_refresh()
+        poll_remaining = {"count": 120}
+
+        def tick() -> None:
+            self._post_batch_task_refresh_job = None
+            try:
+                if not self.winfo_exists():
+                    return
+            except tk.TclError:
+                return
+            if self._modal_dialog_depth > 0:
+                self._post_batch_task_refresh_job = self.after(1000, tick)
+                return
+            self._update_create_report_task_list(advance_from_jpeg=True)
+            poll_remaining["count"] -= 1
+            if poll_remaining["count"] <= 0 or self._create_report_task_available():
+                return
+            self._post_batch_task_refresh_job = self.after(3000, tick)
+
+        self._post_batch_task_refresh_job = self.after(3000, tick)
+
     def _advance_task_after_open_batch(self, from_task_display: str) -> None:
-        """Scan Templates → ModelCHECK → JPEG 3D when Open Batch is launched."""
+        """Scan Templates → ModelCHECK → JPEG 3D → Create Report when GO launches the batch."""
         if self._is_scan_templates_task(from_task_display):
             next_display = self._task_display_for_ttd_filename(
                 DEFAULT_MODELCHECK_TTD
             ) or DEFAULT_MODELCHECK_DISPLAY
         elif self._is_regular_modelcheck_task(from_task_display):
             next_display = self._task_display_for_ttd_filename(JPEG_3D_TTD)
+        elif self._is_jpeg_3d_task(from_task_display):
+            self._update_create_report_task_list(advance_from_jpeg=True)
+            return
         else:
             return
         if not next_display:
@@ -698,32 +808,6 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             font=ctk.CTkFont(size=14, weight="bold"),
             command=self._on_go,
         )
-        self.open_batch_button = ctk.CTkButton(
-            btn_bar,
-            text="Open Batch",
-            width=120,
-            height=28,
-            corner_radius=6,
-            border_width=0,
-            fg_color="#3B8ED0",
-            text_color="#FFFFFF",
-            hover_color="#367DB6",
-            font=ctk.CTkFont(size=14, weight="bold"),
-            command=self._launch_ptcdbatch,
-        )
-        self.build_master_button = ctk.CTkButton(
-            btn_bar,
-            text="Build",
-            width=120,
-            height=28,
-            corner_radius=6,
-            border_width=0,
-            fg_color="#3B8ED0",
-            text_color="#FFFFFF",
-            hover_color="#367DB6",
-            font=ctk.CTkFont(size=14, weight="bold"),
-            command=self._on_build_master_xml,
-        )
         self.summary_report_button = ctk.CTkButton(
             btn_bar,
             text="Report",
@@ -739,9 +823,6 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         )
         self._action_btn_gap = 12
         self.go_button.pack(side="left", padx=(0, self._action_btn_gap))
-        self.open_batch_button.pack(side="left", padx=(0, self._action_btn_gap))
-        self.build_master_button.pack(side="left", padx=(0, self._action_btn_gap))
-        self.summary_report_button.pack(side="left", padx=(0, 0))
 
         def _on_working_directory_or_loadpoint_changed(*_args: object) -> None:
             if self._suppress_settings_autosave:
@@ -845,9 +926,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         file_menu.add_command(label="Save as...", command=self._on_file_menu_save_as)
         file_menu.add_separator()
         file_menu.add_command(
-            label="Open Working Directory...",
+            label="Open Working Directory",
             command=self._on_open_working_directory,
         )
+        file_menu.add_separator()
+        file_menu.add_command(label="Start over...", command=self._on_file_menu_start_over)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self._on_exit)
         menubar.add_cascade(label="File", menu=file_menu)
@@ -1079,8 +1162,71 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             r"Example: C:\PTC\Creo 12.4.3.0",
         )
 
+    @staticmethod
+    def _clean_start_over_directory(directory: Path) -> list[str]:
+        """Remove scan/batch artifacts from one folder; return error lines for failures."""
+        errors: list[str] = []
+        try:
+            entries = list(directory.iterdir())
+        except OSError as exc:
+            return [f"{directory}\n{exc}"]
+        for entry in entries:
+            try:
+                if entry.is_dir():
+                    if entry.name.casefold() != "modchk":
+                        continue
+                    shutil.rmtree(entry)
+                    continue
+                if not entry.is_file():
+                    continue
+                if entry.suffix.casefold() not in _START_OVER_FILE_SUFFIXES:
+                    continue
+                entry.unlink()
+            except OSError as exc:
+                errors.append(f"{entry}\n{exc}")
+        return errors
+
+    def _on_file_menu_start_over(self) -> None:
+        wd = (self.working_directory.get() or "").strip()
+        if not wd:
+            messagebox.showwarning(
+                "Start over",
+                "Set a working directory before using Start over.",
+            )
+            return
+        if not _working_directory_exists_as_dir(wd):
+            messagebox.showwarning(
+                "Start over",
+                "Working directory must be an existing folder.",
+            )
+            return
+        working_dir = Path(wd).expanduser().resolve()
+        templates_dir = working_dir / "templates"
+        prompt = (
+            "Remove prior scan and batch data from the working folder?\n\n"
+            "Keeps Creo models (.prt, .asm, .drw)."
+        )
+        if not self._show_proceed_cancel_dialog("Start over", prompt):
+            return
+        errors: list[str] = []
+        errors.extend(self._clean_start_over_directory(working_dir))
+        if templates_dir.is_dir():
+            errors.extend(self._clean_start_over_directory(templates_dir))
+        self._refresh_action_buttons()
+        if errors:
+            messagebox.showwarning(
+                "Start over",
+                "Some items could not be removed:\n\n" + "\n\n".join(errors),
+            )
+            return
+        messagebox.showinfo(
+            "Start over",
+            f"Removed scan and batch data from:\n{working_dir}",
+        )
+
     def _on_exit(self) -> None:
         """Save settings when valid; warn if the form was partly filled but could not be saved."""
+        self._cancel_post_batch_task_refresh()
         self._settings_path = _default_app_settings_path()
         ok, err = self._write_current_settings_to_disk()
         if not ok and (
@@ -1568,7 +1714,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
     def _go_fields_valid(self) -> bool:
         wd = (self.working_directory.get() or "").strip()
         lp = (self.creo_loadpoint.get() or "").strip().rstrip("\\/")
-        task_fn = self._task_filename_from_ui((self.task.get() or "").strip())
+        task_display = (self.task.get() or "").strip()
+        if self._is_create_report_task(task_display):
+            return False
+        task_fn = self._task_filename_from_ui(task_display)
         if not wd or not _working_directory_ok_for_go(wd):
             return False
         if _path_contains_spaces(wd):
@@ -1582,38 +1731,6 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         ptc = Path(lp) / "Parametric" / "bin" / "ptcdbatch.bat"
         kill = _app_bundle_dir() / "kill.bat"
         return ptc.is_file() and kill.is_file()
-
-    def _open_batch_artifacts_present(self, wdir: Path, task_display: str) -> bool:
-        """True when this task's runner script and batch .dxc exist (same state as after GO)."""
-        try:
-            batch_dir = self._batch_dir_for_task(wdir, task_display)
-            runner = batch_dir / self._batch_runner_basename_for_task(task_display)
-            if not runner.is_file():
-                return False
-            if self._is_scan_templates_task(task_display):
-                return (batch_dir / SCAN_TEMPLATES_DXC_BASENAME).is_file()
-            return any(p.is_file() for p in batch_dir.glob(f"{CREO_BATCH_BASE}-*.dxc"))
-        except OSError:
-            return False
-
-    def _open_batch_fields_valid(self) -> bool:
-        wd = (self.working_directory.get() or "").strip()
-        lp = (self.creo_loadpoint.get() or "").strip().rstrip("\\/")
-        if not wd or not _working_directory_exists_as_dir(wd):
-            return False
-        if _path_contains_spaces(wd):
-            return False
-        if not lp or not _creo_loadpoint_has_parametric_dir(lp):
-            return False
-        try:
-            wdir = Path(wd).expanduser().resolve()
-            task_display = self.task.get() or ""
-            if not self._open_batch_artifacts_present(wdir, task_display):
-                return False
-        except OSError:
-            return False
-        ptc = Path(lp) / "Parametric" / "bin" / "ptcdbatch.bat"
-        return ptc.is_file()
 
     def _refresh_action_buttons(self, *_args: object) -> None:
         """Coalesce many StringVar writes into one UI update (faster startup / settings load)."""
@@ -1652,7 +1769,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
     def _on_app_activate_run(self) -> None:
         self._activate_refresh_job = None
         if self._modal_dialog_depth > 0:
+            self._activate_refresh_job = self.after(500, self._on_app_activate_run)
             return
+        self._update_create_report_task_list(advance_from_jpeg=True)
         self._refresh_action_buttons()
 
     def _install_dialog_parent(self) -> None:
@@ -1785,7 +1904,92 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         finally:
             self._modal_dialog_depth = max(0, self._modal_dialog_depth - 1)
             # CTkButton state can stay visually disabled until the next UI event (same as
-            # _on_first_window_map); refresh after the modal closes so GO → Open Batch works.
+            # _on_first_window_map); refresh after the modal closes so GO stays in sync.
+            if anchor is self:
+
+                def _repaint_action_buttons() -> None:
+                    try:
+                        self._refresh_action_buttons_run()
+                        self.update_idletasks()
+                    except tk.TclError:
+                        pass
+
+                self.after_idle(_repaint_action_buttons)
+        return result["value"]
+
+    def _show_proceed_cancel_dialog(self, title: str, message: str) -> bool:
+        """Return True when the user clicks Proceed (Cancel is the default)."""
+        anchor = self
+        dialog = ctk.CTkToplevel(anchor)
+        dialog.withdraw()
+        dialog.title(title)
+        dialog.resizable(False, False)
+        dialog.transient(anchor)
+
+        result = {"value": False}
+
+        def close(proceed: bool) -> None:
+            result["value"] = proceed
+            dialog.destroy()
+
+        ctk.CTkLabel(dialog, text=message, justify="left", wraplength=420).pack(
+            anchor="w", padx=16, pady=(16, 12)
+        )
+        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_row.pack(anchor="e", padx=16, pady=(0, 16))
+        cancel_btn = ctk.CTkButton(
+            btn_row, text="Cancel", width=88, command=lambda: close(False)
+        )
+        proceed_btn = ctk.CTkButton(
+            btn_row, text="Proceed", width=88, command=lambda: close(True)
+        )
+        cancel_btn.pack(side="right", padx=(8, 0))
+        proceed_btn.pack(side="right")
+
+        def place_centered() -> None:
+            if not dialog.winfo_exists():
+                return
+            try:
+                anchor.deiconify()
+                anchor.update_idletasks()
+            except tk.TclError:
+                pass
+            dialog.update_idletasks()
+            try:
+                _center_toplevel_on_parent(dialog, anchor)
+            except tk.TclError:
+                pass
+
+        def show() -> None:
+            if not dialog.winfo_exists():
+                return
+            dialog.deiconify()
+            place_centered()
+            try:
+                dialog.attributes("-topmost", True)
+                dialog.lift()
+                cancel_btn.focus_set()
+                dialog.after(
+                    200,
+                    lambda: dialog.attributes("-topmost", False)
+                    if dialog.winfo_exists()
+                    else None,
+                )
+            except tk.TclError:
+                pass
+            dialog.after(50, place_centered)
+
+        dialog.bind("<Escape>", lambda _e: close(False))
+        dialog.bind("<Return>", lambda _e: close(False))
+        dialog.protocol("WM_DELETE_WINDOW", lambda: close(False))
+
+        self._modal_dialog_depth += 1
+        try:
+            dialog.update_idletasks()
+            dialog.after_idle(show)
+            dialog.wait_window()
+        finally:
+            self._modal_dialog_depth = max(0, self._modal_dialog_depth - 1)
             if anchor is self:
 
                 def _repaint_action_buttons() -> None:
@@ -1853,36 +2057,26 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 return
         except tk.TclError:
             return
-        if getattr(self, "go_button", None) is not None:
-            self.go_button.configure(state="normal" if self._go_fields_valid() else "disabled")
-            self.open_batch_button.configure(
-                state="normal" if self._open_batch_fields_valid() else "disabled"
-            )
-        scan_templates = self._is_scan_templates_task(self.task.get() or "")
+        task_display = self.task.get() or ""
+        create_report = self._is_create_report_task(task_display)
         gap = getattr(self, "_action_btn_gap", 12)
-        if getattr(self, "build_master_button", None) is not None:
-            if scan_templates:
-                if self.build_master_button.winfo_manager() == "pack":
-                    self.build_master_button.pack_forget()
+        wd = (self.working_directory.get() or "").strip()
+        if getattr(self, "go_button", None) is not None:
+            if create_report:
+                if self.go_button.winfo_manager() == "pack":
+                    self.go_button.pack_forget()
             else:
-                if self.build_master_button.winfo_manager() != "pack":
-                    self.build_master_button.pack(side="left", padx=(0, gap))
-                wd = (self.working_directory.get() or "").strip()
-                build_ok = (
-                    _working_directory_exists_as_dir(wd)
-                    and self._working_directory_has_modelcheck_xml(wd)
-                )
-                self.build_master_button.configure(state="normal" if build_ok else "disabled")
+                if self.go_button.winfo_manager() != "pack":
+                    self.go_button.pack(side="left", padx=(0, gap))
+                self.go_button.configure(state="normal" if self._go_fields_valid() else "disabled")
         if getattr(self, "summary_report_button", None) is not None:
-            if scan_templates:
-                if self.summary_report_button.winfo_manager() == "pack":
-                    self.summary_report_button.pack_forget()
-            else:
+            if create_report:
                 if self.summary_report_button.winfo_manager() != "pack":
                     self.summary_report_button.pack(side="left", padx=(0, 0))
-                wd = (self.working_directory.get() or "").strip()
-                report_ok = _summary_report_inputs_ok(wd)
+                report_ok = _summary_report_inputs_ok(wd) and not self._report_job_running
                 self.summary_report_button.configure(state="normal" if report_ok else "disabled")
+            elif self.summary_report_button.winfo_manager() == "pack":
+                self.summary_report_button.pack_forget()
         self._refresh_file_menu_save_state()
 
     def _refresh_task_options(self) -> None:
@@ -1939,11 +2133,18 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             middle_rows = [(fn, lab) for fn, lab in other_rows if fn.lower() != JPEG_2D_PLOT_TTD.lower()]
             middle_rows.sort(key=lambda row: row[1].casefold())
             ordered = (preferred_rows[:1] + middle_rows + plot_rows) if preferred_rows else (middle_rows + plot_rows)
-            ordered = [(fn, lab) for fn, lab in ordered if lab != SCAN_TEMPLATES_DISPLAY]
+            ordered = [
+                (fn, lab)
+                for fn, lab in ordered
+                if lab not in (SCAN_TEMPLATES_DISPLAY, CREATE_REPORT_DISPLAY)
+            ]
             if self._templates_dir_has_creo_models():
                 scan_row = (SCAN_TEMPLATES_DISPLAY, SCAN_TEMPLATES_DISPLAY)
                 ordered = [scan_row] + ordered
                 self._task_filename_to_description[SCAN_TEMPLATES_DISPLAY] = SCAN_TEMPLATES_DISPLAY
+            if self._create_report_task_available():
+                ordered.append((CREATE_REPORT_DISPLAY, CREATE_REPORT_DISPLAY))
+                self._task_filename_to_description[CREATE_REPORT_DISPLAY] = CREATE_REPORT_DISPLAY
 
             self._task_display_to_filename = {lab: fn for fn, lab in ordered}
             display_values = [lab for _fn, lab in ordered]
@@ -1956,6 +2157,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     self._task_filename_to_description[SCAN_TEMPLATES_DISPLAY] = SCAN_TEMPLATES_DISPLAY
                 else:
                     ordered = [fallback_mc]
+                if self._create_report_task_available():
+                    ordered.append((CREATE_REPORT_DISPLAY, CREATE_REPORT_DISPLAY))
+                    self._task_filename_to_description[CREATE_REPORT_DISPLAY] = CREATE_REPORT_DISPLAY
                 self._task_display_to_filename = {lab: fn for fn, lab in ordered}
                 self._task_filename_to_description.setdefault(
                     DEFAULT_MODELCHECK_TTD, DEFAULT_MODELCHECK_DISPLAY
@@ -1975,6 +2179,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 self.task.set(self._default_task_display(display_values))
             self._refresh_configuration_menu()
         finally:
+            self._last_create_report_available = self._create_report_task_available()
             self._refresh_action_buttons()
 
     def _persist_working_directory_and_loadpoint(self) -> None:
@@ -2157,6 +2362,23 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         return [items[i : i + chunk_size] for i in range(0, len(items), chunk_size)]
 
     @staticmethod
+    def _remove_batch_runner_scripts(*directories: Path) -> None:
+        """Remove generated batch runner .ps1 files from one or more folders."""
+        for directory in directories:
+            try:
+                if not directory.is_dir():
+                    continue
+                for name in CREO_BATCH_RUNNER_BASENAMES:
+                    runner = directory / name
+                    if runner.is_file():
+                        try:
+                            runner.unlink()
+                        except OSError:
+                            pass
+            except OSError:
+                pass
+
+    @staticmethod
     def _cleanup_leftover_batch_files(batch_dir: Path, *, scan_templates: bool) -> None:
         """Remove prior GO batch .dxc and runner script before writing new ones."""
         try:
@@ -2173,13 +2395,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                         p.unlink()
                     except OSError:
                         pass
-            for name in CREO_BATCH_RUNNER_BASENAMES:
-                runner = batch_dir / name
-                if runner.is_file():
-                    try:
-                        runner.unlink()
-                    except OSError:
-                        pass
+            CreoDistributedBatchMakerApp._remove_batch_runner_scripts(batch_dir)
         except OSError:
             pass
 
@@ -2712,7 +2928,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
         sample_start_note = ""
         if self._is_regular_modelcheck_task(task_display_raw):
-            ok, err, sample_start_note = self._update_sample_start_from_template_xml_if_present()
+            ok, err, _ = self._update_sample_start_from_template_xml_if_present()
             if not ok:
                 messagebox.showerror("GO", err)
                 return
@@ -2809,63 +3025,34 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             )
             return
 
-        if scan_templates:
-            num_templates = len(latest_files)
-            success_detail = (
-                f"Created {SCAN_TEMPLATES_DXC_BASENAME} and {runner_basename} in:\n"
-                f"{batch_dir.resolve()}\n\n"
-                f"Use Open Batch to run the runner in PowerShell (ModelCHECK on all templates; "
-                f"part → assembly → drawing; config from configs\\templates).\n"
-                f"Referenced {len(config_files)} config file(s) from configs\\templates and "
-                f"{num_templates} template model(s) in the .dxc."
-            )
-        else:
-            success_detail = (
-                f"Created {num_chunks} chunk file(s): {CREO_BATCH_BASE}-1.dxc … "
-                f"{CREO_BATCH_BASE}-{num_chunks}.dxc\n"
-                f"Runner: {runner_ps1_path}\n\n"
-                f"Use Open Batch to run {runner_basename} in PowerShell (skips chunks whose outputs exist; otherwise polls for output files, then kill.bat).\n"
-                f"Wrote {len(config_files) + (1 if jpeg_config_pro else 0)} config file(s) and {len(latest_files)} model object(s) "
-                f"({self._chunk_size} per chunk; {types_label} in working directory)."
-            )
-            if sample_start_note:
-                success_detail += f"\n\n{sample_start_note}"
-        messagebox.showinfo("Success", success_detail)
+        self._update_create_report_task_list()
         self._save_settings()
-        # Open Batch depends on batch files on disk (_show_app_messagebox also refreshes after OK).
+        if not self._launch_batch_runner(working_dir, task_display_raw):
+            self._refresh_action_buttons_run()
+            return
+        self._schedule_post_batch_task_refresh()
+        self._advance_task_after_open_batch(task_display_raw)
         self._refresh_action_buttons_run()
         try:
             self.update_idletasks()
         except tk.TclError:
             pass
 
-    def _on_build_master_xml(self) -> None:
-        wd = (self.working_directory.get() or "").strip()
-        if not wd:
-            messagebox.showwarning("Missing Working Directory", "Please enter a working directory.")
-            return
-        if not _working_directory_exists_as_dir(wd):
-            self._warn_if_working_directory_invalid()
-            return
-        working_dir = Path(wd).expanduser().resolve()
+    def _build_master_xml_silent(self, working_dir: Path) -> tuple[bool, str | None]:
+        """Merge ModelCHECK XML into master.xml and remove leftover runner .ps1 files."""
         out_path = str(working_dir / "master.xml")
         try:
-            written = merge_master_xml.build_master_xml(
+            merge_master_xml.build_master_xml(
                 working_directory=str(working_dir),
                 output_file=out_path,
             )
         except OSError as exc:
-            messagebox.showerror("Build Failed", f"Could not write master.xml.\n\n{exc}")
-            return
+            return False, f"Could not write master.xml.\n\n{exc}"
         except Exception as exc:
-            messagebox.showerror("Build Failed", f"An error occurred while building master.xml.\n\n{exc}")
-            return
-        messagebox.showinfo(
-            "Build",
-            f"Scanned:\n{working_dir}\n\nWrote:\n{written}",
-        )
-        # Report depends on master.xml on disk; no StringVar changes here.
-        self._refresh_action_buttons()
+            return False, f"An error occurred while building master.xml.\n\n{exc}"
+        templates_dir = working_dir / "templates"
+        self._remove_batch_runner_scripts(working_dir, templates_dir)
+        return True, None
 
     def _set_report_busy(self, busy: bool) -> None:
         self._report_job_running = busy
@@ -2963,12 +3150,15 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             self._warn_if_working_directory_invalid()
             return
         working_dir = Path(wd).expanduser().resolve()
-        master_xml = working_dir / "master.xml"
-        if not master_xml.is_file():
+        if not self._working_directory_has_modelcheck_xml(wd):
             messagebox.showwarning(
-                "Missing master.xml",
-                "Run Build first to create master.xml in the working directory.",
+                "Missing ModelCHECK XML",
+                "No ModelCHECK result XML (*.p.xml, *.a.xml, *.d.xml) was found in the working directory.",
             )
+            return
+        ok, build_err = self._build_master_xml_silent(working_dir)
+        if not ok:
+            messagebox.showerror("Report Failed", build_err or "Could not build master.xml.")
             return
         bundle = _app_bundle_dir()
         model_checks = bundle / "model_checks.xml"
@@ -2992,68 +3182,14 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._persist_working_directory_and_loadpoint()
         self._start_report_job(working_dir)
 
-    def _launch_ptcdbatch(self) -> None:
-        loadpoint_raw = (self.creo_loadpoint.get() or "").strip().rstrip("\\/")
-        working_dir_raw = (self.working_directory.get() or "").strip()
-        if not loadpoint_raw:
-            messagebox.showwarning("Missing Creo Loadpoint", "Please enter a Creo loadpoint.")
-            return
-        if not _creo_loadpoint_has_parametric_dir(loadpoint_raw):
-            self._warn_if_creo_loadpoint_missing_parametric()
-            return
-        if not working_dir_raw:
-            messagebox.showwarning("Missing Working Directory", "Please enter a working directory.")
-            return
-        if not _working_directory_exists_as_dir(working_dir_raw):
-            self._warn_if_working_directory_invalid()
-            return
-        if _path_contains_spaces(working_dir_raw):
-            self._warn_if_working_directory_has_spaces()
-            return
-
-        bat_path = Path(loadpoint_raw) / "Parametric" / "bin" / "ptcdbatch.bat"
-        if not bat_path.exists():
-            messagebox.showerror("File Not Found", f"Could not find:\n{bat_path}")
-            return
-
-        working_dir = Path(working_dir_raw).expanduser().resolve()
-        task_display = self.task.get() or ""
-        scan_templates = self._is_scan_templates_task(task_display)
+    def _launch_batch_runner(self, working_dir: Path, task_display: str) -> bool:
+        """Start the task-specific PowerShell batch runner. Returns False on launch failure."""
         batch_dir = self._batch_dir_for_task(working_dir, task_display)
-        runner_basename = self._batch_runner_basename_for_task(task_display)
-        runner_ps1 = batch_dir / runner_basename
-        if not self._open_batch_artifacts_present(working_dir, task_display):
-            if not runner_ps1.is_file():
-                messagebox.showerror(
-                    "File Not Found",
-                    f"Could not find:\n{runner_ps1}\n\nRun GO first to create the batch .dxc and runner script.",
-                )
-            elif scan_templates:
-                messagebox.showerror(
-                    "Batch .dxc missing",
-                    f"Could not find:\n{batch_dir / SCAN_TEMPLATES_DXC_BASENAME}\n\n"
-                    "Run GO to generate templates.dxc. If you already finished a batch run, the runner removed it — "
-                    "run GO again before using Open Batch.",
-                )
-            else:
-                messagebox.showerror(
-                    "Chunk .dxc files missing",
-                    f"No {CREO_BATCH_BASE}-*.dxc files were found in:\n{batch_dir}\n\n"
-                    "Run GO to generate chunk files. If you already finished a batch run, the runner removed the "
-                    "chunk .dxc files — run GO again before using Open Batch.",
-                )
-            return
-
-        if self._is_regular_modelcheck_task(task_display):
-            ok, err, _ = self._update_sample_start_from_template_xml_if_present()
-            if not ok:
-                messagebox.showerror("Open Batch", err)
-                return
-
+        runner_ps1 = batch_dir / self._batch_runner_basename_for_task(task_display)
         ps_exe = self._resolve_powershell_exe()
         if not ps_exe:
             messagebox.showerror("PowerShell Not Found", "Could not locate powershell.exe.")
-            return
+            return False
         try:
             subprocess.Popen(
                 [
@@ -3072,8 +3208,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 "Launch Failed",
                 f"Could not start:\n{runner_ps1}\n\n{exc}",
             )
-            return
-        self._advance_task_after_open_batch(task_display)
+            return False
+        return True
 
     @staticmethod
     def _resolve_powershell_exe() -> str | None:
