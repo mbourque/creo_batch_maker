@@ -9,6 +9,7 @@ import shutil
 import sys
 import subprocess
 import threading
+import time
 import webbrowser
 import xml.etree.ElementTree as ET
 import tkinter as tk
@@ -79,6 +80,14 @@ BATCH_OUTPUT_WAIT_TIMEOUT_MIN = 60
 BATCH_OUTPUT_SETTLE_SEC = 5
 # Wizard polls the batch folder until chunk .dxc files are gone (runner deletes them when done).
 WIZARD_BATCH_DXC_POLL_MS = 3000
+BATCH_TIMEOUT_LOG_PREFIX = "creo-batch-timeouts-"
+_BATCH_TIMEOUT_LOG_HEADER = "Models timed out:"
+WIZARD_BATCH_FAILED_INLINE_MAX = 10
+# Chunk ETA on ModelCHECK / JPEG 3D: show after this many chunks finish (depends on total).
+WIZARD_BATCH_ETA_MIN_CHUNKS_DEFAULT = 2
+WIZARD_BATCH_ETA_MIN_CHUNKS_SMALL = 1
+WIZARD_BATCH_ETA_SMALL_BATCH_MAX_CHUNKS = 2
+WIZARD_BATCH_ETA_ESTIMATING_SUFFIX = " · Estimating time…"
 # When no Creo loadpoint / no .ttd list yet, File → New uses this default task (filename + UI label).
 DEFAULT_MODELCHECK_TTD = "modelcheck.ttd"
 DEFAULT_MODELCHECK_DISPLAY = "ModelCHECK"
@@ -125,6 +134,167 @@ def _normalize_chunk_size(value: object) -> int:
     except (TypeError, ValueError):
         return CREO_BATCH_CHUNK_SIZE_DEFAULT
     return max(CREO_BATCH_CHUNK_SIZE_MIN, min(CREO_BATCH_CHUNK_SIZE_MAX, n))
+
+
+def _batch_timeout_log_path(log_dir: Path, task_kind: str) -> Path:
+    return log_dir / f"{BATCH_TIMEOUT_LOG_PREFIX}{task_kind}.txt"
+
+
+def _parse_batch_timeout_log(path: Path) -> list[str]:
+    try:
+        text = path.read_text(encoding="utf-8-sig", errors="replace")
+    except OSError:
+        return []
+    models: list[str] = []
+    past_header = False
+    header_cf = _BATCH_TIMEOUT_LOG_HEADER.casefold()
+    for line in text.splitlines():
+        stripped = line.strip().lstrip("\ufeff")
+        if not past_header:
+            if stripped.casefold() == header_cf:
+                past_header = True
+            continue
+        if stripped:
+            models.append(stripped)
+    return models
+
+
+def _latest_legacy_batch_timeout_log(log_dir: Path, task_kind: str) -> Path | None:
+    """Oldest runners used ``creo-batch-timeouts-{kind}-HHmmss.txt``."""
+    if not log_dir.is_dir():
+        return None
+    prefix = f"{BATCH_TIMEOUT_LOG_PREFIX}{task_kind}-"
+    candidates: list[Path] = []
+    try:
+        for path in log_dir.iterdir():
+            if not path.is_file():
+                continue
+            name = path.name
+            if not name.startswith(prefix) or not name.endswith(".txt"):
+                continue
+            candidates.append(path)
+    except OSError:
+        return None
+    if not candidates:
+        return None
+    return max(candidates, key=lambda p: p.stat().st_mtime)
+
+
+def _read_batch_failed_models(log_dir: Path, task_kind: str) -> list[str]:
+    if not log_dir.is_dir():
+        return []
+    fixed = _batch_timeout_log_path(log_dir, task_kind)
+    if fixed.is_file():
+        models = _parse_batch_timeout_log(fixed)
+        if models:
+            return models
+    legacy = _latest_legacy_batch_timeout_log(log_dir, task_kind)
+    if legacy is None:
+        return []
+    return _parse_batch_timeout_log(legacy)
+
+
+def _is_batch_timeout_log_name(name: str) -> bool:
+    n = name.casefold()
+    return n.startswith(BATCH_TIMEOUT_LOG_PREFIX.casefold()) and n.endswith(".txt")
+
+
+def _remove_batch_timeout_logs_in_directory(directory: Path) -> list[str]:
+    """Remove ``creo-batch-timeouts-*.txt`` failure logs; return unlink error lines."""
+    errors: list[str] = []
+    if not directory.is_dir():
+        return errors
+    try:
+        for entry in directory.iterdir():
+            if not entry.is_file() or not _is_batch_timeout_log_name(entry.name):
+                continue
+            try:
+                entry.unlink()
+            except OSError as exc:
+                errors.append(f"{entry}\n{exc}")
+    except OSError as exc:
+        errors.append(f"{directory}\n{exc}")
+    return errors
+
+
+def _clear_batch_timeout_logs(batch_dir: Path, task_kind: str) -> None:
+    """Remove failure logs for one task before a new batch run."""
+    if not batch_dir.is_dir():
+        return
+    prefix = f"{BATCH_TIMEOUT_LOG_PREFIX}{task_kind}".casefold()
+    try:
+        for path in batch_dir.iterdir():
+            if not path.is_file():
+                continue
+            if not _is_batch_timeout_log_name(path.name):
+                continue
+            if path.name.casefold().startswith(prefix):
+                path.unlink()
+    except OSError:
+        pass
+
+
+def _format_batch_failed_models_line(models: list[str]) -> str:
+    if not models:
+        return ""
+    total = len(models)
+    shown = models[:WIZARD_BATCH_FAILED_INLINE_MAX]
+    line = f"Failed ({total}): {', '.join(shown)}"
+    rest = total - len(shown)
+    if rest > 0:
+        line += f", ... and {rest} more"
+    return line
+
+
+def _batch_eta_min_chunks_done(total_chunks: int) -> int:
+    if total_chunks <= WIZARD_BATCH_ETA_SMALL_BATCH_MAX_CHUNKS:
+        return WIZARD_BATCH_ETA_MIN_CHUNKS_SMALL
+    return WIZARD_BATCH_ETA_MIN_CHUNKS_DEFAULT
+
+
+def _format_batch_eta_remaining(seconds: float) -> str:
+    minutes = max(1, int(round(max(0.0, seconds) / 60)))
+    if minutes == 1:
+        return "~1 min remaining"
+    return f"~{minutes} min remaining"
+
+
+def _batch_progress_eta_suffix(
+    watch: dict[str, object],
+    *,
+    done: int,
+    remaining: int,
+    initial: int,
+) -> str:
+    step = watch.get("step")
+    if step not in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
+        return ""
+    if remaining <= 0 or initial <= 0:
+        watch.pop("eta_at_done", None)
+        watch.pop("eta_suffix", None)
+        return ""
+    if done <= 0 or done < _batch_eta_min_chunks_done(initial):
+        watch.pop("eta_at_done", None)
+        watch.pop("eta_suffix", None)
+        return WIZARD_BATCH_ETA_ESTIMATING_SUFFIX
+    cached_done = watch.get("eta_at_done")
+    cached_suffix = watch.get("eta_suffix")
+    if (
+        isinstance(cached_done, int)
+        and cached_done == done
+        and isinstance(cached_suffix, str)
+        and cached_suffix
+    ):
+        return cached_suffix
+    started = watch.get("started_at")
+    if not isinstance(started, (int, float)):
+        return WIZARD_BATCH_ETA_ESTIMATING_SUFFIX
+    elapsed = max(1.0, time.time() - float(started))
+    eta_sec = (elapsed / done) * remaining
+    suffix = " · " + _format_batch_eta_remaining(eta_sec)
+    watch["eta_at_done"] = done
+    watch["eta_suffix"] = suffix
+    return suffix
 
 
 def _normalize_output_timeout_sec(value: object) -> int:
@@ -279,6 +449,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self.geometry("584x460")
         self._wizard_step = WIZARD_STEP_SETUP
         self._wizard_step_outcome: dict[int, str] = {}
+        self._wizard_step_failed_models: dict[int, list[str]] = {}
         self.resizable(False, False)
 
         ctk.set_appearance_mode("light")
@@ -1018,15 +1189,25 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return 1.0, f"Batch progress: {initial} of {initial} chunks complete."
         fraction = done / initial
         chunks_word = "chunks" if initial != 1 else "chunk"
-        return fraction, f"Batch progress: {done} of {initial} {chunks_word} complete."
+        text = f"Batch progress: {done} of {initial} {chunks_word} complete."
+        text += _batch_progress_eta_suffix(
+            watch, done=done, remaining=remaining, initial=initial
+        )
+        return fraction, text
 
     def _wizard_step_shows_batch_progress(self, step: int) -> bool:
         if step not in (WIZARD_STEP_SCAN, WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
             return False
-        return (
+        if (
             self._wizard_batch_waiting_on_step(step)
             or self._wizard_batch_ready_for_next(step)
-        )
+        ):
+            return True
+        if step in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
+            batch_dir, _ = self._wizard_batch_dir_for_step(step)
+            if batch_dir is not None and self._wizard_failed_models_for_step(step, batch_dir):
+                return True
+        return False
 
     def _wizard_batch_progress_info_for_step(self, step: int) -> tuple[float, str] | None:
         watch = self._wizard_batch_watch
@@ -1075,18 +1256,37 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if frame is None or label is None or bar is None:
             return
         info = self._wizard_batch_progress_info_for_step(step)
-        if info is None:
-            label.configure(text="Waiting for batch to finish…", text_color="#666666")
+        failures_only = False
+        if info is None and step in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
+            batch_dir, _ = self._wizard_batch_dir_for_step(step)
+            if batch_dir is not None and self._wizard_failed_models_for_step(step, batch_dir):
+                failures_only = True
+        if info is None and not failures_only:
+            wait_text = "Waiting for batch to finish…"
+            watch = self._wizard_batch_watch
+            if (
+                step in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D)
+                and watch is not None
+                and watch.get("step") == step
+            ):
+                wait_text += WIZARD_BATCH_ETA_ESTIMATING_SUFFIX
+            label.configure(text=wait_text, text_color="#666666")
             bar.set(0)
         else:
-            fraction, text = info
+            if failures_only:
+                fraction, text = 1.0, ""
+            else:
+                fraction, text = info  # type: ignore[misc]
             finished = fraction >= 1.0
             label.configure(
                 text=text,
-                text_color="#2E7D32" if finished else "#111111",
+                text_color="#2E7D32" if finished and text else "#111111",
             )
             bar.set(fraction)
         frame.pack(anchor="w", fill="x", pady=(8, 0))
+        if step in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
+            batch_dir, _ = self._wizard_batch_dxc_context_for_step(step)
+            self._refresh_wizard_batch_failed_label(step, batch_dir)
 
     def _wizard_batch_outputs_ready(self, watch: dict[str, object]) -> bool:
         batch_dir = watch.get("batch_dir")
@@ -1117,12 +1317,14 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self, step: int, batch_dir: Path, scan_templates: bool
     ) -> None:
         self._cancel_wizard_batch_output_watch()
+        self._wizard_step_failed_models.pop(step, None)
         self._wizard_batch_watch = {
             "step": step,
             "batch_dir": batch_dir,
             "scan_templates": scan_templates,
             "had_dxc": self._batch_dxc_files_exist(batch_dir, scan_templates),
             "initial_dxc_count": self._batch_dxc_count(batch_dir, scan_templates),
+            "started_at": time.time(),
         }
         self._tick_wizard_batch_output_watch()
 
@@ -1140,6 +1342,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             self._wizard_batch_watch_job = self.after(1000, self._tick_wizard_batch_output_watch)
             return
         ready = self._wizard_batch_outputs_ready(watch)
+        if ready:
+            self._wizard_capture_failed_models_after_batch(watch)
         self._refresh_wizard_ui()
         if ready:
             step = watch.get("step")
@@ -1166,6 +1370,50 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if self._wizard_step_has_remaining_dxc(step):
             return True
         return not self._wizard_batch_outputs_ready(watch)
+
+    def _wizard_capture_failed_models_after_batch(self, watch: dict[str, object]) -> None:
+        step = watch.get("step")
+        if step not in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
+            return
+        batch_dir = watch.get("batch_dir")
+        if not isinstance(batch_dir, Path):
+            return
+        task_display = self._wizard_task_display_for_step(step)
+        if not task_display:
+            return
+        task_kind = self._runner_task_kind(task_display)
+        self._wizard_step_failed_models[step] = _read_batch_failed_models(
+            batch_dir, task_kind
+        )
+
+    def _wizard_failed_models_for_step(self, step: int, log_dir: Path) -> list[str]:
+        if step not in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
+            return []
+        task_display = self._wizard_task_display_for_step(step)
+        if not task_display:
+            return []
+        task_kind = self._runner_task_kind(task_display)
+        models = _read_batch_failed_models(log_dir, task_kind)
+        self._wizard_step_failed_models[step] = models
+        return models
+
+    def _refresh_wizard_batch_failed_label(self, step: int, log_dir: Path | None) -> None:
+        label = getattr(self, "wizard_batch_failed_label", None)
+        if label is None:
+            return
+        if step not in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D) or log_dir is None:
+            label.configure(text="")
+            label.pack_forget()
+            return
+        failed_line = _format_batch_failed_models_line(
+            self._wizard_failed_models_for_step(step, log_dir)
+        )
+        if failed_line:
+            label.configure(text=failed_line, text_color="#C62828")
+            label.pack(anchor="w", pady=(4, 0))
+        else:
+            label.configure(text="")
+            label.pack_forget()
 
     def _wizard_batch_primary_action_label(self, step: int) -> str:
         if step == WIZARD_STEP_SCAN:
@@ -1466,7 +1714,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 has_scan = self._templates_dir_has_scan_xml()
                 if has_scan:
                     summary.configure(
-                        text="Skip or run Scan Templates > again.",
+                        text="Template scan complete.",
                         text_color="#2E7D32",
                     )
                 elif count:
@@ -1546,22 +1794,15 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                         "ModelCHECK XML found." if has_xml else "ModelCHECK XML not found yet."
                     )
                     ok = ok or has_xml
-                    if has_xml and latest_files:
-                        lines.append("Skip or run ModelCHECK again.")
-                    elif has_xml:
-                        lines.append("Skip or run ModelCHECK.")
                 elif step == WIZARD_STEP_JPEG_3D:
                     has_jpg = self._working_directory_has_jpg_files(wd)
                     lines.append("JPEG files found." if has_jpg else "JPEG files not found yet.")
                     ok = ok or has_jpg
-                    if has_jpg and latest_files:
-                        lines.append("Skip or run JPEG 3D again.")
-                    elif has_jpg:
-                        lines.append("Skip or run JPEG 3D.")
                 label.configure(
                     text="\n".join(lines),
                     text_color="#2E7D32" if ok else "#666666",
                 )
+                self._refresh_wizard_batch_failed_label(step, working_dir)
             else:
                 label.configure(
                     text="Working folder will be created when you run this step.",
@@ -1847,6 +2088,15 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         )
         self.wizard_batch_progress_bar.pack(anchor="w", fill="x")
         self.wizard_batch_progress_bar.set(0)
+        self.wizard_batch_failed_label = ctk.CTkLabel(
+            self.wizard_batch_progress_frame,
+            text="",
+            font=ctk.CTkFont(size=12),
+            text_color="#C62828",
+            anchor="w",
+            justify="left",
+            wraplength=500,
+        )
 
         self.wizard_report_frame = ctk.CTkFrame(self.wizard_step_body, fg_color="transparent")
         self.wizard_report_status_label = ctk.CTkLabel(
@@ -2314,11 +2564,14 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._cancel_wizard_batch_output_watch()
         self._close_batch_runner_window()
         errors: list[str] = []
+        errors.extend(_remove_batch_timeout_logs_in_directory(working_dir))
         errors.extend(self._clean_start_over_directory(working_dir))
         if templates_dir.is_dir():
+            errors.extend(_remove_batch_timeout_logs_in_directory(templates_dir))
             errors.extend(self._clean_start_over_directory(templates_dir))
         self._refresh_action_buttons()
         self._wizard_step_outcome.clear()
+        self._wizard_step_failed_models.clear()
         self._set_wizard_step(WIZARD_STEP_SETUP)
         if errors:
             messagebox.showwarning(
@@ -2351,6 +2604,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._set_creo_loadpoint_value("")
         self._cancel_wizard_batch_output_watch()
         self._wizard_step_outcome.clear()
+        self._wizard_step_failed_models.clear()
         self._refresh_task_options()
         self._set_wizard_step(WIZARD_STEP_SETUP)
 
@@ -3679,8 +3933,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "$TimeoutLogInitialized = $false",
             "$SuccessFileCount = 0",
             "$TimedOutFileCount = 0",
-            "$runStamp = Get-Date -Format 'HHmmss'",
-            "$TimeoutLog = Join-Path -Path $WorkDir -ChildPath ('creo-batch-timeouts-' + $TaskKind + '-' + $runStamp + '.txt')",
+            "$TimeoutLog = Join-Path -Path $WorkDir -ChildPath ('creo-batch-timeouts-' + $TaskKind + '.txt')",
             "",
             "function Record-TimedOutChunk {",
             "    param([int]$Chunk, [string[]]$MissingOutputs)",
@@ -4034,6 +4287,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
         self._update_create_report_task_list()
         self._save_settings()
+        if not scan_templates and task_display_raw:
+            task_kind = self._runner_task_kind(task_display_raw)
+            if task_kind in ("modelcheck", "jpeg3d"):
+                _clear_batch_timeout_logs(batch_dir, task_kind)
+                self._wizard_step_failed_models.pop(self._wizard_step, None)
         if not self._launch_batch_runner(working_dir, task_display_raw):
             self._refresh_action_buttons_run()
             return
