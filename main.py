@@ -47,6 +47,11 @@ _START_TEMPLATE_DEST_NAMES: dict[str, str] = {
     "asm": "assembly_template.asm",
     "drw": "drawing_template.drw",
 }
+_START_TEMPLATE_XML_NAMES: dict[str, str] = {
+    "prt": "part_template.p.xml",
+    "asm": "assembly_template.a.xml",
+    "drw": "drawing_template.d.xml",
+}
 
 # Chunk .dxc files: working_dir / f"{CREO_BATCH_BASE}-1.dxc", "-2.dxc", ...
 CREO_BATCH_BASE = "creo-batch"
@@ -72,6 +77,8 @@ BATCH_OUTPUT_WAIT_TIMEOUT_DEFAULT = 120
 BATCH_OUTPUT_WAIT_TIMEOUT_MIN = 60
 # After all expected outputs for a chunk appear, settle this many seconds before running kill.bat.
 BATCH_OUTPUT_SETTLE_SEC = 5
+# Wizard polls the batch folder until chunk .dxc files are gone (runner deletes them when done).
+WIZARD_BATCH_DXC_POLL_MS = 3000
 # When no Creo loadpoint / no .ttd list yet, File → New uses this default task (filename + UI label).
 DEFAULT_MODELCHECK_TTD = "modelcheck.ttd"
 DEFAULT_MODELCHECK_DISPLAY = "ModelCHECK"
@@ -85,6 +92,14 @@ TASK_COMBOBOX_FONT = ("Segoe UI", 11)
 _START_OVER_FILE_SUFFIXES = frozenset(
     {".ps1", ".dxc", ".xml", ".html", ".js", ".jpg", ".png", ".log", ".css"}
 )
+WIZARD_STEP_SETUP = 0
+WIZARD_STEP_SCAN = 1
+WIZARD_STEP_MODELCHECK = 2
+WIZARD_STEP_JPEG_3D = 3
+WIZARD_STEP_REPORT = 4
+WIZARD_STEP_COUNT = 5
+WIZARD_STEPPER_LABELS = ("Setup", "Templates", "ModelCHECK", "JPEG 3D", "Report")
+WIZARD_STEPPER_FONT_SIZE = 14
 
 
 def _creo_model_name_pattern(extensions: tuple[str, ...]) -> re.Pattern[str]:
@@ -261,7 +276,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._install_dialog_parent()
 
         self.title("PDSVISION Cad Assessment Tool")
-        self.geometry("584x310")
+        self.geometry("584x460")
+        self._wizard_step = WIZARD_STEP_SETUP
+        self._wizard_step_outcome: dict[int, str] = {}
         self.resizable(False, False)
 
         ctk.set_appearance_mode("light")
@@ -296,6 +313,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._refresh_action_buttons_job: str | None = None
         self._activate_refresh_job: str | None = None
         self._post_batch_task_refresh_job: str | None = None
+        self._wizard_batch_watch: dict[str, object] | None = None
+        self._wizard_batch_watch_job: str | None = None
+        self._batch_runner_process: subprocess.Popen | None = None
         self._last_create_report_available = False
         self._modal_dialog_depth = 0
         self._report_job_running = False
@@ -461,6 +481,17 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         except OSError:
             return False
 
+    def _working_directory_index_html_path(self, working_dir_str: str | None = None) -> Path | None:
+        """Path to index.html in the working directory, or None if missing."""
+        s = (working_dir_str if working_dir_str is not None else self.working_directory.get()).strip()
+        if not s:
+            return None
+        try:
+            path = Path(s).expanduser() / "index.html"
+            return path if path.is_file() else None
+        except OSError:
+            return None
+
     def _create_report_task_available(self, working_dir_str: str | None = None) -> bool:
         wd = (working_dir_str if working_dir_str is not None else self.working_directory.get()).strip()
         if not wd or not _working_directory_exists_as_dir(wd):
@@ -531,33 +562,18 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         return None
 
     def _maybe_advance_to_create_report_task(self) -> None:
+        """Refresh task metadata only; wizard steps advance via Next, one step at a time."""
         if not self._create_report_task_available():
             return
-        try:
-            values = tuple(self.task_select.cget("values") or ())
-        except tk.TclError:
-            values = ()
-        if CREATE_REPORT_DISPLAY not in values:
-            return
-        self.task.set(CREATE_REPORT_DISPLAY)
-        self._refresh_configuration_menu()
-        self._refresh_action_buttons()
+        self._update_create_report_task_list(advance_from_jpeg=False)
 
     def _update_create_report_task_list(self, *, advance_from_jpeg: bool = False) -> None:
-        """Rebuild the Task dropdown when Create Report eligibility changes."""
+        """Rebuild task maps when Create Report eligibility changes (no wizard auto-advance)."""
         available = self._create_report_task_available()
         if available == self._last_create_report_available:
-            if advance_from_jpeg and available:
-                self._maybe_advance_to_create_report_task()
             return
         self._last_create_report_available = available
-        prev_task = self.task.get() or ""
         self._refresh_task_options()
-        if advance_from_jpeg and (
-            self._is_jpeg_3d_task(prev_task)
-            or self._is_jpeg_3d_task(self.task.get() or "")
-        ):
-            self._maybe_advance_to_create_report_task()
 
     def _cancel_post_batch_task_refresh(self) -> None:
         jid = self._post_batch_task_refresh_job
@@ -583,7 +599,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             if self._modal_dialog_depth > 0:
                 self._post_batch_task_refresh_job = self.after(1000, tick)
                 return
-            self._update_create_report_task_list(advance_from_jpeg=True)
+            self._update_create_report_task_list(advance_from_jpeg=False)
             poll_remaining["count"] -= 1
             if poll_remaining["count"] <= 0 or self._create_report_task_available():
                 return
@@ -592,29 +608,24 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._post_batch_task_refresh_job = self.after(3000, tick)
 
     def _advance_task_after_open_batch(self, from_task_display: str) -> None:
-        """Scan Templates → ModelCHECK → JPEG 3D → Create Report when GO launches the batch."""
-        if self._is_scan_templates_task(from_task_display):
-            next_display = self._task_display_for_ttd_filename(
-                DEFAULT_MODELCHECK_TTD
-            ) or DEFAULT_MODELCHECK_DISPLAY
-        elif self._is_regular_modelcheck_task(from_task_display):
-            next_display = self._task_display_for_ttd_filename(JPEG_3D_TTD)
-        elif self._is_jpeg_3d_task(from_task_display):
-            self._update_create_report_task_list(advance_from_jpeg=True)
-            return
-        else:
-            return
-        if not next_display:
-            return
-        try:
-            values = tuple(self.task_select.cget("values") or ())
-        except tk.TclError:
-            values = ()
-        if values and next_display not in values:
-            return
-        self.task.set(next_display)
-        self._refresh_configuration_menu()
-        self._refresh_action_buttons()
+        """Legacy hook; wizard advances only when the user clicks Next."""
+        del from_task_display
+
+    def _wizard_advance_one_step_after_batch(self) -> None:
+        """Advance exactly one wizard step after the user clicks Next on a finished batch."""
+        step = self._wizard_step
+        self._cancel_wizard_batch_output_watch()
+        self._close_batch_runner_window()
+        if step == WIZARD_STEP_SCAN:
+            self._wizard_step_outcome[WIZARD_STEP_SCAN] = "done"
+            self._set_wizard_step(WIZARD_STEP_MODELCHECK)
+        elif step == WIZARD_STEP_MODELCHECK:
+            self._wizard_step_outcome[WIZARD_STEP_MODELCHECK] = "done"
+            self._set_wizard_step(WIZARD_STEP_JPEG_3D)
+        elif step == WIZARD_STEP_JPEG_3D:
+            self._wizard_step_outcome[WIZARD_STEP_JPEG_3D] = "done"
+            self._set_wizard_step(WIZARD_STEP_REPORT)
+            self._update_create_report_task_list(advance_from_jpeg=False)
 
     def _clean_description_inner(self, inner: str) -> str:
         """Remove XML comments and junk; collapse to a single display line."""
@@ -732,6 +743,923 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             font=TASK_COMBOBOX_FONT,
         )
 
+    def _wizard_jpeg_3d_display(self) -> str:
+        return (
+            self._task_display_for_ttd_filename(JPEG_3D_TTD)
+            or "JPEG 3D"
+        )
+
+    def _wizard_modelcheck_display(self) -> str:
+        return (
+            self._task_display_for_ttd_filename(DEFAULT_MODELCHECK_TTD)
+            or DEFAULT_MODELCHECK_DISPLAY
+        )
+
+    def _wizard_task_display_for_step(self, step: int) -> str:
+        if step == WIZARD_STEP_SCAN:
+            return SCAN_TEMPLATES_DISPLAY
+        if step == WIZARD_STEP_MODELCHECK:
+            return self._wizard_modelcheck_display()
+        if step == WIZARD_STEP_JPEG_3D:
+            return self._wizard_jpeg_3d_display()
+        if step == WIZARD_STEP_REPORT:
+            return CREATE_REPORT_DISPLAY
+        return ""
+
+    def _wizard_step_title(self, step: int) -> str:
+        titles = {
+            WIZARD_STEP_SETUP: "Setup",
+            WIZARD_STEP_SCAN: "Scan Templates",
+            WIZARD_STEP_MODELCHECK: self._wizard_modelcheck_display(),
+            WIZARD_STEP_JPEG_3D: self._wizard_jpeg_3d_display(),
+            WIZARD_STEP_REPORT: "Create Report",
+        }
+        return titles.get(step, "")
+
+    def _wizard_step_intro(self, step: int) -> str:
+        if step == WIZARD_STEP_SETUP:
+            return (
+                "Choose the working folder for your models and batch outputs, "
+                "and your Creo loadpoint."
+            )
+        if step == WIZARD_STEP_SCAN:
+            return (
+                "Optional: upload templates for model types in your working folder, then run "
+                "ModelCHECK on them to seed configs. Part template is always shown; assembly and "
+                "drawing rows appear only when .asm or .drw files are present. At least one "
+                "template is required to scan."
+            )
+        if step == WIZARD_STEP_MODELCHECK:
+            return (
+                "Run ModelCHECK on models in the working directory. "
+                "Outputs (XML, HTML, etc.) are written to the working folder."
+            )
+        if step == WIZARD_STEP_JPEG_3D:
+            return (
+                "Export JPEG 3D images for parts and assemblies in the working directory."
+            )
+        if step == WIZARD_STEP_REPORT:
+            return (
+                "Build master.xml from ModelCHECK results and generate the Model Quality Report."
+            )
+        return ""
+
+    def _wizard_setup_valid(self) -> bool:
+        wd = (self.working_directory.get() or "").strip()
+        lp = (self.creo_loadpoint.get() or "").strip().rstrip("\\/")
+        if not wd or not _working_directory_ok_for_go(wd):
+            return False
+        if _path_contains_spaces(wd):
+            return False
+        if not lp or not _creo_loadpoint_has_parametric_dir(lp):
+            return False
+        ptc = Path(lp) / "Parametric" / "bin" / "ptcdbatch.bat"
+        kill = _app_bundle_dir() / "kill.bat"
+        return ptc.is_file() and kill.is_file()
+
+    def _template_dest_path(self, kind: str) -> Path | None:
+        dest_dir = self._start_templates_dir()
+        if dest_dir is None:
+            return None
+        dest_name = _START_TEMPLATE_DEST_NAMES.get(kind)
+        if not dest_name:
+            return None
+        return dest_dir / dest_name
+
+    def _template_is_set(self, kind: str) -> bool:
+        dest = self._template_dest_path(kind)
+        return dest is not None and dest.is_file()
+
+    def _wizard_template_kind_visible(self, kind: str) -> bool:
+        """Show a template row for part always; asm/drw only when WD has that type or template is set."""
+        if kind == "prt":
+            return True
+        if self._template_is_set(kind):
+            return True
+        if kind == "asm":
+            return self._working_directory_has_creo_models(extensions=("asm",))
+        if kind == "drw":
+            return self._working_directory_has_creo_models(extensions=("drw",))
+        return True
+
+    def _refresh_wizard_template_row_visibility(self) -> None:
+        rows = getattr(self, "_wizard_template_rows", None)
+        if not rows:
+            return
+        for kind in ("prt", "asm", "drw"):
+            row = rows.get(kind)
+            if row is not None:
+                row.pack_forget()
+        for kind in ("prt", "asm", "drw"):
+            row = rows.get(kind)
+            if row is not None and self._wizard_template_kind_visible(kind):
+                row.pack(fill="x", pady=3)
+
+    def _template_stem_and_letter(self, kind: str) -> tuple[str, str] | None:
+        dest_name = _START_TEMPLATE_DEST_NAMES.get(kind)
+        if not dest_name:
+            return None
+        m = re.match(r"^(.*)\.(prt|asm|drw)$", dest_name, flags=re.IGNORECASE)
+        if not m:
+            return None
+        return m.group(1), m.group(2).lower()[0]
+
+    def _template_scan_artifact_paths(self, kind: str) -> list[Path]:
+        """Model file and ModelCHECK outputs (xml, html, js) for one template kind."""
+        info = self._template_stem_and_letter(kind)
+        dest_dir = self._start_templates_dir()
+        if info is None or dest_dir is None or not dest_dir.is_dir():
+            return []
+        stem, letter = info
+        ext = {"p": "prt", "a": "asm", "d": "drw"}[letter]
+        paths: list[Path] = []
+        seen: set[Path] = set()
+
+        def add(path: Path) -> None:
+            resolved = path.resolve()
+            if resolved not in seen and path.is_file():
+                seen.add(resolved)
+                paths.append(path)
+
+        dest = dest_dir / _START_TEMPLATE_DEST_NAMES[kind]
+        add(dest)
+        xml_name = _START_TEMPLATE_XML_NAMES.get(kind)
+        if xml_name:
+            add(dest_dir / xml_name)
+        rev_re = re.compile(rf"^{re.escape(stem)}\.{re.escape(ext)}\.\d+$", flags=re.IGNORECASE)
+        html_re = re.compile(rf"^{re.escape(stem)}\.{re.escape(letter)}\.html$", flags=re.IGNORECASE)
+        stem_fold = stem.casefold()
+        try:
+            for entry in dest_dir.iterdir():
+                if not entry.is_file():
+                    continue
+                name = entry.name
+                if rev_re.match(name) or html_re.match(name):
+                    add(entry)
+                    continue
+                name_low = name.casefold()
+                if name_low.endswith(".js") and name_low.startswith(stem_fold):
+                    add(entry)
+        except OSError:
+            pass
+        return paths
+
+    def _on_wizard_clear_template(self, kind: str) -> None:
+        if self._wizard_batch_waiting_on_step(WIZARD_STEP_SCAN):
+            return
+        paths = self._template_scan_artifact_paths(kind)
+        if not paths:
+            return
+        errors: list[str] = []
+        for path in paths:
+            try:
+                path.unlink()
+            except OSError as exc:
+                errors.append(f"{path}\n{exc}")
+        self._update_sample_start_from_template_xml_if_present()
+        self._refresh_task_options()
+        self._refresh_wizard_template_status()
+        self._refresh_wizard_footer()
+        if errors:
+            messagebox.showwarning(
+                "Remove template",
+                "Some files could not be removed:\n\n" + "\n\n".join(errors),
+            )
+
+    def _templates_upload_count(self) -> int:
+        return sum(1 for kind, _ in _START_TEMPLATE_KINDS if self._template_is_set(kind))
+
+    def _set_wizard_step(self, step: int) -> None:
+        step = max(WIZARD_STEP_SETUP, min(WIZARD_STEP_COUNT - 1, step))
+        if step != self._wizard_step:
+            self._cancel_wizard_batch_output_watch()
+        self._wizard_step = step
+        task_display = self._wizard_task_display_for_step(step)
+        if task_display:
+            self.task.set(task_display)
+        self._refresh_configuration_menu()
+        self._refresh_wizard_ui()
+
+    def _wizard_batch_dir_for_step(self, step: int) -> tuple[Path | None, bool]:
+        """Batch folder and whether this step uses Scan Templates (templates.dxc)."""
+        wd_str = (self.working_directory.get() or "").strip()
+        if not wd_str:
+            return None, False
+        try:
+            working_dir = Path(wd_str).expanduser().resolve()
+        except OSError:
+            return None, False
+        task_display = self._wizard_task_display_for_step(step)
+        if not task_display or self._is_create_report_task(task_display):
+            return None, False
+        scan_templates = self._is_scan_templates_task(task_display)
+        batch_dir = self._batch_dir_for_task(working_dir, task_display)
+        return batch_dir, scan_templates
+
+    def _wizard_batch_dxc_context_for_step(self, step: int) -> tuple[Path | None, bool]:
+        """Batch folder and scan-templates flag; prefer the active watch folder when set."""
+        watch = self._wizard_batch_watch
+        if watch is not None and watch.get("step") == step:
+            batch_dir = watch.get("batch_dir")
+            if isinstance(batch_dir, Path):
+                return batch_dir, bool(watch.get("scan_templates"))
+        return self._wizard_batch_dir_for_step(step)
+
+    def _wizard_step_has_remaining_dxc(self, step: int) -> bool:
+        batch_dir, scan_templates = self._wizard_batch_dxc_context_for_step(step)
+        if batch_dir is None:
+            return False
+        return self._batch_dxc_files_exist(batch_dir, scan_templates)
+
+    def _wizard_batch_ready_for_next(self, step: int) -> bool:
+        """True when this step's batch finished (all .dxc gone after a run) and Next should show."""
+        if self._wizard_step_has_remaining_dxc(step):
+            return False
+        watch = self._wizard_batch_watch
+        if watch is not None and watch.get("step") == step:
+            return self._wizard_batch_outputs_ready(watch)
+        return self._wizard_batch_step_already_complete(step)
+
+    @staticmethod
+    def _batch_dxc_files_exist(batch_dir: Path, scan_templates: bool) -> bool:
+        try:
+            if scan_templates:
+                return (batch_dir / SCAN_TEMPLATES_DXC_BASENAME).is_file()
+            return any(batch_dir.glob(f"{CREO_BATCH_BASE}-*.dxc"))
+        except OSError:
+            return False
+
+    @staticmethod
+    def _batch_dxc_count(batch_dir: Path, scan_templates: bool) -> int:
+        try:
+            if scan_templates:
+                return 1 if (batch_dir / SCAN_TEMPLATES_DXC_BASENAME).is_file() else 0
+            return len(list(batch_dir.glob(f"{CREO_BATCH_BASE}-*.dxc")))
+        except OSError:
+            return 0
+
+    def _wizard_batch_progress_info(self, watch: dict[str, object] | None) -> tuple[float, str] | None:
+        if watch is None or not watch.get("had_dxc"):
+            return None
+        batch_dir = watch.get("batch_dir")
+        if not isinstance(batch_dir, Path):
+            return None
+        scan_templates = bool(watch.get("scan_templates"))
+        initial = watch.get("initial_dxc_count")
+        if not isinstance(initial, int) or initial <= 0:
+            return None
+        remaining = self._batch_dxc_count(batch_dir, scan_templates)
+        done = max(0, initial - remaining)
+        if scan_templates or initial == 1:
+            if remaining:
+                return 0.0, "Template scan running…"
+            return 1.0, "Template scan finished."
+        if remaining == 0:
+            return 1.0, f"Batch progress: {initial} of {initial} chunks complete."
+        fraction = done / initial
+        chunks_word = "chunks" if initial != 1 else "chunk"
+        return fraction, f"Batch progress: {done} of {initial} {chunks_word} complete."
+
+    def _wizard_step_shows_batch_progress(self, step: int) -> bool:
+        if step not in (WIZARD_STEP_SCAN, WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
+            return False
+        return (
+            self._wizard_batch_waiting_on_step(step)
+            or self._wizard_batch_ready_for_next(step)
+        )
+
+    def _wizard_batch_progress_info_for_step(self, step: int) -> tuple[float, str] | None:
+        watch = self._wizard_batch_watch
+        if watch is not None and watch.get("step") == step:
+            info = self._wizard_batch_progress_info(watch)
+            if info is not None:
+                return info
+        if not self._wizard_batch_ready_for_next(step):
+            return None
+        batch_dir, scan_templates = self._wizard_batch_dir_for_step(step)
+        if batch_dir is None:
+            return None
+        if scan_templates:
+            return 1.0, "Template scan finished."
+        return 1.0, "Batch finished."
+
+    def _refresh_wizard_step_batch_progress(self, step: int) -> None:
+        rows = (
+            (
+                WIZARD_STEP_SCAN,
+                getattr(self, "wizard_scan_progress_frame", None),
+                getattr(self, "wizard_scan_progress_label", None),
+                getattr(self, "wizard_scan_progress_bar", None),
+            ),
+            (
+                WIZARD_STEP_MODELCHECK,
+                getattr(self, "wizard_batch_progress_frame", None),
+                getattr(self, "wizard_batch_progress_label", None),
+                getattr(self, "wizard_batch_progress_bar", None),
+            ),
+        )
+        for _, frame, _label, _bar in rows:
+            if frame is not None:
+                frame.pack_forget()
+        if not self._wizard_step_shows_batch_progress(step):
+            return
+        frame = label = bar = None
+        if step == WIZARD_STEP_SCAN:
+            frame = getattr(self, "wizard_scan_progress_frame", None)
+            label = getattr(self, "wizard_scan_progress_label", None)
+            bar = getattr(self, "wizard_scan_progress_bar", None)
+        elif step in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
+            frame = getattr(self, "wizard_batch_progress_frame", None)
+            label = getattr(self, "wizard_batch_progress_label", None)
+            bar = getattr(self, "wizard_batch_progress_bar", None)
+        if frame is None or label is None or bar is None:
+            return
+        info = self._wizard_batch_progress_info_for_step(step)
+        if info is None:
+            label.configure(text="Waiting for batch to finish…", text_color="#666666")
+            bar.set(0)
+        else:
+            fraction, text = info
+            finished = fraction >= 1.0
+            label.configure(
+                text=text,
+                text_color="#2E7D32" if finished else "#111111",
+            )
+            bar.set(fraction)
+        frame.pack(anchor="w", fill="x", pady=(8, 0))
+
+    def _wizard_batch_outputs_ready(self, watch: dict[str, object]) -> bool:
+        batch_dir = watch.get("batch_dir")
+        if not isinstance(batch_dir, Path):
+            return False
+        scan_templates = bool(watch.get("scan_templates"))
+        has_dxc = self._batch_dxc_files_exist(batch_dir, scan_templates)
+        if has_dxc:
+            watch["had_dxc"] = True
+            count = self._batch_dxc_count(batch_dir, scan_templates)
+            initial = watch.get("initial_dxc_count")
+            if not isinstance(initial, int) or count > initial:
+                watch["initial_dxc_count"] = count
+            return False
+        return bool(watch.get("had_dxc"))
+
+    def _cancel_wizard_batch_output_watch(self) -> None:
+        jid = self._wizard_batch_watch_job
+        if jid is not None:
+            try:
+                self.after_cancel(jid)
+            except tk.TclError:
+                pass
+        self._wizard_batch_watch_job = None
+        self._wizard_batch_watch = None
+
+    def _start_wizard_batch_output_watch(
+        self, step: int, batch_dir: Path, scan_templates: bool
+    ) -> None:
+        self._cancel_wizard_batch_output_watch()
+        self._wizard_batch_watch = {
+            "step": step,
+            "batch_dir": batch_dir,
+            "scan_templates": scan_templates,
+            "had_dxc": self._batch_dxc_files_exist(batch_dir, scan_templates),
+            "initial_dxc_count": self._batch_dxc_count(batch_dir, scan_templates),
+        }
+        self._tick_wizard_batch_output_watch()
+
+    def _tick_wizard_batch_output_watch(self) -> None:
+        self._wizard_batch_watch_job = None
+        watch = self._wizard_batch_watch
+        if watch is None:
+            return
+        try:
+            if not self.winfo_exists():
+                return
+        except tk.TclError:
+            return
+        if self._modal_dialog_depth > 0:
+            self._wizard_batch_watch_job = self.after(1000, self._tick_wizard_batch_output_watch)
+            return
+        ready = self._wizard_batch_outputs_ready(watch)
+        self._refresh_wizard_ui()
+        if ready:
+            step = watch.get("step")
+            if step == WIZARD_STEP_JPEG_3D:
+                self._update_create_report_task_list(advance_from_jpeg=False)
+            return
+        self._wizard_batch_watch_job = self.after(
+            WIZARD_BATCH_DXC_POLL_MS, self._tick_wizard_batch_output_watch
+        )
+
+    def _wizard_batch_step_already_complete(self, step: int) -> bool:
+        """True only when this step's batch already finished earlier in this session."""
+        if self._wizard_step_outcome.get(step) != "done":
+            return False
+        batch_dir, scan_templates = self._wizard_batch_dir_for_step(step)
+        if batch_dir is None:
+            return False
+        return not self._batch_dxc_files_exist(batch_dir, scan_templates)
+
+    def _wizard_batch_waiting_on_step(self, step: int) -> bool:
+        watch = self._wizard_batch_watch
+        if watch is None or watch.get("step") != step:
+            return False
+        if self._wizard_step_has_remaining_dxc(step):
+            return True
+        return not self._wizard_batch_outputs_ready(watch)
+
+    def _wizard_batch_primary_action_label(self, step: int) -> str:
+        if step == WIZARD_STEP_SCAN:
+            return "Scan Templates >"
+        if step == WIZARD_STEP_MODELCHECK:
+            return "Run ModelCHECK >"
+        if step == WIZARD_STEP_JPEG_3D:
+            return "Run JPEG 3D >"
+        return "Next >"
+
+    def _on_wizard_back(self) -> None:
+        if self._wizard_step <= WIZARD_STEP_SETUP:
+            return
+        if self._wizard_batch_waiting_on_step(self._wizard_step):
+            return
+        self._cancel_wizard_batch_output_watch()
+        self._set_wizard_step(self._wizard_step - 1)
+
+    def _on_wizard_skip_step(self) -> None:
+        step = self._wizard_step
+        self._cancel_wizard_batch_output_watch()
+        self._close_batch_runner_window()
+        if step == WIZARD_STEP_SCAN:
+            self._wizard_step_outcome[WIZARD_STEP_SCAN] = "skipped"
+            self._set_wizard_step(WIZARD_STEP_MODELCHECK)
+        elif step == WIZARD_STEP_MODELCHECK:
+            self._wizard_step_outcome[WIZARD_STEP_MODELCHECK] = "skipped"
+            self._set_wizard_step(WIZARD_STEP_JPEG_3D)
+        elif step == WIZARD_STEP_JPEG_3D:
+            self._wizard_step_outcome[WIZARD_STEP_JPEG_3D] = "skipped"
+            self._set_wizard_step(WIZARD_STEP_REPORT)
+            self._update_create_report_task_list(advance_from_jpeg=False)
+
+    def _on_wizard_next(self) -> None:
+        step = self._wizard_step
+        if step == WIZARD_STEP_SETUP:
+            if not self._wizard_setup_valid():
+                wd = (self.working_directory.get() or "").strip()
+                if not wd:
+                    messagebox.showwarning(
+                        "Missing Working Directory", "Please enter a working directory."
+                    )
+                    return
+                if not _working_directory_ok_for_go(wd):
+                    messagebox.showwarning(
+                        "Working directory",
+                        "Working directory must be an existing folder, or a new folder name "
+                        "under an existing folder.",
+                    )
+                    return
+                if _path_contains_spaces(wd):
+                    self._warn_if_working_directory_has_spaces()
+                    return
+                lp = (self.creo_loadpoint.get() or "").strip().rstrip("\\/")
+                if not lp:
+                    messagebox.showwarning("Missing Creo Loadpoint", "Please enter a Creo loadpoint.")
+                    return
+                if not _creo_loadpoint_has_parametric_dir(lp):
+                    self._warn_if_creo_loadpoint_missing_parametric()
+                    return
+                messagebox.showerror(
+                    "Setup",
+                    "Could not find ptcdbatch.bat under the loadpoint or kill.bat next to the app.",
+                )
+                return
+            self._persist_working_directory_and_loadpoint()
+            self._refresh_task_options()
+            self._set_wizard_step(WIZARD_STEP_SCAN)
+            return
+        if step == WIZARD_STEP_SCAN:
+            if self._wizard_batch_waiting_on_step(step):
+                return
+            if self._wizard_batch_ready_for_next(step):
+                self._wizard_advance_one_step_after_batch()
+                return
+            self._on_go()
+            return
+        if step in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
+            if self._wizard_batch_waiting_on_step(step):
+                return
+            if self._wizard_batch_ready_for_next(step):
+                self._wizard_advance_one_step_after_batch()
+                return
+            self._on_go()
+            return
+        if step == WIZARD_STEP_REPORT:
+            self._on_write_summary_report()
+
+    def _on_wizard_open_report(self) -> None:
+        path = self._working_directory_index_html_path()
+        if path is None:
+            messagebox.showwarning(
+                "Open Report",
+                "index.html was not found in the working directory.",
+            )
+            return
+        try:
+            webbrowser.open(path.as_uri())
+        except OSError as exc:
+            messagebox.showerror(
+                "Open Failed",
+                f"Could not open report in browser.\n\n{exc}",
+            )
+
+    def _on_wizard_browse_template(self, kind: str) -> None:
+        if self._wizard_batch_waiting_on_step(WIZARD_STEP_SCAN):
+            return
+        labels = {k: label.rstrip(".") for k, label in _START_TEMPLATE_KINDS}
+        title = labels.get(kind, "Template")
+        wd = (self.working_directory.get() or "").strip()
+        if not wd or not Path(wd).is_dir():
+            messagebox.showwarning(
+                "Template",
+                "Set a working directory on the Setup step before choosing a template.",
+            )
+            return
+        selected = fd.askopenfilename(
+            title=title,
+            initialdir=wd,
+            filetypes=[
+                (f"Creo {kind} files", f"*.{kind};*.{kind}.*"),
+                ("All files", "*.*"),
+            ],
+        )
+        if not selected:
+            return
+        source = Path(selected)
+        if not source.is_file():
+            messagebox.showerror("Template", f"File not found:\n{source}")
+            return
+        if not self._creo_model_filename_matches(source.name, kind):
+            messagebox.showerror(
+                "Template",
+                f"Select a Creo {kind} file (*.{kind} or *.{kind}.*).",
+            )
+            return
+        dest_dir = self._start_templates_dir()
+        if dest_dir is None:
+            messagebox.showwarning(
+                "Template",
+                "Set a working directory on the Setup step before choosing a template.",
+            )
+            return
+        try:
+            dest_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            messagebox.showerror(
+                "Template",
+                f"Could not create templates folder:\n{dest_dir.resolve()}\n\n{exc}",
+            )
+            return
+        dest_name = _START_TEMPLATE_DEST_NAMES.get(kind)
+        if not dest_name:
+            return
+        dest = dest_dir / dest_name
+        try:
+            shutil.copy2(source, dest)
+        except OSError as exc:
+            messagebox.showerror(
+                "Template",
+                f"Could not copy template:\n{source}\n\n→\n\n{dest.resolve()}\n\n{exc}",
+            )
+            return
+        self._refresh_task_options()
+        self._refresh_wizard_template_status()
+        self._refresh_wizard_footer()
+
+    def _refresh_wizard_ui(self) -> None:
+        self._refresh_wizard_stepper()
+        self._refresh_wizard_step_panels()
+        self._refresh_wizard_footer()
+
+    def _refresh_wizard_stepper(self) -> None:
+        frame = getattr(self, "wizard_stepper_frame", None)
+        if frame is None:
+            return
+        for widget in frame.winfo_children():
+            widget.destroy()
+        current = self._wizard_step
+        for idx, label in enumerate(WIZARD_STEPPER_LABELS):
+            if idx > 0:
+                ctk.CTkLabel(
+                    frame,
+                    text="—",
+                    font=ctk.CTkFont(size=WIZARD_STEPPER_FONT_SIZE),
+                    text_color="#888888",
+                ).pack(side="left", padx=6)
+            outcome = self._wizard_step_outcome.get(idx, "")
+            if idx < current:
+                if outcome == "skipped":
+                    mark = "—"
+                    color = "#888888"
+                else:
+                    mark = "✓"
+                    color = "#2E7D32"
+            elif idx == current:
+                mark = str(idx + 1)
+                color = "#3B8ED0"
+            else:
+                mark = str(idx + 1)
+                color = "#AAAAAA"
+            step_text = f"{mark} {label}"
+            ctk.CTkLabel(
+                frame,
+                text=step_text,
+                font=ctk.CTkFont(
+                    size=WIZARD_STEPPER_FONT_SIZE,
+                    weight="bold" if idx == current else "normal",
+                ),
+                text_color=color,
+            ).pack(side="left", padx=4)
+
+    def _refresh_wizard_step_panels(self) -> None:
+        step = self._wizard_step
+        panels = (
+            getattr(self, "wizard_setup_frame", None),
+            getattr(self, "wizard_scan_frame", None),
+            getattr(self, "wizard_batch_frame", None),
+            getattr(self, "wizard_batch_frame", None),
+            getattr(self, "wizard_report_frame", None),
+        )
+        for panel in {p for p in panels if p is not None}:
+            panel.pack_forget()
+        title = getattr(self, "wizard_step_title_label", None)
+        intro = getattr(self, "wizard_step_intro_label", None)
+        if title is not None:
+            title.configure(text=self._wizard_step_title(step))
+        if intro is not None:
+            intro.configure(text=self._wizard_step_intro(step))
+        if step == WIZARD_STEP_SETUP and getattr(self, "wizard_setup_frame", None):
+            self.wizard_setup_frame.pack(fill="both", expand=True)
+            self._refresh_wizard_setup_status()
+        elif step == WIZARD_STEP_SCAN and getattr(self, "wizard_scan_frame", None):
+            self.wizard_scan_frame.pack(fill="both", expand=True)
+            self._refresh_wizard_template_status()
+        elif step in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D) and getattr(
+            self, "wizard_batch_frame", None
+        ):
+            self.wizard_batch_frame.pack(fill="both", expand=True)
+            self._refresh_wizard_batch_status()
+        elif step == WIZARD_STEP_REPORT and getattr(self, "wizard_report_frame", None):
+            self.wizard_report_frame.pack(fill="both", expand=True)
+            self._refresh_wizard_report_status()
+
+    def _refresh_wizard_setup_status(self) -> None:
+        label = getattr(self, "wizard_setup_status_label", None)
+        if label is None:
+            return
+        wd = (self.working_directory.get() or "").strip()
+        if self._working_directory_index_html_path(wd):
+            label.configure(
+                text="Report (index.html) found in the working directory.",
+                text_color="#2E7D32",
+            )
+            if not label.winfo_ismapped():
+                label.pack(anchor="w", pady=(8, 0))
+        else:
+            label.pack_forget()
+
+    def _refresh_wizard_template_row_controls(self) -> None:
+        """Enable or disable Browse and × on visible template rows."""
+        waiting = self._wizard_batch_waiting_on_step(WIZARD_STEP_SCAN)
+        browse_buttons = getattr(self, "_wizard_template_browse_buttons", {})
+        clear_buttons = getattr(self, "_wizard_template_clear_buttons", {})
+        for kind in ("prt", "asm", "drw"):
+            if not self._wizard_template_kind_visible(kind):
+                continue
+            browse = browse_buttons.get(kind)
+            if browse is not None:
+                browse.configure(state="disabled" if waiting else "normal")
+            clear_btn = clear_buttons.get(kind)
+            if clear_btn is None:
+                continue
+            dest = self._template_dest_path(kind)
+            if dest is not None and dest.is_file():
+                clear_btn.pack(side="right", padx=(0, 4))
+                clear_btn.configure(state="disabled" if waiting else "normal")
+            else:
+                clear_btn.pack_forget()
+
+    def _refresh_wizard_template_status(self) -> None:
+        labels = getattr(self, "_wizard_template_status_labels", None)
+        if not labels:
+            return
+        self._refresh_wizard_template_row_visibility()
+        if not self._wizard_batch_waiting_on_step(WIZARD_STEP_SCAN):
+            for kind, label in labels.items():
+                if not self._wizard_template_kind_visible(kind):
+                    continue
+                dest = self._template_dest_path(kind)
+                if dest is not None and dest.is_file():
+                    label.configure(text=f"Set ({dest.name})", text_color="#2E7D32")
+                else:
+                    label.configure(text="Not set", text_color="#666666")
+            count = self._templates_upload_count()
+            summary = getattr(self, "wizard_scan_summary_label", None)
+            if summary is not None:
+                has_scan = self._templates_dir_has_scan_xml()
+                if has_scan:
+                    summary.configure(
+                        text="Skip or run Scan Templates > again.",
+                        text_color="#2E7D32",
+                    )
+                elif count:
+                    summary.configure(
+                        text=f"{count} template file(s) ready — use Scan Templates > to continue.",
+                        text_color="#111111",
+                    )
+                else:
+                    summary.configure(
+                        text="No templates uploaded yet — skip this step or browse below.",
+                        text_color="#666666",
+                    )
+        self._refresh_wizard_template_row_controls()
+        self._refresh_wizard_step_batch_progress(WIZARD_STEP_SCAN)
+
+    def _scan_templates_skip_allowed(self) -> bool:
+        """Skip when no templates uploaded, or scan XML already exists from a prior run."""
+        if self._templates_upload_count() == 0:
+            return True
+        return self._templates_dir_has_scan_xml()
+
+    def _wizard_step_skip_allowed(self, step: int) -> bool:
+        if self._wizard_batch_waiting_on_step(step):
+            return False
+        if self._wizard_batch_ready_for_next(step):
+            return False
+        if step == WIZARD_STEP_SCAN:
+            return self._scan_templates_skip_allowed()
+        if step == WIZARD_STEP_MODELCHECK:
+            return self._working_directory_has_modelcheck_xml()
+        if step == WIZARD_STEP_JPEG_3D:
+            return self._working_directory_has_jpg_files()
+        return False
+
+    def _latest_models_for_task(self, working_dir: Path, task_display: str) -> list[Path]:
+        """Same model list GO uses: top-level only, latest revision per base name."""
+        scanned = self._scan_models_non_recursive(
+            working_dir,
+            extensions=self._model_scan_extensions_for_task(task_display),
+        )
+        return self._get_latest_model_files(scanned)
+
+    def _format_batch_model_count_message(self, latest_files: list[Path], _task_display: str) -> str:
+        if not latest_files:
+            return "No models to batch in the working directory yet."
+        count = len(latest_files)
+        models_word = "model" if count == 1 else "models"
+        return f"{count} {models_word} will be batched in the working directory."
+
+    def _refresh_wizard_batch_status(self) -> None:
+        label = getattr(self, "wizard_batch_status_label", None)
+        if label is None:
+            return
+        step = self._wizard_step
+        if step in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
+            self._refresh_wizard_step_batch_progress(step)
+        if self._wizard_batch_waiting_on_step(step):
+            return
+        task_display = self._wizard_task_display_for_step(step)
+        wd = (self.working_directory.get() or "").strip()
+        if not wd:
+            label.configure(text="Set the working directory on the Setup step.", text_color="#666666")
+            return
+        try:
+            working_dir = Path(wd).expanduser()
+            if not working_dir.is_dir() and not working_dir.parent.is_dir():
+                label.configure(text="Working directory is not ready.", text_color="#666666")
+                return
+            if working_dir.is_dir():
+                latest_files = self._latest_models_for_task(working_dir, task_display)
+                lines: list[str] = []
+                lines.append(self._format_batch_model_count_message(latest_files, task_display))
+                ok = bool(latest_files)
+                if step == WIZARD_STEP_MODELCHECK:
+                    has_xml = self._working_directory_has_modelcheck_xml(wd)
+                    lines.append(
+                        "ModelCHECK XML found." if has_xml else "ModelCHECK XML not found yet."
+                    )
+                    ok = ok or has_xml
+                    if has_xml and latest_files:
+                        lines.append("Skip or run ModelCHECK again.")
+                    elif has_xml:
+                        lines.append("Skip or run ModelCHECK.")
+                elif step == WIZARD_STEP_JPEG_3D:
+                    has_jpg = self._working_directory_has_jpg_files(wd)
+                    lines.append("JPEG files found." if has_jpg else "JPEG files not found yet.")
+                    ok = ok or has_jpg
+                    if has_jpg and latest_files:
+                        lines.append("Skip or run JPEG 3D again.")
+                    elif has_jpg:
+                        lines.append("Skip or run JPEG 3D.")
+                label.configure(
+                    text="\n".join(lines),
+                    text_color="#2E7D32" if ok else "#666666",
+                )
+            else:
+                label.configure(
+                    text="Working folder will be created when you run this step.",
+                    text_color="#111111",
+                )
+        except OSError:
+            label.configure(text="Could not scan the working directory.", text_color="#666666")
+
+    def _refresh_wizard_report_status(self) -> None:
+        label = getattr(self, "wizard_report_status_label", None)
+        if label is None:
+            return
+        wd = (self.working_directory.get() or "").strip()
+        if not wd or not _working_directory_exists_as_dir(wd):
+            label.configure(text="Working directory is not ready.", text_color="#666666")
+            return
+        has_xml = self._working_directory_has_modelcheck_xml(wd)
+        has_jpg = self._working_directory_has_jpg_files(wd)
+        has_index = self._working_directory_index_html_path(wd) is not None
+        lines: list[str] = []
+        lines.append("ModelCHECK XML found." if has_xml else "ModelCHECK XML not found yet.")
+        lines.append("JPEG files found." if has_jpg else "JPEG files not found yet.")
+        lines.append("Report (index.html) found." if has_index else "Report (index.html) not found yet.")
+        bundle = _app_bundle_dir()
+        if not (bundle / "model_checks.xml").is_file():
+            lines.append("Missing model_checks.xml next to the app.")
+        if not (bundle / "report_template.html.j2").is_file():
+            lines.append("Missing report_template.html.j2 next to the app.")
+        ok = _summary_report_inputs_ok(wd) or has_index
+        label.configure(
+            text="\n".join(lines),
+            text_color="#2E7D32" if ok else "#666666",
+        )
+
+    def _refresh_wizard_footer(self) -> None:
+        back = getattr(self, "wizard_back_button", None)
+        skip = getattr(self, "wizard_skip_button", None)
+        open_rpt = getattr(self, "wizard_open_report_button", None)
+        nxt = getattr(self, "wizard_next_button", None)
+        if back is None or skip is None or nxt is None:
+            return
+        step = self._wizard_step
+        batch_waiting = self._wizard_batch_waiting_on_step(step)
+        if step > WIZARD_STEP_SETUP:
+            back.pack(side="left")
+            back.configure(state="disabled" if batch_waiting else "normal")
+        else:
+            back.pack_forget()
+        if self._wizard_step_skip_allowed(step):
+            skip.pack(side="left", padx=(0, 12))
+            skip.configure(state="normal")
+        else:
+            skip.pack_forget()
+        wd = (self.working_directory.get() or "").strip()
+        if step == WIZARD_STEP_SETUP:
+            nxt.configure(text="Next >", state="normal" if self._wizard_setup_valid() else "disabled")
+        elif step == WIZARD_STEP_SCAN:
+            if self._wizard_batch_waiting_on_step(step):
+                nxt.configure(text="Waiting…", state="disabled")
+            elif self._wizard_batch_ready_for_next(step):
+                nxt.configure(text="Next >", state="normal")
+            else:
+                can_scan = self._templates_upload_count() > 0 and self._go_fields_valid()
+                nxt.configure(
+                    text="Scan Templates >",
+                    state="normal" if can_scan else "disabled",
+                )
+        elif step in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
+            if self._wizard_batch_waiting_on_step(step):
+                nxt.configure(text="Waiting…", state="disabled")
+            elif self._wizard_batch_ready_for_next(step):
+                nxt.configure(text="Next >", state="normal")
+            else:
+                nxt.configure(
+                    text=self._wizard_batch_primary_action_label(step),
+                    state="normal" if self._go_fields_valid() else "disabled",
+                )
+        elif step == WIZARD_STEP_REPORT:
+            busy = self._report_job_running
+            report_ok = _summary_report_inputs_ok(wd) and not busy
+            nxt.configure(
+                text="Creating Report..." if busy else "Create Report",
+                state="normal" if report_ok else "disabled",
+            )
+        if open_rpt is not None:
+            busy = self._report_job_running
+            has_index = self._working_directory_index_html_path(wd) is not None
+            open_rpt.pack_forget()
+            if step == WIZARD_STEP_SETUP and has_index:
+                open_rpt.pack(side="left")
+                open_rpt.configure(state="normal")
+            elif step == WIZARD_STEP_REPORT and has_index:
+                open_rpt.pack(side="right", padx=(0, 12))
+                open_rpt.configure(state="normal" if not busy else "disabled")
+        if step == WIZARD_STEP_SETUP:
+            self._refresh_wizard_setup_status()
+        self._refresh_file_menu_save_state()
+
     def _build_ui(self) -> None:
         self._build_ttk_styles()
         container = ctk.CTkFrame(self, corner_radius=0, fg_color="#ECECEC")
@@ -751,54 +1679,238 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._task_display_to_filename: dict[str, str] = {}
         self._task_filename_to_description: dict[str, str] = {}
 
-        self._build_path_row(
+        self.wizard_stepper_frame = ctk.CTkFrame(container, fg_color="transparent")
+        self.wizard_stepper_frame.pack(fill="x", padx=32, pady=(4, 8))
+
+        self.wizard_step_title_label = ctk.CTkLabel(
             container,
+            text="",
+            font=ctk.CTkFont(size=15, weight="bold"),
+            text_color="#111111",
+        )
+        self.wizard_step_title_label.pack(anchor="w", padx=32, pady=(0, 2))
+
+        self.wizard_step_intro_label = ctk.CTkLabel(
+            container,
+            text="",
+            font=ctk.CTkFont(size=12),
+            text_color="#444444",
+            wraplength=500,
+            justify="left",
+        )
+        self.wizard_step_intro_label.pack(anchor="w", padx=32, pady=(0, 6))
+
+        self.wizard_step_body = ctk.CTkFrame(container, fg_color="transparent")
+        self.wizard_step_body.pack(fill="both", expand=True, padx=32, pady=(0, 8))
+
+        self.wizard_setup_frame = ctk.CTkFrame(self.wizard_step_body, fg_color="transparent")
+        self._build_path_row(
+            self.wizard_setup_frame,
             label_text="Working Directory",
             variable=self.working_directory,
             browse_kind="directory",
         )
         self._build_path_row(
-            container,
+            self.wizard_setup_frame,
             label_text="Creo Loadpoint",
             variable=self.creo_loadpoint,
             browse_kind="directory",
         )
+        self.wizard_setup_status_label = ctk.CTkLabel(
+            self.wizard_setup_frame,
+            text="",
+            font=ctk.CTkFont(size=12),
+            text_color="#2E7D32",
+            anchor="w",
+            justify="left",
+            wraplength=500,
+        )
 
-        ctk.CTkLabel(
-            container,
-            text="Task",
-            font=ctk.CTkFont(size=13),
+        self.wizard_scan_frame = ctk.CTkFrame(self.wizard_step_body, fg_color="transparent")
+        self.wizard_scan_summary_label = ctk.CTkLabel(
+            self.wizard_scan_frame,
+            text="",
+            font=ctk.CTkFont(size=12),
+            text_color="#666666",
+            anchor="w",
+            justify="left",
+        )
+        self.wizard_scan_summary_label.pack(anchor="w", pady=(0, 8))
+        self._wizard_template_status_labels: dict[str, ctk.CTkLabel] = {}
+        self._wizard_template_browse_buttons: dict[str, ctk.CTkButton] = {}
+        self._wizard_template_clear_buttons: dict[str, ctk.CTkButton] = {}
+        self._wizard_template_rows: dict[str, ctk.CTkFrame] = {}
+        template_labels = {
+            "prt": "Part template",
+            "asm": "Assembly template",
+            "drw": "Drawing template",
+        }
+        for kind, row_label in template_labels.items():
+            row = ctk.CTkFrame(self.wizard_scan_frame, fg_color="transparent")
+            self._wizard_template_rows[kind] = row
+            row.pack(fill="x", pady=3)
+            ctk.CTkLabel(
+                row,
+                text=row_label,
+                width=140,
+                anchor="w",
+                font=ctk.CTkFont(size=12),
+                text_color="#111111",
+            ).pack(side="left")
+            status = ctk.CTkLabel(
+                row,
+                text="Not set",
+                anchor="w",
+                font=ctk.CTkFont(size=12),
+                text_color="#666666",
+            )
+            status.pack(side="left", fill="x", expand=True, padx=(0, 8))
+            self._wizard_template_status_labels[kind] = status
+            browse_btn = ctk.CTkButton(
+                row,
+                text="Browse...",
+                width=88,
+                height=26,
+                corner_radius=6,
+                border_width=0,
+                fg_color="#3B8ED0",
+                text_color="#FFFFFF",
+                hover_color="#367DB6",
+                font=ctk.CTkFont(size=13),
+                command=lambda k=kind: self._on_wizard_browse_template(k),
+            )
+            browse_btn.pack(side="right")
+            self._wizard_template_browse_buttons[kind] = browse_btn
+            clear_btn = ctk.CTkButton(
+                row,
+                text="×",
+                width=24,
+                height=26,
+                corner_radius=6,
+                border_width=1,
+                fg_color="#ECECEC",
+                border_color="#8F98A3",
+                text_color="#666666",
+                hover_color="#DDDDDD",
+                font=ctk.CTkFont(size=16),
+                command=lambda k=kind: self._on_wizard_clear_template(k),
+            )
+            self._wizard_template_clear_buttons[kind] = clear_btn
+
+        self.wizard_scan_progress_frame = ctk.CTkFrame(self.wizard_scan_frame, fg_color="transparent")
+        self.wizard_scan_progress_label = ctk.CTkLabel(
+            self.wizard_scan_progress_frame,
+            text="",
+            font=ctk.CTkFont(size=12),
             text_color="#111111",
-        ).pack(anchor="w", padx=32, pady=(0, 1))
-
-        task_line = ctk.CTkFrame(container, fg_color="transparent")
-        task_line.pack(fill="x", padx=32, pady=(0, 4))
-        self.task_select = ttk.Combobox(
-            task_line,
-            textvariable=self.task,
-            values=(),
-            width=10,
-            state="readonly",
-            height=6,
-            style="Task.TCombobox",
-            font=TASK_COMBOBOX_FONT,
+            anchor="w",
+            justify="left",
         )
-        self.task_select.pack(fill="x", expand=True)
+        self.wizard_scan_progress_label.pack(anchor="w", pady=(0, 4))
+        self.wizard_scan_progress_bar = ctk.CTkProgressBar(
+            self.wizard_scan_progress_frame,
+            width=460,
+            height=12,
+            progress_color="#3B8ED0",
+        )
+        self.wizard_scan_progress_bar.pack(anchor="w", fill="x")
+        self.wizard_scan_progress_bar.set(0)
+        self._refresh_wizard_template_row_visibility()
 
-        def _on_task_selected(_e=None):
-            self._refresh_configuration_menu()
-            self._refresh_action_buttons()
+        self.wizard_batch_frame = ctk.CTkFrame(self.wizard_step_body, fg_color="transparent")
+        self.wizard_batch_status_label = ctk.CTkLabel(
+            self.wizard_batch_frame,
+            text="",
+            font=ctk.CTkFont(size=12),
+            text_color="#666666",
+            anchor="w",
+            justify="left",
+            wraplength=500,
+        )
+        self.wizard_batch_status_label.pack(anchor="w")
 
-        self.task_select.bind("<<ComboboxSelected>>", _on_task_selected)
+        self.wizard_batch_progress_frame = ctk.CTkFrame(self.wizard_batch_frame, fg_color="transparent")
+        self.wizard_batch_progress_label = ctk.CTkLabel(
+            self.wizard_batch_progress_frame,
+            text="",
+            font=ctk.CTkFont(size=12),
+            text_color="#111111",
+            anchor="w",
+            justify="left",
+        )
+        self.wizard_batch_progress_label.pack(anchor="w", pady=(0, 4))
+        self.wizard_batch_progress_bar = ctk.CTkProgressBar(
+            self.wizard_batch_progress_frame,
+            width=460,
+            height=12,
+            progress_color="#3B8ED0",
+        )
+        self.wizard_batch_progress_bar.pack(anchor="w", fill="x")
+        self.wizard_batch_progress_bar.set(0)
 
-        btn_row = ctk.CTkFrame(container, fg_color="transparent")
-        btn_row.pack(fill="x", padx=32, pady=(29, 6))
-        btn_bar = ctk.CTkFrame(btn_row, fg_color="transparent")
+        self.wizard_report_frame = ctk.CTkFrame(self.wizard_step_body, fg_color="transparent")
+        self.wizard_report_status_label = ctk.CTkLabel(
+            self.wizard_report_frame,
+            text="",
+            font=ctk.CTkFont(size=12),
+            text_color="#666666",
+            anchor="w",
+            justify="left",
+            wraplength=500,
+        )
+        self.wizard_report_status_label.pack(anchor="w")
+
+        footer = ctk.CTkFrame(container, fg_color="transparent")
+        footer.pack(fill="x", padx=32, pady=(0, 6))
+        self.wizard_back_button = ctk.CTkButton(
+            footer,
+            text="< Back",
+            width=100,
+            height=28,
+            corner_radius=6,
+            border_width=1,
+            fg_color="#ECECEC",
+            border_color="#8F98A3",
+            text_color="#111111",
+            hover_color="#DDDDDD",
+            font=ctk.CTkFont(size=13),
+            command=self._on_wizard_back,
+        )
+        self.wizard_back_button.pack(side="left")
+        self.wizard_open_report_button = ctk.CTkButton(
+            footer,
+            text="Open Report",
+            width=120,
+            height=28,
+            corner_radius=6,
+            border_width=0,
+            fg_color="#2E7D32",
+            text_color="#FFFFFF",
+            hover_color="#256628",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            command=self._on_wizard_open_report,
+        )
+        btn_bar = ctk.CTkFrame(footer, fg_color="transparent")
+        self.wizard_footer_btn_bar = btn_bar
         btn_bar.pack(side="right")
-        self.go_button = ctk.CTkButton(
+        self.wizard_skip_button = ctk.CTkButton(
             btn_bar,
-            text="GO",
-            width=120,
+            text="Skip",
+            width=100,
+            height=28,
+            corner_radius=6,
+            border_width=1,
+            fg_color="#ECECEC",
+            border_color="#8F98A3",
+            text_color="#111111",
+            hover_color="#DDDDDD",
+            font=ctk.CTkFont(size=13),
+            command=self._on_wizard_skip_step,
+        )
+        self.wizard_next_button = ctk.CTkButton(
+            btn_bar,
+            text="Next >",
+            width=140,
             height=28,
             corner_radius=6,
             border_width=0,
@@ -806,38 +1918,27 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             text_color="#FFFFFF",
             hover_color="#367DB6",
             font=ctk.CTkFont(size=14, weight="bold"),
-            command=self._on_go,
+            command=self._on_wizard_next,
         )
-        self.summary_report_button = ctk.CTkButton(
-            btn_bar,
-            text="Report",
-            width=120,
-            height=28,
-            corner_radius=6,
-            border_width=0,
-            fg_color="#3B8ED0",
-            text_color="#FFFFFF",
-            hover_color="#367DB6",
-            font=ctk.CTkFont(size=14, weight="bold"),
-            command=self._on_write_summary_report,
-        )
-        self._action_btn_gap = 12
-        self.go_button.pack(side="left", padx=(0, self._action_btn_gap))
+        self.wizard_next_button.pack(side="right")
 
         def _on_working_directory_or_loadpoint_changed(*_args: object) -> None:
             if self._suppress_settings_autosave:
                 return
             self._refresh_task_options()
             self._persist_working_directory_and_loadpoint()
+            if self._wizard_step == WIZARD_STEP_SCAN:
+                self._refresh_wizard_template_status()
+            self._refresh_wizard_footer()
 
         def _on_task_var_changed(*_args: object) -> None:
-            self._refresh_action_buttons()
+            self._refresh_wizard_ui()
 
         self.working_directory.trace_add("write", _on_working_directory_or_loadpoint_changed)
         self.creo_loadpoint.trace_add("write", _on_working_directory_or_loadpoint_changed)
         self.task.trace_add("write", _on_task_var_changed)
 
-        self._refresh_action_buttons()
+        self._set_wizard_step(WIZARD_STEP_SETUP)
 
     def _build_path_row(
         self,
@@ -855,10 +1956,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             font=ctk.CTkFont(size=13),
             text_color="#111111",
         )
-        row_label.pack(anchor="w", padx=32, pady=(0, 1))
+        row_label.pack(anchor="w", pady=(0, 1))
 
         line = ctk.CTkFrame(block, fg_color="transparent")
-        line.pack(fill="x", padx=32, pady=(0, 5))
+        line.pack(fill="x", pady=(0, 5))
 
         browse_button = ctk.CTkButton(
             line,
@@ -982,8 +2083,6 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 command=lambda o=option: self._on_settings_config_item(o),
             )
         self._configuration_menu.add_separator()
-        self._add_start_templates_cascade(self._configuration_menu)
-        self._configuration_menu.add_separator()
         self._configuration_menu.add_command(
             label="Open configurations...",
             command=self._on_open_settings_folder,
@@ -1004,8 +2103,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             if self._is_scan_templates_task(task_display):
                 return (
                     False,
-                    "Upload at least one template (.prt, .asm, or .drw) with "
-                    "Configuration → Templates… into <working_directory>\\templates.",
+                    "Upload at least one template (.prt, .asm, or .drw) on the Scan Templates wizard step.",
                 )
             if self._is_jpeg_2d_plot_task(task_display):
                 detail = (
@@ -1101,6 +2199,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         )
 
     def _warn_if_working_directory_has_no_creo_models(self) -> None:
+        if self._wizard_step == WIZARD_STEP_SETUP:
+            return
         wd = (self.working_directory.get() or "").strip()
         if not wd or not _working_directory_exists_as_dir(wd):
             return
@@ -1111,8 +2211,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             messagebox.showwarning(
                 "Templates",
                 "No template models found.\n\n"
-                "Use Configuration → Templates… to copy at least one .prt, .asm, or .drw "
-                f"into:\n{Path(wd) / 'templates'}",
+                "Use Browse on the Scan Templates wizard step to copy at least one "
+                f".prt, .asm, or .drw into:\n{Path(wd) / 'templates'}",
             )
             return
         scan_exts = self._model_scan_extensions_for_task(task_display)
@@ -1163,7 +2263,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         )
 
     @staticmethod
-    def _clean_start_over_directory(directory: Path) -> list[str]:
+    def _clean_start_over_directory(directory: Path, *, remove_creo_models: bool = False) -> list[str]:
         """Remove scan/batch artifacts from one folder; return error lines for failures."""
         errors: list[str] = []
         try:
@@ -1179,9 +2279,12 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     continue
                 if not entry.is_file():
                     continue
-                if entry.suffix.casefold() not in _START_OVER_FILE_SUFFIXES:
+                suffix = entry.suffix.casefold()
+                if suffix in _START_OVER_FILE_SUFFIXES:
+                    entry.unlink()
                     continue
-                entry.unlink()
+                if remove_creo_models and _CREO_MODEL_TOPLEVEL_RE.match(entry.name):
+                    entry.unlink()
             except OSError as exc:
                 errors.append(f"{entry}\n{exc}")
         return errors
@@ -1204,15 +2307,19 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         templates_dir = working_dir / "templates"
         prompt = (
             "Remove prior scan and batch data from the working folder?\n\n"
-            "Keeps Creo models (.prt, .asm, .drw)."
+            "Keeps Creo models (.prt, .asm, .drw) in the working folder and in templates\\."
         )
         if not self._show_proceed_cancel_dialog("Start over", prompt):
             return
+        self._cancel_wizard_batch_output_watch()
+        self._close_batch_runner_window()
         errors: list[str] = []
         errors.extend(self._clean_start_over_directory(working_dir))
         if templates_dir.is_dir():
             errors.extend(self._clean_start_over_directory(templates_dir))
         self._refresh_action_buttons()
+        self._wizard_step_outcome.clear()
+        self._set_wizard_step(WIZARD_STEP_SETUP)
         if errors:
             messagebox.showwarning(
                 "Start over",
@@ -1227,6 +2334,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
     def _on_exit(self) -> None:
         """Save settings when valid; warn if the form was partly filled but could not be saved."""
         self._cancel_post_batch_task_refresh()
+        self._cancel_wizard_batch_output_watch()
         self._settings_path = _default_app_settings_path()
         ok, err = self._write_current_settings_to_disk()
         if not ok and (
@@ -1241,7 +2349,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._paired_settings_json_path = None
         self._set_working_directory_value("")
         self._set_creo_loadpoint_value("")
+        self._cancel_wizard_batch_output_watch()
+        self._wizard_step_outcome.clear()
         self._refresh_task_options()
+        self._set_wizard_step(WIZARD_STEP_SETUP)
 
     def _write_current_settings_to_disk(self) -> tuple[bool, str]:
         """If valid, persist current form to ``app_settings.json`` and paired JSON (if any)."""
@@ -1501,15 +2612,6 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         dialog.protocol("WM_DELETE_WINDOW", close_dialog)
         self._present_modal_toplevel(dialog, focus_widget=entry)
 
-    def _add_start_templates_cascade(self, parent_menu: tk.Menu) -> None:
-        start_templates_menu = tk.Menu(parent_menu, tearoff=0)
-        for kind, label in _START_TEMPLATE_KINDS:
-            start_templates_menu.add_command(
-                label=label,
-                command=lambda k=kind: self._on_pick_start_template(k),
-            )
-        parent_menu.add_cascade(label="Templates...", menu=start_templates_menu)
-
     def _start_templates_dir(self) -> Path | None:
         wd = (self.working_directory.get() or "").strip()
         if not wd or not Path(wd).is_dir():
@@ -1522,87 +2624,6 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if not pattern:
             return False
         return re.match(pattern, filename, re.IGNORECASE) is not None
-
-    def _on_pick_start_template(self, kind: str) -> None:
-        labels = {k: label.rstrip(".") for k, label in _START_TEMPLATE_KINDS}
-        title = labels.get(kind, "Start template")
-        pattern = _CREO_MODEL_EXT_PATTERNS.get(kind)
-        if not pattern:
-            messagebox.showerror("Start template", f"Unknown template type:\n{kind}")
-            return
-
-        wd = (self.working_directory.get() or "").strip()
-        if not wd or not Path(wd).is_dir():
-            messagebox.showwarning(
-                "Start template",
-                "Set a working directory that exists on disk before choosing a template.",
-            )
-            return
-
-        selected = fd.askopenfilename(
-            title=title,
-            initialdir=wd,
-            filetypes=[
-                (f"Creo {kind} files", f"*.{kind};*.{kind}.*"),
-                ("All files", "*.*"),
-            ],
-        )
-        if not selected:
-            return
-
-        source = Path(selected)
-        if not source.is_file():
-            messagebox.showerror(
-                "Start template",
-                f"File not found:\n{source}",
-            )
-            return
-        if not self._creo_model_filename_matches(source.name, kind):
-            messagebox.showerror(
-                "Start template",
-                f"Select a Creo {kind} file (*.{kind} or *.{kind}.*).",
-            )
-            return
-
-        dest_dir = self._start_templates_dir()
-        if dest_dir is None:
-            messagebox.showwarning(
-                "Start template",
-                "Set a working directory that exists on disk before choosing a template.",
-            )
-            return
-
-        try:
-            dest_dir.mkdir(parents=True, exist_ok=True)
-        except OSError as exc:
-            messagebox.showerror(
-                "Start template",
-                f"Could not create templates folder:\n{dest_dir.resolve()}\n\n{exc}",
-            )
-            return
-
-        dest_name = _START_TEMPLATE_DEST_NAMES.get(kind)
-        if not dest_name:
-            messagebox.showerror("Start template", f"Unknown template type:\n{kind}")
-            return
-
-        dest = dest_dir / dest_name
-        try:
-            shutil.copy2(source, dest)
-        except OSError as exc:
-            messagebox.showerror(
-                "Start template",
-                f"Could not copy template:\n{source}\n\n→\n\n{dest.resolve()}\n\n{exc}",
-            )
-            return
-
-        messagebox.showinfo(
-            "Start template",
-            f"Copied {title.lower()} to:\n{dest.resolve()}",
-        )
-        self._refresh_task_options()
-        if self._templates_dir_has_creo_models():
-            self.task.set(SCAN_TEMPLATES_DISPLAY)
 
     def _on_open_working_directory(self) -> None:
         wd = (self.working_directory.get() or "").strip()
@@ -1771,7 +2792,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if self._modal_dialog_depth > 0:
             self._activate_refresh_job = self.after(500, self._on_app_activate_run)
             return
-        self._update_create_report_task_list(advance_from_jpeg=True)
+        self._update_create_report_task_list(advance_from_jpeg=False)
         self._refresh_action_buttons()
 
     def _install_dialog_parent(self) -> None:
@@ -2057,27 +3078,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 return
         except tk.TclError:
             return
-        task_display = self.task.get() or ""
-        create_report = self._is_create_report_task(task_display)
-        gap = getattr(self, "_action_btn_gap", 12)
-        wd = (self.working_directory.get() or "").strip()
-        if getattr(self, "go_button", None) is not None:
-            if create_report:
-                if self.go_button.winfo_manager() == "pack":
-                    self.go_button.pack_forget()
-            else:
-                if self.go_button.winfo_manager() != "pack":
-                    self.go_button.pack(side="left", padx=(0, gap))
-                self.go_button.configure(state="normal" if self._go_fields_valid() else "disabled")
-        if getattr(self, "summary_report_button", None) is not None:
-            if create_report:
-                if self.summary_report_button.winfo_manager() != "pack":
-                    self.summary_report_button.pack(side="left", padx=(0, 0))
-                report_ok = _summary_report_inputs_ok(wd) and not self._report_job_running
-                self.summary_report_button.configure(state="normal" if report_ok else "disabled")
-            elif self.summary_report_button.winfo_manager() == "pack":
-                self.summary_report_button.pack_forget()
-        self._refresh_file_menu_save_state()
+        self._refresh_wizard_ui()
 
     def _refresh_task_options(self) -> None:
         try:
@@ -2088,16 +3089,12 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     self._task_filename_to_description = {
                         SCAN_TEMPLATES_DISPLAY: SCAN_TEMPLATES_DISPLAY
                     }
-                    self.task_select.configure(values=(SCAN_TEMPLATES_DISPLAY,))
-                    self.task.set(SCAN_TEMPLATES_DISPLAY)
                 else:
                     fallback = [(DEFAULT_MODELCHECK_TTD, DEFAULT_MODELCHECK_DISPLAY)]
                     self._task_display_to_filename = {lab: fn for fn, lab in fallback}
                     self._task_filename_to_description = {
                         DEFAULT_MODELCHECK_TTD: DEFAULT_MODELCHECK_DISPLAY
                     }
-                    self.task_select.configure(values=(DEFAULT_MODELCHECK_DISPLAY,))
-                    self.task.set(DEFAULT_MODELCHECK_DISPLAY)
                 self._refresh_configuration_menu()
                 return
 
@@ -2166,17 +3163,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 )
                 display_values = [lab for _fn, lab in ordered]
 
-            self.task_select.configure(values=tuple(display_values))
-            prev_fn = self._task_filename_from_ui(self.task.get() or "")
-            restored = False
-            if prev_fn:
-                for display, filename in self._task_display_to_filename.items():
-                    if filename.lower() == prev_fn.lower():
-                        self.task.set(display)
-                        restored = True
-                        break
-            if not restored:
-                self.task.set(self._default_task_display(display_values))
+            task_display = self._wizard_task_display_for_step(self._wizard_step)
+            if task_display:
+                self.task.set(task_display)
             self._refresh_configuration_menu()
         finally:
             self._last_create_report_available = self._create_report_task_available()
@@ -2379,8 +3368,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 pass
 
     @staticmethod
-    def _cleanup_leftover_batch_files(batch_dir: Path, *, scan_templates: bool) -> None:
-        """Remove prior GO batch .dxc and runner script before writing new ones."""
+    def _cleanup_leftover_batch_dxc(batch_dir: Path, *, scan_templates: bool) -> None:
+        """Remove leftover batch .dxc files (does not remove runner .ps1)."""
         try:
             if not batch_dir.is_dir():
                 return
@@ -2395,6 +3384,18 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                         p.unlink()
                     except OSError:
                         pass
+        except OSError:
+            pass
+
+    @staticmethod
+    def _cleanup_leftover_batch_files(batch_dir: Path, *, scan_templates: bool) -> None:
+        """Remove prior GO batch .dxc and runner script before writing new ones."""
+        try:
+            if not batch_dir.is_dir():
+                return
+            CreoDistributedBatchMakerApp._cleanup_leftover_batch_dxc(
+                batch_dir, scan_templates=scan_templates
+            )
             CreoDistributedBatchMakerApp._remove_batch_runner_scripts(batch_dir)
         except OSError:
             pass
@@ -2439,7 +3440,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         expected_outputs: list[str],
         output_timeout_sec: int,
     ) -> str:
-        """PowerShell runner for Scan Templates: one templates.dxc, all template models."""
+        """PowerShell runner for Scan Templates: one templates.dxc, all template models.
+
+        Removes templates.dxc in a finally block when the job finishes (run, skip, or error).
+        """
         ptc = cls._ps_single_quoted_literal(ptcdbatch_bat)
         wd = cls._ps_single_quoted_literal(templates_dir)
         kb = cls._ps_single_quoted_literal(kill_bat)
@@ -2494,6 +3498,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             r'Write-ChLog "kill.bat: $KillBat"',
             r'Write-ChLog ("Output wait timeout: " + $OutputTimeoutSec + " s; settle: " + $OutputSettleSec + " s")',
             "",
+            "try {",
             "if (-not (Test-Path -LiteralPath $dxc)) {",
             r'    Write-ChLog "ERROR: DXC file missing."',
             "    exit 1",
@@ -2501,9 +3506,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "",
             "if ($Expected.Count -eq 0) {",
             r'    Write-ChLog "SKIP: no expected output files configured; nothing to do."',
-            "    exit 0",
-            "}",
-            "",
+            "} else {",
             "$missing = Get-MissingOutputs -Dir $WorkDir -Names $Expected",
             "if ($missing.Count -eq 0) {",
             r'    Write-ChLog ("SKIP: all " + $Expected.Count + " expected output file(s) already exist.")',
@@ -2567,19 +3570,21 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             r'        Write-ChLog ("ERROR: kill.bat failed: " + $_.Exception.Message)',
             "    }",
             "}",
+            "}",
+            "} finally {",
+            "    try {",
+            "        if (Test-Path -LiteralPath $dxc) {",
+            "            Remove-Item -LiteralPath $dxc -Force -ErrorAction Stop",
+            r'            Write-ChLog ("Removed chunk dxc: " + $dxc)',
+            "        }",
+            "    } catch {",
+            r'        Write-ChLog ("Cleanup note: " + $_.Exception.Message)',
+            "    }",
+            "}",
             "",
             r'Write-ChLog "---------- Batch summary ----------"',
             r'Write-ChLog ("Count of Files Success: " + $SuccessFileCount)',
             r'Write-ChLog ("Count of Files Timed Out: " + $TimedOutFileCount)',
-            "",
-            r'Write-ChLog "Removing templates.dxc."',
-            "try {",
-            "    if (Test-Path -LiteralPath $dxc) {",
-            "        Remove-Item -LiteralPath $dxc -Force -ErrorAction Stop",
-            "    }",
-            "} catch {",
-            r'    Write-ChLog ("Cleanup note: " + $_.Exception.Message)',
-            "}",
             "",
             r'Write-ChLog "Scan Templates runner finished."',
         ]
@@ -2600,7 +3605,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         """PowerShell: per chunk, skip if outputs already exist; else launch ptcdbatch, poll for expected output files, settle, then run kill.bat.
 
         If any outputs time out, write one per-run timeout summary file in ``working_dir``
-        listing timed-out model names only. Cleans up chunk .dxc files at the end.
+        listing timed-out model names only. Removes each chunk .dxc when that chunk finishes.
         """
         ptc = cls._ps_single_quoted_literal(ptcdbatch_bat)
         wd = cls._ps_single_quoted_literal(working_dir)
@@ -2714,6 +3719,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             r'    Write-ChLog "---------- Chunk $chunk / $NumChunks ----------"',
             '    $dxc = Join-Path -Path $WorkDir -ChildPath ("{0}-{1}.dxc" -f $ChunkBase, $chunk)',
             r'    Write-ChLog "DXC path: $dxc"',
+            "    try {",
             "    if (-not (Test-Path -LiteralPath $dxc)) {",
             r'        Write-ChLog "ERROR: DXC file missing. Skipping this chunk."',
             "        continue",
@@ -2788,6 +3794,16 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "    } catch {",
             r'        Write-ChLog ("ERROR: kill.bat failed: " + $_.Exception.Message)',
             "    }",
+            "    } finally {",
+            "        try {",
+            "            if (Test-Path -LiteralPath $dxc) {",
+            "                Remove-Item -LiteralPath $dxc -Force -ErrorAction Stop",
+            r'                Write-ChLog ("Removed chunk dxc: " + $dxc)',
+            "            }",
+            "        } catch {",
+            r'            Write-ChLog ("Cleanup note: " + $_.Exception.Message)',
+            "        }",
+            "    }",
             "}",
             "",
             "if ($TimedOutModels.Count -gt 0) {",
@@ -2801,15 +3817,6 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             r'Write-ChLog ("Count of Files Timed Out: " + $TimedOutFileCount)',
             "",
             r'Write-ChLog "Runner finished all chunks."',
-            "",
-            r'Write-ChLog "Cleaning up leftover chunk .dxc files in the working directory."',
-            "try {",
-            "    Get-ChildItem -LiteralPath $WorkDir -Filter ($ChunkBase + '-*.dxc') -File -ErrorAction SilentlyContinue | ForEach-Object {",
-            "        Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue",
-            "    }",
-            "} catch {",
-            r'    Write-ChLog ("Cleanup note: " + $_.Exception.Message)',
-            "}",
         ]
         return "\n".join(lines) + "\n"
 
@@ -2841,7 +3848,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     "Templates",
                     "GO needs at least one Creo template (.prt, .asm, or .drw) in:\n"
                     f"{Path(working_dir_raw) / 'templates'}\n\n"
-                    "Use Configuration → Templates… to upload templates first.",
+                    "Use Browse on the Scan Templates wizard step to upload templates first.",
                 )
             elif self._is_jpeg_2d_plot_task(task_display_raw):
                 messagebox.showwarning(
@@ -2899,7 +3906,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             messagebox.showwarning("Missing Task", "Please select a task.")
             return
 
-        working_dir = Path(working_dir_raw)
+        working_dir = Path(working_dir_raw).expanduser().resolve()
         batch_dir = self._batch_dir_for_task(working_dir, task_display_raw).resolve()
         models_dir = batch_dir if scan_templates else working_dir
         effective_ttd = self._effective_ttd_filename(task_display_raw)
@@ -3031,7 +4038,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             self._refresh_action_buttons_run()
             return
         self._schedule_post_batch_task_refresh()
-        self._advance_task_after_open_batch(task_display_raw)
+        self._start_wizard_batch_output_watch(
+            self._wizard_step, batch_dir, scan_templates
+        )
         self._refresh_action_buttons_run()
         try:
             self.update_idletasks()
@@ -3056,13 +4065,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
     def _set_report_busy(self, busy: bool) -> None:
         self._report_job_running = busy
-        btn = getattr(self, "summary_report_button", None)
-        if btn is not None:
-            btn.configure(state="disabled", text="Report..." if busy else "Report")
         try:
             self.configure(cursor="wait" if busy else "")
         except tk.TclError:
             pass
+        self._refresh_wizard_footer()
 
     def _bring_app_forward(self) -> None:
         try:
@@ -3182,8 +4189,25 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._persist_working_directory_and_loadpoint()
         self._start_report_job(working_dir)
 
+    def _close_batch_runner_window(self) -> None:
+        """Close the PowerShell console launched for the current batch runner, if still open."""
+        proc = self._batch_runner_process
+        self._batch_runner_process = None
+        if proc is None:
+            return
+        try:
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+        except OSError:
+            pass
+
     def _launch_batch_runner(self, working_dir: Path, task_display: str) -> bool:
         """Start the task-specific PowerShell batch runner. Returns False on launch failure."""
+        self._close_batch_runner_window()
         batch_dir = self._batch_dir_for_task(working_dir, task_display)
         runner_ps1 = batch_dir / self._batch_runner_basename_for_task(task_display)
         ps_exe = self._resolve_powershell_exe()
@@ -3191,8 +4215,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             messagebox.showerror("PowerShell Not Found", "Could not locate powershell.exe.")
             return False
         try:
-            subprocess.Popen(
-                [
+            popen_kw: dict = {
+                "args": [
                     ps_exe,
                     "-NoExit",
                     "-ExecutionPolicy",
@@ -3200,16 +4224,30 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     "-File",
                     str(runner_ps1.resolve()),
                 ],
-                cwd=str(batch_dir),
-                creationflags=subprocess.CREATE_NEW_CONSOLE,
-            )
+                "cwd": str(batch_dir),
+                "creationflags": subprocess.CREATE_NEW_CONSOLE,
+            }
+            startupinfo = self._minimized_console_startupinfo()
+            if startupinfo is not None:
+                popen_kw["startupinfo"] = startupinfo
+            self._batch_runner_process = subprocess.Popen(**popen_kw)
         except OSError as exc:
+            self._batch_runner_process = None
             messagebox.showerror(
                 "Launch Failed",
                 f"Could not start:\n{runner_ps1}\n\n{exc}",
             )
             return False
         return True
+
+    @staticmethod
+    def _minimized_console_startupinfo() -> subprocess.STARTUPINFO | None:
+        if sys.platform != "win32":
+            return None
+        info = subprocess.STARTUPINFO()
+        info.dwFlags |= getattr(subprocess, "STARTF_USESHOWWINDOW", 1)
+        info.wShowWindow = getattr(subprocess, "SW_SHOWMINNOACTIVE", 7)
+        return info
 
     @staticmethod
     def _resolve_powershell_exe() -> str | None:
