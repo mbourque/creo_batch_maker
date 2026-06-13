@@ -40,14 +40,15 @@ Usage:
 
 ### File
 
-- **New**, **Open…**, **Save**, **Save as…**, **Open Working Directory**, **Start over…**, **Exit** — working directory, loadpoint, chunk size, and timeout as JSON (`app_settings.json` or a file you choose; wizard step is not stored). **Open Working Directory** opens the current working folder in File Explorer. **Start over…** asks for confirmation (Cancel is default), then removes prior scan and batch data from the working folder and `templates\` (if present), including all batch failure logs (`creo-batch-timeouts-*.txt`, including `creo-batch-timeouts-modelcheck.txt` and `creo-batch-timeouts-jpeg3d.txt`), while keeping Creo models (`.prt`, `.asm`, `.drw`) in both places, and returns the wizard to **Setup**.
+- **New**, **Open…**, **Save**, **Save as…**, **Open Working Directory**, **Start over…**, **Exit** — working directory, loadpoint, chunk size, and timeout as JSON (`app_settings.json` or a file you choose; wizard step is not stored). **Open Working Directory** opens the current working folder in File Explorer. **Start over…** asks for confirmation (Cancel is default), then removes prior scan and batch data from the working folder and `templates\` (if present), including all batch failure logs (`creo-batch-timeouts-*.txt`, including `creo-batch-timeouts-modelcheck.txt` and `creo-batch-timeouts-jpeg3d.txt`), while keeping Creo models (`.prt`, `.asm`, `.drw`) in both places, and returns the wizard to **Setup**. **File** (except **Exit**), **Settings**, and **Configuration** are enabled only on the **Setup** step when no batch or report job is running; on other wizard steps or while **Waiting…** / **Creating Report…**, those items are disabled. **Help** and **File → Exit** stay available (Exit stops the PowerShell batch runner if any, then closes the app — same as the window **×** button).
 
 ### Settings
 
-Always visible. Values are stored in `app_settings.json` (also written on successful batch launch and **File → Save**).
+Enabled on the **Setup** step only (see **File** above). Values are stored in `app_settings.json` (also written on successful batch launch and **File → Save**).
 
 - **Chunk size…** — models per `creo-batch-N.dxc` chunk (**1–10**, default **10**). JSON key: `chunk_size`. Re-run the ModelCHECK wizard step after changing.
 - **Timeout…** — seconds to wait for chunk output files with no new file appearing (**whole number ≥ 60**, default **120**). JSON key: `output_timeout_sec`. Re-run the batch wizard step after changing.
+- **Automatic mode** (checkbox) — after **Run ModelCHECK >** finishes, automatically advances to **JPEG 3D**, runs that batch, then **Create Report** when JPEG finishes. The **Open in browser?** dialog still appears when the report is done so you can choose whether to open it. Does not auto-run Scan Templates or the first ModelCHECK launch — start ModelCHECK yourself on that step. While Automatic mode is on, the batch PowerShell runner is **hidden** (no taskbar console); with it off, the runner opens **minimized** so you can restore it to read the log. ModelCHECK and JPEG 3D steps show a blue **Automatic mode** note in the progress area describing the auto-advance. JSON key: `automatic_mode` (default **on**).
 
 ### Configuration
 

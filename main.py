@@ -88,6 +88,10 @@ WIZARD_BATCH_ETA_MIN_CHUNKS_DEFAULT = 2
 WIZARD_BATCH_ETA_MIN_CHUNKS_SMALL = 1
 WIZARD_BATCH_ETA_SMALL_BATCH_MAX_CHUNKS = 2
 WIZARD_BATCH_ETA_ESTIMATING_SUFFIX = " · Estimating time…"
+WIZARD_AUTOMATIC_MODE_MESSAGE = (
+    "Automatic Mode — will run ModelCHECK and JPEG 3D and create Report when done."
+)
+AUTOMATIC_MODE_DEFAULT = True
 # When no Creo loadpoint / no .ttd list yet, File → New uses this default task (filename + UI label).
 DEFAULT_MODELCHECK_TTD = "modelcheck.ttd"
 DEFAULT_MODELCHECK_DISPLAY = "ModelCHECK"
@@ -307,6 +311,16 @@ def _normalize_output_timeout_sec(value: object) -> int:
     return n
 
 
+def _normalize_automatic_mode(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return False
+
+
 def _canonical_app_settings(data: dict[str, object]) -> dict[str, object]:
     """Keys persisted in app_settings.json (task selection is not stored)."""
     return {
@@ -317,6 +331,9 @@ def _canonical_app_settings(data: dict[str, object]) -> dict[str, object]:
         ),
         "output_timeout_sec": _normalize_output_timeout_sec(
             data.get("output_timeout_sec", BATCH_OUTPUT_WAIT_TIMEOUT_DEFAULT)
+        ),
+        "automatic_mode": _normalize_automatic_mode(
+            data.get("automatic_mode", AUTOMATIC_MODE_DEFAULT)
         ),
     }
 
@@ -465,6 +482,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._configs_templates_dir = self._configs_dir / "templates"
         self._chunk_size = CREO_BATCH_CHUNK_SIZE_DEFAULT
         self._output_timeout_sec = BATCH_OUTPUT_WAIT_TIMEOUT_DEFAULT
+        self._automatic_mode = AUTOMATIC_MODE_DEFAULT
+        self._automatic_mode_var = tk.BooleanVar(master=self, value=AUTOMATIC_MODE_DEFAULT)
+        self._automatic_wizard_chain_job: str | None = None
+        self._automatic_chain_phase: str | int | None = None
         self._configuration_menu: tk.Menu | None = None
         self._menubar: tk.Menu | None = None
         self._settings_options = [
@@ -1286,7 +1307,27 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         frame.pack(anchor="w", fill="x", pady=(8, 0))
         if step in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
             batch_dir, _ = self._wizard_batch_dxc_context_for_step(step)
+            self._refresh_wizard_batch_automatic_label(step)
             self._refresh_wizard_batch_failed_label(step, batch_dir)
+
+    def _wizard_automatic_mode_progress_note(self, step: int) -> str:
+        if not self._automatic_mode:
+            return ""
+        if step not in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
+            return ""
+        return WIZARD_AUTOMATIC_MODE_MESSAGE
+
+    def _refresh_wizard_batch_automatic_label(self, step: int) -> None:
+        label = getattr(self, "wizard_batch_automatic_label", None)
+        if label is None:
+            return
+        note = self._wizard_automatic_mode_progress_note(step)
+        if note and self._wizard_step_shows_batch_progress(step):
+            label.configure(text=note, text_color="#1565C0")
+            label.pack(anchor="w", pady=(4, 0))
+        else:
+            label.configure(text="")
+            label.pack_forget()
 
     def _wizard_batch_outputs_ready(self, watch: dict[str, object]) -> bool:
         batch_dir = watch.get("batch_dir")
@@ -1349,10 +1390,81 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             step = watch.get("step")
             if step == WIZARD_STEP_JPEG_3D:
                 self._update_create_report_task_list(advance_from_jpeg=False)
+            if step in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
+                self._schedule_automatic_wizard_chain(step)
             return
         self._wizard_batch_watch_job = self.after(
             WIZARD_BATCH_DXC_POLL_MS, self._tick_wizard_batch_output_watch
         )
+
+    def _cancel_automatic_wizard_chain(self) -> None:
+        jid = self._automatic_wizard_chain_job
+        if jid is not None:
+            try:
+                self.after_cancel(jid)
+            except tk.TclError:
+                pass
+        self._automatic_wizard_chain_job = None
+        self._automatic_chain_phase = None
+
+    def _schedule_automatic_wizard_chain(self, completed_step: int) -> None:
+        if not self._automatic_mode:
+            return
+        if completed_step not in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
+            return
+        self._cancel_automatic_wizard_chain()
+        self._automatic_chain_phase = completed_step
+        self._automatic_wizard_chain_job = self.after(250, self._run_automatic_wizard_chain)
+
+    def _run_automatic_wizard_chain(self) -> None:
+        self._automatic_wizard_chain_job = None
+        if not self._automatic_mode:
+            self._automatic_chain_phase = None
+            return
+        if self._modal_dialog_depth > 0:
+            self._automatic_wizard_chain_job = self.after(500, self._run_automatic_wizard_chain)
+            return
+
+        phase = self._automatic_chain_phase
+        step = self._wizard_step
+
+        if phase == WIZARD_STEP_MODELCHECK and step == WIZARD_STEP_MODELCHECK:
+            if not self._wizard_batch_ready_for_next(step):
+                return
+            self._on_wizard_next()
+            self._automatic_chain_phase = "start_jpeg"
+            self._automatic_wizard_chain_job = self.after(300, self._run_automatic_wizard_chain)
+            return
+
+        if phase == "start_jpeg" and step == WIZARD_STEP_JPEG_3D:
+            if self._wizard_batch_waiting_on_step(step):
+                return
+            if self._wizard_batch_ready_for_next(step):
+                self._automatic_chain_phase = WIZARD_STEP_JPEG_3D
+                self._run_automatic_wizard_chain()
+                return
+            if self._go_fields_valid():
+                self._automatic_chain_phase = None
+                self._on_wizard_next()
+            return
+
+        if phase == WIZARD_STEP_JPEG_3D and step == WIZARD_STEP_JPEG_3D:
+            if not self._wizard_batch_ready_for_next(step):
+                return
+            self._on_wizard_next()
+            self._automatic_chain_phase = "create_report"
+            self._automatic_wizard_chain_job = self.after(300, self._run_automatic_wizard_chain)
+            return
+
+        if phase == "create_report" and step == WIZARD_STEP_REPORT:
+            if self._report_job_running:
+                self._automatic_wizard_chain_job = self.after(500, self._run_automatic_wizard_chain)
+                return
+            wd = (self.working_directory.get() or "").strip()
+            if _summary_report_inputs_ok(wd):
+                self._automatic_chain_phase = None
+                self._on_wizard_next()
+            return
 
     def _wizard_batch_step_already_complete(self, step: int) -> bool:
         """True only when this step's batch already finished earlier in this session."""
@@ -1429,11 +1541,13 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return
         if self._wizard_batch_waiting_on_step(self._wizard_step):
             return
+        self._cancel_automatic_wizard_chain()
         self._cancel_wizard_batch_output_watch()
         self._set_wizard_step(self._wizard_step - 1)
 
     def _on_wizard_skip_step(self) -> None:
         step = self._wizard_step
+        self._cancel_automatic_wizard_chain()
         self._cancel_wizard_batch_output_watch()
         self._close_batch_runner_window()
         if step == WIZARD_STEP_SCAN:
@@ -1585,6 +1699,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._refresh_wizard_stepper()
         self._refresh_wizard_step_panels()
         self._refresh_wizard_footer()
+        self._refresh_menu_bar_state()
 
     def _refresh_wizard_stepper(self) -> None:
         frame = getattr(self, "wizard_stepper_frame", None)
@@ -1826,6 +1941,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         lines.append("ModelCHECK XML found." if has_xml else "ModelCHECK XML not found yet.")
         lines.append("JPEG files found." if has_jpg else "JPEG files not found yet.")
         lines.append("Report (index.html) found." if has_index else "Report (index.html) not found yet.")
+        if self._automatic_mode and self._report_job_running:
+            lines.append("Automatic mode — creating the report…")
         bundle = _app_bundle_dir()
         if not (bundle / "model_checks.xml").is_file():
             lines.append("Missing model_checks.xml next to the app.")
@@ -1899,7 +2016,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 open_rpt.configure(state="normal" if not busy else "disabled")
         if step == WIZARD_STEP_SETUP:
             self._refresh_wizard_setup_status()
-        self._refresh_file_menu_save_state()
+        self._refresh_menu_bar_state()
 
     def _build_ui(self) -> None:
         self._build_ttk_styles()
@@ -2088,6 +2205,15 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         )
         self.wizard_batch_progress_bar.pack(anchor="w", fill="x")
         self.wizard_batch_progress_bar.set(0)
+        self.wizard_batch_automatic_label = ctk.CTkLabel(
+            self.wizard_batch_progress_frame,
+            text="",
+            font=ctk.CTkFont(size=12),
+            text_color="#1565C0",
+            anchor="w",
+            justify="left",
+            wraplength=500,
+        )
         self.wizard_batch_failed_label = ctk.CTkLabel(
             self.wizard_batch_progress_frame,
             text="",
@@ -2295,18 +2421,75 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             label="Timeout...",
             command=self._on_timeout_settings,
         )
+        general_settings_menu.add_checkbutton(
+            label="Automatic mode",
+            variable=self._automatic_mode_var,
+            command=self._on_automatic_mode_toggle,
+        )
         menubar.add_cascade(label="Settings", menu=general_settings_menu)
 
         self._configuration_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Configuration", menu=self._configuration_menu)
 
-        help_menu = tk.Menu(menubar, tearoff=0)
+        self._help_menu = tk.Menu(menubar, tearoff=0)
+        help_menu = self._help_menu
         help_menu.add_command(label="About...", command=self._on_about)
         menubar.add_cascade(label="Help", menu=help_menu)
 
         self.configure(menu=menubar)
         self._refresh_configuration_menu()
-        self._refresh_file_menu_save_state()
+        self._refresh_menu_bar_state()
+
+    def _wizard_batch_is_running(self) -> bool:
+        watch = self._wizard_batch_watch
+        if watch is None:
+            return False
+        step = watch.get("step")
+        if not isinstance(step, int):
+            return False
+        return self._wizard_batch_waiting_on_step(step)
+
+    def _app_menus_fully_enabled(self) -> bool:
+        return (
+            self._wizard_step == WIZARD_STEP_SETUP
+            and not self._wizard_batch_is_running()
+            and not self._report_job_running
+        )
+
+    def _refresh_menu_bar_state(self) -> None:
+        """Setup-only full menus; while a batch/report runs, only File → Exit stays enabled."""
+        menubar = self._menubar
+        fm = getattr(self, "_file_menu", None)
+        if menubar is None or fm is None:
+            return
+        fully_enabled = self._app_menus_fully_enabled()
+        for label in ("Settings", "Configuration"):
+            try:
+                menubar.entryconfigure(label, state=tk.NORMAL if fully_enabled else tk.DISABLED)
+            except tk.TclError:
+                pass
+        try:
+            menubar.entryconfigure("Help", state=tk.NORMAL)
+        except tk.TclError:
+            pass
+        for label in (
+            "New",
+            "Open...",
+            "Save",
+            "Save as...",
+            "Open Working Directory",
+            "Start over...",
+        ):
+            try:
+                fm.entryconfigure(label, state=tk.NORMAL if fully_enabled else tk.DISABLED)
+            except tk.TclError:
+                pass
+        try:
+            fm.entryconfigure("Exit", state=tk.NORMAL)
+        except tk.TclError:
+            pass
+        if fully_enabled:
+            self._refresh_file_menu_save_state()
 
     def _refresh_file_menu_save_state(self) -> None:
         """Disable File → Save / Save as when settings are not in a savable state."""
@@ -2413,6 +2596,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     "creo_loadpoint": self.creo_loadpoint.get().strip(),
                     "chunk_size": self._chunk_size,
                     "output_timeout_sec": self._output_timeout_sec,
+                    "automatic_mode": self._automatic_mode,
                 }
             ),
             "",
@@ -2563,6 +2747,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return
         self._cancel_wizard_batch_output_watch()
         self._close_batch_runner_window()
+        self._cancel_automatic_wizard_chain()
         errors: list[str] = []
         errors.extend(_remove_batch_timeout_logs_in_directory(working_dir))
         errors.extend(self._clean_start_over_directory(working_dir))
@@ -2585,9 +2770,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         )
 
     def _on_exit(self) -> None:
-        """Save settings when valid; warn if the form was partly filled but could not be saved."""
+        """Save settings when valid, stop batch runner, then close."""
         self._cancel_post_batch_task_refresh()
+        self._cancel_automatic_wizard_chain()
         self._cancel_wizard_batch_output_watch()
+        self._close_batch_runner_window()
         self._settings_path = _default_app_settings_path()
         ok, err = self._write_current_settings_to_disk()
         if not ok and (
@@ -2603,6 +2790,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._set_working_directory_value("")
         self._set_creo_loadpoint_value("")
         self._cancel_wizard_batch_output_watch()
+        self._cancel_automatic_wizard_chain()
         self._wizard_step_outcome.clear()
         self._wizard_step_failed_models.clear()
         self._refresh_task_options()
@@ -2732,6 +2920,24 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         except OSError as exc:
             return f"Could not write app_settings.json:\n{path.resolve()}\n\n{exc}"
         return None
+
+    def _persist_automatic_mode(self, enabled: bool) -> str | None:
+        self._automatic_mode = _normalize_automatic_mode(enabled)
+        data = self._read_app_settings_dict()
+        data["automatic_mode"] = self._automatic_mode
+        return self._write_app_settings_dict(data)
+
+    def _on_automatic_mode_toggle(self) -> None:
+        enabled = bool(self._automatic_mode_var.get())
+        err = self._persist_automatic_mode(enabled)
+        if err:
+            self._automatic_mode_var.set(not enabled)
+            self._automatic_mode = _normalize_automatic_mode(not enabled)
+            messagebox.showerror("Automatic mode", err)
+            return
+        if not enabled:
+            self._cancel_automatic_wizard_chain()
+        self._refresh_wizard_ui()
 
     def _persist_chunk_size(self, chunk_size: int) -> str | None:
         self._chunk_size = _normalize_chunk_size(chunk_size)
@@ -3455,6 +3661,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._output_timeout_sec = _normalize_output_timeout_sec(
             data.get("output_timeout_sec", BATCH_OUTPUT_WAIT_TIMEOUT_DEFAULT)
         )
+        self._automatic_mode = _normalize_automatic_mode(
+            data.get("automatic_mode", AUTOMATIC_MODE_DEFAULT)
+        )
+        self._automatic_mode_var.set(self._automatic_mode)
         self._set_creo_loadpoint_value(str(data.get("creo_loadpoint") or ""))
         self._warn_if_creo_loadpoint_missing_parametric()
         self._set_working_directory_value(str(data.get("working_directory") or ""))
@@ -4328,6 +4538,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         except tk.TclError:
             pass
         self._refresh_wizard_footer()
+        self._refresh_menu_bar_state()
 
     def _bring_app_forward(self) -> None:
         try:
@@ -4485,7 +4696,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 "cwd": str(batch_dir),
                 "creationflags": subprocess.CREATE_NEW_CONSOLE,
             }
-            startupinfo = self._minimized_console_startupinfo()
+            startupinfo = self._console_startupinfo(hidden=self._automatic_mode)
             if startupinfo is not None:
                 popen_kw["startupinfo"] = startupinfo
             self._batch_runner_process = subprocess.Popen(**popen_kw)
@@ -4499,12 +4710,15 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         return True
 
     @staticmethod
-    def _minimized_console_startupinfo() -> subprocess.STARTUPINFO | None:
+    def _console_startupinfo(*, hidden: bool = False) -> subprocess.STARTUPINFO | None:
         if sys.platform != "win32":
             return None
         info = subprocess.STARTUPINFO()
         info.dwFlags |= getattr(subprocess, "STARTF_USESHOWWINDOW", 1)
-        info.wShowWindow = getattr(subprocess, "SW_SHOWMINNOACTIVE", 7)
+        if hidden:
+            info.wShowWindow = getattr(subprocess, "SW_HIDE", 0)
+        else:
+            info.wShowWindow = getattr(subprocess, "SW_SHOWMINNOACTIVE", 7)
         return info
 
     @staticmethod
