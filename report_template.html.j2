@@ -144,7 +144,13 @@
         .flag-button { background-color: red; color: white; }
         .dimmed-button { background-color: #e2e8f0; color: #475569; }
         .model-thumb-wrap { float: left; padding: 10px; margin-right: 8px; box-sizing: border-box; }
-        .model-thumb-wrap img { display: block; width: 300px; height: auto; }
+        .model-thumb-wrap img {
+            display: block;
+            width: 300px;
+            height: auto;
+            -webkit-user-drag: none;
+            pointer-events: none;
+        }
         .model-name-plain { color: #1a1a1a; font-weight: normal; }
         .save-help-overlay {
             display: none;
@@ -237,6 +243,68 @@
             return MQ_MODEL_FILTER_ORDER.indexOf(mode) !== -1;
         }
 
+        function isSortByIssueCountMode(mode) {
+            return mode === 'sort-by-count';
+        }
+
+        function mqInitSidebarNavOrder() {
+            var navs = document.querySelectorAll('.sidebar-check-nav');
+            for (var i = 0; i < navs.length; i++) {
+                if (!navs[i].hasAttribute('data-mq-nav-order')) {
+                    navs[i].setAttribute('data-mq-nav-order', String(i));
+                }
+            }
+        }
+
+        function mqCountSectionIssues(wrapper) {
+            if (!wrapper) { return 0; }
+            var rows = wrapper.querySelectorAll('.mq-issue-row');
+            var count = 0;
+            for (var i = 0; i < rows.length; i++) {
+                var fileRow = fileRowFor(rows[i]);
+                if (fileRow && fileRow.parentNode && document.body.contains(fileRow)) {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        function mqApplySidebarNavOrder(mode) {
+            var ul = document.querySelector('.sidebar ul');
+            if (!ul) { return; }
+            var hr = ul.querySelector('hr');
+            if (!hr) { return; }
+            var navs = ul.querySelectorAll('.sidebar-check-nav');
+            if (!navs.length) { return; }
+            var sorted = [];
+            for (var i = 0; i < navs.length; i++) {
+                sorted.push(navs[i]);
+            }
+            if (isSortByIssueCountMode(mode)) {
+                sorted.sort(function (a, b) {
+                    var wa = document.getElementById(mqNavSectionId(a));
+                    var wb = document.getElementById(mqNavSectionId(b));
+                    var ca = mqCountSectionIssues(wa);
+                    var cb = mqCountSectionIssues(wb);
+                    if (cb !== ca) { return cb - ca; }
+                    var oa = parseInt(a.getAttribute('data-mq-nav-order') || '0', 10);
+                    var ob = parseInt(b.getAttribute('data-mq-nav-order') || '0', 10);
+                    return oa - ob;
+                });
+            } else {
+                sorted.sort(function (a, b) {
+                    var oa = parseInt(a.getAttribute('data-mq-nav-order') || '0', 10);
+                    var ob = parseInt(b.getAttribute('data-mq-nav-order') || '0', 10);
+                    return oa - ob;
+                });
+            }
+            var insertAfter = hr;
+            for (var j = 0; j < sorted.length; j++) {
+                insertAfter.parentNode.insertBefore(sorted[j], insertAfter.nextSibling);
+                insertAfter = sorted[j];
+            }
+        }
+
         function categoriesPresentInDom() {
             var present = {};
             var sections = document.getElementsByClassName('check-section-wrapper');
@@ -310,9 +378,50 @@
             }
         }
 
+        function mqFlaggedFiltersPresentInDom() {
+            var flagged = false;
+            var unflagged = false;
+            var rows = document.querySelectorAll('.mq-issue-row');
+            for (var i = 0; i < rows.length; i++) {
+                var fileRow = fileRowFor(rows[i]);
+                if (!fileRow || !fileRow.parentNode || !document.body.contains(fileRow)) {
+                    continue;
+                }
+                if (rows[i].classList.contains('flagged')) {
+                    flagged = true;
+                } else {
+                    unflagged = true;
+                }
+                if (flagged && unflagged) { break; }
+            }
+            return { flagged: flagged, unflagged: unflagged };
+        }
+
+        function mqSetFilterOptionVisible(opt, visible) {
+            if (!opt) { return; }
+            opt.hidden = !visible;
+            opt.disabled = !visible;
+        }
+
+        function syncFlaggedFilterOptions() {
+            var sel = document.getElementById('sidebar-view-filter');
+            if (!sel) { return; }
+            var present = mqFlaggedFiltersPresentInDom();
+            mqSetFilterOptionVisible(sel.querySelector('option[value="flagged"]'), present.flagged);
+            mqSetFilterOptionVisible(sel.querySelector('option[value="unflagged"]'), present.unflagged);
+            if ((sel.value === 'flagged' && !present.flagged) ||
+                (sel.value === 'unflagged' && !present.unflagged)) {
+                sel.value = 'all';
+                document.body.removeAttribute('data-mq-view-filter');
+                mqSyncSidebarNav();
+                mqApplySidebarNavOrder('all');
+            }
+        }
+
         function syncViewFilterOptions() {
             syncCategoryFilterOptions();
             syncModelFilterOptions();
+            syncFlaggedFilterOptions();
         }
 
         function openPopup(event, url) {
@@ -347,7 +456,7 @@
         }
 
         function mqSectionMatchesFilter(wrapper, mode) {
-            if (!wrapper || mode === 'all') { return true; }
+            if (!wrapper || mode === 'all' || isSortByIssueCountMode(mode)) { return true; }
             if (mode === 'warning') { return wrapper.getAttribute('data-mq-section-stat') !== 'ERROR'; }
             if (mode === 'error') { return wrapper.getAttribute('data-mq-section-stat') !== 'WARNING'; }
             if (isCategoryFilterMode(mode)) { return wrapper.getAttribute('data-mq-category') === mode; }
@@ -384,6 +493,7 @@
                 document.body.setAttribute('data-mq-view-filter', mode);
             }
             mqSyncSidebarNav();
+            mqApplySidebarNavOrder(mode);
         }
 
         function setViewFilterAll() {
@@ -391,6 +501,7 @@
             if (sel) { sel.value = 'all'; }
             document.body.removeAttribute('data-mq-view-filter');
             mqSyncSidebarNav();
+            mqApplySidebarNavOrder('all');
         }
 
         function jumpToHealthCheck(checkName) {
@@ -588,7 +699,10 @@
             markReportSessionDirty();
             if (opts.syncFilters) { syncViewFilterOptions(); }
             mqApplySummaryToDom();
-            if (opts.syncNav) { mqSyncSidebarNav(); }
+            if (opts.syncNav) {
+                mqSyncSidebarNav();
+                mqApplySidebarNavOrder(document.body.getAttribute('data-mq-view-filter') || 'all');
+            }
         }
 
         function toggleFlag(id) {
@@ -597,6 +711,7 @@
             var flagButton = element.querySelector('.flag-button');
             element.classList.toggle('flagged');
             if (flagButton) { flagButton.classList.toggle('dimmed-button'); }
+            syncFlaggedFilterOptions();
             var mode = document.body.getAttribute('data-mq-view-filter') || 'all';
             if (mode === 'flagged' || mode === 'unflagged') { mqSyncSidebarNav(); }
             markReportSessionDirty();
@@ -871,6 +986,30 @@
                 window.addEventListener('hashchange', setActiveSidebarNavFromHash);
                 setActiveSidebarNavFromHash();
             }
+            function initModelThumbDrag() {
+                var wraps = document.querySelectorAll('a.model-thumb-wrap[href]');
+                for (var i = 0; i < wraps.length; i++) {
+                    (function (wrap) {
+                        var img = wrap.querySelector('img');
+                        if (img) {
+                            img.setAttribute('draggable', 'false');
+                        }
+                        wrap.addEventListener('dragstart', function (e) {
+                            var rel = wrap.getAttribute('href');
+                            if (!rel) { return; }
+                            var fileUrl;
+                            try {
+                                fileUrl = new URL(rel, window.location.href).href;
+                            } catch (err) {
+                                fileUrl = rel;
+                            }
+                            e.dataTransfer.setData('text/uri-list', fileUrl);
+                            e.dataTransfer.setData('text/plain', fileUrl);
+                            e.dataTransfer.effectAllowed = 'copy';
+                        });
+                    })(wraps[i]);
+                }
+            }
             function initSaveHelpDialog() {
                 var overlay = document.getElementById('save-help-overlay');
                 if (!overlay) { return; }
@@ -896,6 +1035,8 @@
             function initReportUi() {
                 initPersistedReportState();
                 restoreViewFilterFromDom();
+                syncFlaggedFilterOptions();
+                mqInitSidebarNavOrder();
                 mqInitPassBaseline();
                 mqInitCategoryCards();
                 var baked = document.querySelector('.mq-dashboard[data-mq-summary-baked="1"]');
@@ -905,6 +1046,7 @@
                 }
                 initSidebarNavHighlight();
                 initHealthCheckJumps();
+                initModelThumbDrag();
                 initSaveHelpDialog();
                 initBeforeUnloadWarning();
                 var persistedFilter = document.body.getAttribute('data-mq-view-filter');
@@ -946,6 +1088,7 @@
             <option value="error">Show errors</option>
             <option value="flagged">Show flagged</option>
             <option value="unflagged">Show unflagged</option>
+            <option value="sort-by-count">Sort by issue count</option>
             <optgroup label="By model" id="sidebar-model-filter-group">
                 <option value="PRT">Parts</option>
                 <option value="ASM">Assemblies</option>
@@ -1014,7 +1157,7 @@
                 {% if file.image_url %}
                     {% if file.model_href %}
                 <a class="model-thumb-wrap" href="{{ file.model_href | safe }}" onclick="void(0); return false;">
-                    <img loading="lazy" decoding="async" title="Drag this into Creo" src="{{ file.image_url | e }}" alt="" onerror="this.onerror=null;this.style.display='none';"/></a>
+                    <img loading="lazy" decoding="async" draggable="false" title="Drag this into Creo" src="{{ file.image_url | e }}" alt="" onerror="this.onerror=null;this.style.display='none';"/></a>
                     {% else %}
                 <span class="model-thumb-wrap" title="No file link: session-style model name (not used as a file URL).">
                     <img loading="lazy" decoding="async" title="No file link for this model name" src="{{ file.image_url | e }}" alt="" onerror="this.onerror=null;this.style.display='none';"/></span>
