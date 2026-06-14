@@ -42,6 +42,8 @@ from pathlib import Path
 
 from typing import Any
 
+from make_html_summary import _model_check_category_map
+
 
 
 
@@ -487,6 +489,116 @@ def find_top_level_assembly(master_root: ET.Element) -> str | None:
 
 
 
+def _resolve_check_xml_path(working_dir: str, model: str) -> str | None:
+    """Locate ``*.p.xml`` / ``*.a.xml`` / ``*.d.xml`` for a logical model name in ``working_dir``."""
+    display = _model_display_lower(model)
+    xml_base = _check_xml_basename_for_display(display)
+    if not xml_base:
+        return None
+    wd = os.path.normpath(os.path.abspath(working_dir))
+    direct = os.path.join(wd, xml_base)
+    if os.path.isfile(direct):
+        return direct
+    target_cf = xml_base.casefold()
+    try:
+        for name in os.listdir(wd):
+            if name.casefold() == target_cf:
+                path = os.path.join(wd, name)
+                if os.path.isfile(path):
+                    return path
+    except OSError:
+        return None
+    return None
+
+
+def _parse_mc_bom_item_names(check_xml_path: str) -> list[str]:
+    """Read ``<mc_bom><item><name>…</name></item></mc_bom>`` from a ModelCHECK result XML."""
+    try:
+        root = ET.parse(check_xml_path).getroot()
+    except (ET.ParseError, OSError):
+        return []
+    bom = root.find(".//mc_bom")
+    if bom is None:
+        return []
+    names: list[str] = []
+    for item in bom.findall("item"):
+        name = (item.findtext("name") or "").strip()
+        if name:
+            names.append(name)
+    return names
+
+
+def scan_model_issue_counts(
+    master_root: ET.Element,
+    model_checks_xml_path: str | None = None,
+) -> dict[str, tuple[int, int]]:
+    """Casefold model name -> (error_count, warning_count) for report-visible checks."""
+    allowed: set[str] | None = None
+    if model_checks_xml_path and os.path.isfile(model_checks_xml_path):
+        allowed = set(_model_check_category_map(model_checks_xml_path).keys())
+
+    counts: dict[str, tuple[int, int]] = {}
+    for file_element in master_root.findall("File"):
+        model = (file_element.findtext("Model") or "").strip()
+        if not model:
+            continue
+        errors = 0
+        warnings = 0
+        for check in file_element.findall(".//check"):
+            if _check_hidden_from_report(check):
+                continue
+            stat_el = check.find("stat")
+            stat = (stat_el.text if stat_el is not None else "").strip().upper()
+            if stat not in ("ERROR", "WARNING"):
+                continue
+            name = check.get("name") or ""
+            if allowed is not None and name not in allowed:
+                continue
+            if stat == "ERROR":
+                errors += 1
+            else:
+                warnings += 1
+        key = model.casefold()
+        prev_e, prev_w = counts.get(key, (0, 0))
+        counts[key] = (prev_e + errors, prev_w + warnings)
+    return counts
+
+
+@dataclass
+class BomComponentRow:
+    name: str
+    errors: int = 0
+    warnings: int = 0
+
+
+def load_top_level_assembly_bom(
+    working_dir: str,
+    top_level_assembly: str | None,
+    *,
+    master_root: ET.Element | None = None,
+    model_checks_xml_path: str | None = None,
+) -> list[BomComponentRow]:
+    """BOM components from the top assembly's ``.a.xml``, with issue counts from ``master.xml``."""
+    if not top_level_assembly:
+        return []
+    xml_path = _resolve_check_xml_path(working_dir, top_level_assembly)
+    if not xml_path:
+        return []
+    names = _parse_mc_bom_item_names(xml_path)
+    issue_counts: dict[str, tuple[int, int]] = {}
+    if master_root is not None:
+        issue_counts = scan_model_issue_counts(master_root, model_checks_xml_path)
+    rows: list[BomComponentRow] = []
+    for name in names:
+        errors, warnings = issue_counts.get(name.casefold(), (0, 0))
+        rows.append(BomComponentRow(name=name, errors=errors, warnings=warnings))
+    return rows
+
+
+def _model_checks_xml_path() -> Path:
+    return _app_dir() / "model_checks.xml"
+
+
 HEALTH_CHECKS: list[tuple[str, str]] = [
 
     ("REGEN_ERRS", "Regeneration errors"),
@@ -556,6 +668,8 @@ class BatchStatistics:
     skipped_models: list[str] = field(default_factory=list)
 
     top_level_assembly: str | None = None
+
+    top_level_assembly_bom: list[BomComponentRow] = field(default_factory=list)
 
     family_generics_detail: list[FamilyGenericRow] = field(default_factory=list)
 
@@ -789,8 +903,42 @@ _MQ_STATS_CSS = """
 .mq-family-table-rest[hidden] { display: none !important; }
 
 .mq-family-more-wrap { margin: 10px 0 0 0; font-size: 0.88rem; }
+.mq-family-expand-btn[hidden], .mq-family-collapse-btn[hidden] { display: none !important; }
 
 .mq-stats-page.mq-stats-embedded { background: transparent; padding: 0; margin-top: 20px; max-width: none; }
+
+.mq-bom-table { width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+.mq-bom-head {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 8px 10px; border-bottom: 1px solid #e2e8f0;
+  font-size: 0.78rem; text-transform: uppercase; letter-spacing: .04em;
+  color: #64748b; font-weight: 600; background: #fff;
+}
+.mq-bom-head .mq-bom-model { flex: 1; min-width: 0; text-align: left; }
+.mq-bom-head .mq-bom-num { width: 5.5rem; text-align: center; flex-shrink: 0; }
+.mq-bom-row, .mq-stats-embedded button.mq-bom-jump {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 8px 10px; border-bottom: 1px solid #e2e8f0;
+  font-size: 0.88rem; box-sizing: border-box;
+}
+.mq-bom-row .mq-bom-model, .mq-stats-embedded button.mq-bom-jump .mq-bom-model {
+  flex: 1; min-width: 0; text-align: left;
+}
+.mq-bom-row .mq-bom-num, .mq-stats-embedded button.mq-bom-jump .mq-bom-num {
+  width: 5.5rem; text-align: center; flex-shrink: 0;
+  font-weight: 600; color: #0f172a;
+}
+.mq-stats-embedded button.mq-bom-jump {
+  border: none; background: transparent; text-align: left; font: inherit; color: inherit;
+  cursor: pointer; margin: 0;
+}
+.mq-stats-embedded button.mq-bom-jump:hover { background: #f1f5f9; }
+.mq-stats-embedded button.mq-bom-jump:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
+.mq-bom-table > .mq-bom-row:last-child,
+.mq-bom-table > button.mq-bom-jump:last-of-type { border-bottom: none; }
+.mq-bom-table-rest[hidden] { display: none !important; }
+.mq-bom-more-wrap { margin: 12px 0 0 0; font-size: 0.88rem; }
+.mq-bom-expand-btn[hidden], .mq-bom-collapse-btn[hidden] { display: none !important; }
 
 </style>"""
 
@@ -806,6 +954,8 @@ def _esc(text: Any) -> str:
 _LIST_PREVIEW_LIMIT = 20
 
 _FAMILY_TABLE_PREVIEW_LIMIT = 5
+
+_BOM_LIST_PREVIEW_LIMIT = 10
 
 
 def _comma_separated_list_html(names: list[str], *, span_class: str) -> str:
@@ -845,6 +995,7 @@ def _family_table_section(generics: list[FamilyGenericRow]) -> str:
     )
     more_html = ""
     if len(generics) > _FAMILY_TABLE_PREVIEW_LIMIT:
+        total = len(generics)
         tbody_html = "".join(
             _family_table_row(g)
             for g in generics[:_FAMILY_TABLE_PREVIEW_LIMIT]
@@ -852,8 +1003,23 @@ def _family_table_section(generics: list[FamilyGenericRow]) -> str:
             _family_table_row(g, collapsed=True)
             for g in generics[_FAMILY_TABLE_PREVIEW_LIMIT:]
         )
-        more_html = """
-    <p class="mq-family-more-wrap"><button type="button" class="mq-skipped-more-btn" onclick="var s=this.closest('.mq-section');s.querySelectorAll('.mq-family-table-rest').forEach(function(r){r.removeAttribute('hidden');});this.parentElement.remove();">Show all rows...</button></p>"""
+        more_html = (
+            '<p class="mq-family-more-wrap">'
+            '<button type="button" class="mq-skipped-more-btn mq-family-expand-btn" '
+            'onclick="var s=this.closest(&quot;.mq-section&quot;);'
+            "s.querySelectorAll('.mq-family-table-rest').forEach(function(r){r.removeAttribute('hidden');});"
+            'var w=this.closest(&quot;.mq-family-more-wrap&quot;);'
+            "w.querySelector('.mq-family-expand-btn').setAttribute('hidden','');"
+            "w.querySelector('.mq-family-collapse-btn').removeAttribute('hidden');\">"
+            f"Show all {total} rows…</button>"
+            '<button type="button" class="mq-skipped-more-btn mq-family-collapse-btn" hidden '
+            'onclick="var s=this.closest(&quot;.mq-section&quot;);'
+            "s.querySelectorAll('.mq-family-table-rest').forEach(function(r){r.setAttribute('hidden','');});"
+            'var w=this.closest(&quot;.mq-family-more-wrap&quot;);'
+            "w.querySelector('.mq-family-collapse-btn').setAttribute('hidden','');"
+            "w.querySelector('.mq-family-expand-btn').removeAttribute('hidden');\">"
+            "Collapse</button></p>"
+        )
     else:
         tbody_html = "".join(_family_table_row(g) for g in generics)
     return f"""
@@ -869,6 +1035,86 @@ def _family_table_section(generics: list[FamilyGenericRow]) -> str:
       <tbody>{tbody_html}</tbody>
 
     </table>{more_html}
+
+  </div>"""
+
+
+def _bom_row(row: BomComponentRow, *, embedded: bool, collapsed: bool = False) -> str:
+    display = _esc(_model_display_lower(row.name))
+    hidden_attr = " hidden" if collapsed else ""
+    rest_cls = " mq-bom-table-rest" if collapsed else ""
+    inner = (
+        f'<span class="mq-bom-model">{display}</span>'
+        f'<span class="mq-bom-num">{row.errors}</span>'
+        f'<span class="mq-bom-num">{row.warnings}</span>'
+    )
+    if embedded:
+        return (
+            f'<button type="button" class="mq-bom-jump{rest_cls}"{hidden_attr} '
+            f'data-mq-model-jump="{_esc(row.name)}">{inner}</button>'
+        )
+    return f'<div class="mq-bom-row{rest_cls}"{hidden_attr}>{inner}</div>'
+
+
+def _top_level_bom_section(
+    bom_rows: list[BomComponentRow],
+    *,
+    assembly_name: str,
+    embedded: bool,
+) -> str:
+    if not bom_rows:
+        return ""
+    total = len(bom_rows)
+    if total > _BOM_LIST_PREVIEW_LIMIT:
+        rows_html = "".join(
+            _bom_row(row, embedded=embedded)
+            for row in bom_rows[:_BOM_LIST_PREVIEW_LIMIT]
+        ) + "".join(
+            _bom_row(row, embedded=embedded, collapsed=True)
+            for row in bom_rows[_BOM_LIST_PREVIEW_LIMIT:]
+        )
+        more_html = (
+            '<p class="mq-bom-more-wrap">'
+            '<button type="button" class="mq-skipped-more-btn mq-bom-expand-btn" '
+            'onclick="var s=this.closest(&quot;.mq-section&quot;);'
+            "s.querySelectorAll('.mq-bom-table-rest').forEach(function(r){r.removeAttribute('hidden');});"
+            'var w=this.closest(&quot;.mq-bom-more-wrap&quot;);'
+            "w.querySelector('.mq-bom-expand-btn').setAttribute('hidden','');"
+            "w.querySelector('.mq-bom-collapse-btn').removeAttribute('hidden');\">"
+            f"Show all {total} components…</button>"
+            '<button type="button" class="mq-skipped-more-btn mq-bom-collapse-btn" hidden '
+            'onclick="var s=this.closest(&quot;.mq-section&quot;);'
+            "s.querySelectorAll('.mq-bom-table-rest').forEach(function(r){r.setAttribute('hidden','');});"
+            'var w=this.closest(&quot;.mq-bom-more-wrap&quot;);'
+            "w.querySelector('.mq-bom-collapse-btn').setAttribute('hidden','');"
+            "w.querySelector('.mq-bom-expand-btn').removeAttribute('hidden');\">"
+            "Collapse</button></p>"
+        )
+    else:
+        rows_html = "".join(_bom_row(row, embedded=embedded) for row in bom_rows)
+        more_html = ""
+
+    asm_display = _esc(_model_display_lower(assembly_name))
+    note = f"BOM from {asm_display} ({total} components)."
+    if embedded:
+        note += " Click a row to scroll to that model in the report."
+
+    return f"""
+
+  <div class="mq-section mq-top-asm-bom">
+
+    <h2>Top level assembly information</h2>
+
+    <p class="mq-section-note">{note}</p>
+
+    <div class="mq-bom-table">
+      <div class="mq-bom-head">
+        <div class="mq-bom-model">Model</div>
+        <div class="mq-bom-num">Errors</div>
+        <div class="mq-bom-num">Warnings</div>
+      </div>
+      {rows_html}
+    </div>{more_html}
 
   </div>"""
 
@@ -935,7 +1181,13 @@ def generate_statistics_html(stats: BatchStatistics, *, embedded: bool = False) 
 
     family_section = _family_table_section(stats.family_generics_detail)
 
-
+    bom_section = ""
+    if stats.top_level_assembly and stats.top_level_assembly_bom:
+        bom_section = _top_level_bom_section(
+            stats.top_level_assembly_bom,
+            assembly_name=stats.top_level_assembly,
+            embedded=embedded,
+        )
 
     health_max = max(stats.health_counts.values()) if stats.health_counts else 0
 
@@ -1052,7 +1304,7 @@ def generate_statistics_html(stats: BatchStatistics, *, embedded: bool = False) 
 
 
 
-    body_sections = summary_grid + health_section + complexity_snapshot_section + family_section
+    body_sections = summary_grid + bom_section + health_section + complexity_snapshot_section + family_section
 
     if not body_sections.strip():
 
@@ -1066,9 +1318,9 @@ def generate_statistics_html(stats: BatchStatistics, *, embedded: bool = False) 
 
     page_class = "mq-stats-page mq-stats-embedded" if embedded else "mq-stats-page"
     if embedded:
-        title_html = '  <h1 class="mq-page-title" id="statistics">Statistics</h1>'
+        title_html = '  <h1 class="mq-page-title" id="statistics">Scan Statistics</h1>'
     else:
-        title_html = '  <h1 class="mq-stats-title">Statistics</h1>'
+        title_html = '  <h1 class="mq-stats-title">Scan Statistics</h1>'
     return f"""{_MQ_STATS_CSS}
 
 <div class="{page_class}">
@@ -1089,6 +1341,13 @@ def generate_statistics_fragment(
     """Build statistics HTML from an already-parsed ``master.xml`` root."""
     stats = scan_batch_statistics(master_root, master_path=master_path)
     stats.skipped_models = scan_skipped_models(working_dir, master_root)
+    if stats.top_level_assembly:
+        stats.top_level_assembly_bom = load_top_level_assembly_bom(
+            working_dir,
+            stats.top_level_assembly,
+            master_root=master_root,
+            model_checks_xml_path=str(_model_checks_xml_path()),
+        )
     return generate_statistics_html(stats, embedded=embedded)
 
 
@@ -1106,6 +1365,13 @@ def write_statistics_html_file(master_xml_path: str, output_path: str) -> str:
     stats = scan_batch_statistics(root, master_path=master_xml_path)
 
     stats.skipped_models = scan_skipped_models(working_dir, root)
+    if stats.top_level_assembly:
+        stats.top_level_assembly_bom = load_top_level_assembly_bom(
+            working_dir,
+            stats.top_level_assembly,
+            master_root=root,
+            model_checks_xml_path=str(_model_checks_xml_path()),
+        )
 
     fragment = generate_statistics_html(stats, embedded=False)
 
@@ -1119,7 +1385,7 @@ def write_statistics_html_file(master_xml_path: str, output_path: str) -> str:
 
         '  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
 
-        "  <title>Statistics</title>\n"
+        "  <title>Scan Statistics</title>\n"
 
         "</head>\n<body style=\"margin:0;background:#e8eaed;\">\n"
 

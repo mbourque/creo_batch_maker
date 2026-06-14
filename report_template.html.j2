@@ -115,6 +115,12 @@
             clear: both;
         }
         .file-list p { margin: 5px 0; }
+        .file-list.mq-bom-scroll-target {
+            outline: 2px solid #2563eb;
+            outline-offset: 2px;
+            border-radius: 4px;
+            transition: outline-color 0.4s ease;
+        }
         .hide-button { cursor: pointer; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; padding: 5px 10px; margin-left: 10px; }
         .check-buttons { text-align: right; margin-bottom: 10px; display: flex; justify-content: flex-end; gap: 10px; }
         .file-list .check-buttons { clear: both; }
@@ -537,6 +543,37 @@
             for (var i = 0; i < bars.length; i++) {
                 bars[i].addEventListener('click', function () {
                     jumpToHealthCheck(this.getAttribute('data-mq-health-check'));
+                });
+            }
+        }
+
+        function jumpToModel(modelName) {
+            if (!modelName) { return; }
+            setViewFilterAll();
+            var needle = modelName.toLowerCase();
+            var target = null;
+            var rows = document.querySelectorAll('.file-list[data-mq-model]');
+            for (var i = 0; i < rows.length; i++) {
+                var m = (rows[i].getAttribute('data-mq-model') || '').toLowerCase();
+                if (m === needle) {
+                    target = rows[i];
+                    break;
+                }
+            }
+            if (!target || !document.body.contains(target)) { return; }
+            if (target.id) {
+                window.location.hash = target.id;
+            }
+            target.classList.add('mq-bom-scroll-target');
+            setTimeout(function () { target.classList.remove('mq-bom-scroll-target'); }, 2500);
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function initModelJumps() {
+            var btns = document.querySelectorAll('.mq-bom-jump[data-mq-model-jump]');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    jumpToModel(this.getAttribute('data-mq-model-jump'));
                 });
             }
         }
@@ -1046,6 +1083,7 @@
                 }
                 initSidebarNavHighlight();
                 initHealthCheckJumps();
+                initModelJumps();
                 initModelThumbDrag();
                 initSaveHelpDialog();
                 initBeforeUnloadWarning();
@@ -1106,7 +1144,7 @@
     </div>
     <ul>
         <li><a href="#summary">Score</a></li>
-        <li><a href="#statistics">Statistics</a></li>
+        <li><a href="#statistics">Scan Statistics</a></li>
         <hr>
         {% for section in check_sections %}
         <li title="{{ section.category }}" class="sidebar-check-nav wrapper-{{ section.class }}"

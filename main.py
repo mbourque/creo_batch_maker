@@ -53,6 +53,8 @@ _START_TEMPLATE_XML_NAMES: dict[str, str] = {
     "asm": "assembly_template.a.xml",
     "drw": "drawing_template.d.xml",
 }
+# ModelCHECK detail outputs under templates\ removed when Scan Templates finishes (Next >).
+_TEMPLATE_SCAN_DETAIL_SUFFIXES = (".html", ".js", ".png", ".ps1", ".css")
 
 # Chunk .dxc files: working_dir / f"{CREO_BATCH_BASE}-1.dxc", "-2.dxc", ...
 CREO_BATCH_BASE = "creo-batch"
@@ -369,6 +371,25 @@ def _xml_attr_escape(value: str) -> str:
 def _dxc_path_str(path: Path) -> str:
     """Absolute path for Creo .dxc XML (forward slashes)."""
     return path.resolve().as_posix()
+
+
+def _clean_templates_dir_scan_detail_files(templates_dir: Path) -> list[str]:
+    """Remove ModelCHECK detail and runner files from templates\\; keep Creo models and .xml."""
+    errors: list[str] = []
+    try:
+        if not templates_dir.is_dir():
+            return errors
+        for entry in templates_dir.iterdir():
+            if not entry.is_file():
+                continue
+            if entry.name.casefold().endswith(_TEMPLATE_SCAN_DETAIL_SUFFIXES):
+                try:
+                    entry.unlink()
+                except OSError as exc:
+                    errors.append(f"{entry}\n{exc}")
+    except OSError as exc:
+        errors.append(f"{templates_dir}\n{exc}")
+    return errors
 
 
 def _sort_scan_template_models(paths: list[Path]) -> list[Path]:
@@ -806,6 +827,15 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._cancel_wizard_batch_output_watch()
         self._close_batch_runner_window()
         if step == WIZARD_STEP_SCAN:
+            templates_dir = self._start_templates_dir()
+            if templates_dir is not None:
+                cleanup_errors = _clean_templates_dir_scan_detail_files(templates_dir)
+                if cleanup_errors:
+                    messagebox.showwarning(
+                        "Scan Templates",
+                        "Some template detail files could not be removed:\n\n"
+                        + "\n\n".join(cleanup_errors),
+                    )
             self._wizard_step_outcome[WIZARD_STEP_SCAN] = "done"
             self._set_wizard_step(WIZARD_STEP_MODELCHECK)
         elif step == WIZARD_STEP_MODELCHECK:
