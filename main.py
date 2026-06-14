@@ -78,11 +78,14 @@ BATCH_OUTPUT_WAIT_TIMEOUT_DEFAULT = 120
 BATCH_OUTPUT_WAIT_TIMEOUT_MIN = 60
 # After all expected outputs for a chunk appear, settle this many seconds before running kill.bat.
 BATCH_OUTPUT_SETTLE_SEC = 5
+# xtop.exe: abort chunk wait after N consecutive dead polls with no restart within restart sec (within window sec of first dead poll).
+BATCH_XTOP_DEAD_CHECKS = 2
+BATCH_XTOP_RESTART_WAIT_SEC = 10
+BATCH_XTOP_DEAD_WINDOW_SEC = 30
 # Wizard polls the batch folder until chunk .dxc files are gone (runner deletes them when done).
 WIZARD_BATCH_DXC_POLL_MS = 3000
 BATCH_TIMEOUT_LOG_PREFIX = "creo-batch-timeouts-"
 _BATCH_TIMEOUT_LOG_HEADER = "Models timed out:"
-WIZARD_BATCH_FAILED_INLINE_MAX = 10
 # Chunk ETA on ModelCHECK / JPEG 3D: show after this many chunks finish (depends on total).
 WIZARD_BATCH_ETA_MIN_CHUNKS_DEFAULT = 2
 WIZARD_BATCH_ETA_MIN_CHUNKS_SMALL = 1
@@ -241,13 +244,7 @@ def _clear_batch_timeout_logs(batch_dir: Path, task_kind: str) -> None:
 def _format_batch_failed_models_line(models: list[str]) -> str:
     if not models:
         return ""
-    total = len(models)
-    shown = models[:WIZARD_BATCH_FAILED_INLINE_MAX]
-    line = f"Failed ({total}): {', '.join(shown)}"
-    rest = total - len(shown)
-    if rest > 0:
-        line += f", ... and {rest} more"
-    return line
+    return f"Failed ({len(models)}): {', '.join(models)}"
 
 
 def _batch_eta_min_chunks_done(total_chunks: int) -> int:
@@ -1551,6 +1548,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._cancel_wizard_batch_output_watch()
         self._close_batch_runner_window()
         if step == WIZARD_STEP_SCAN:
+            if self._warn_wizard_working_directory_missing_models():
+                return
             self._wizard_step_outcome[WIZARD_STEP_SCAN] = "skipped"
             self._set_wizard_step(WIZARD_STEP_MODELCHECK)
         elif step == WIZARD_STEP_MODELCHECK:
@@ -1594,6 +1593,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 )
                 return
             self._persist_working_directory_and_loadpoint()
+            if self._warn_wizard_working_directory_missing_models():
+                return
             self._refresh_task_options()
             self._set_wizard_step(WIZARD_STEP_SCAN)
             return
@@ -1785,8 +1786,23 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             )
             if not label.winfo_ismapped():
                 label.pack(anchor="w", pady=(8, 0))
-        else:
-            label.pack_forget()
+            return
+        if (
+            wd
+            and _working_directory_exists_as_dir(wd)
+            and not self._wizard_working_directory_has_models(wd)
+        ):
+            label.configure(
+                text=(
+                    "No Creo models (.prt, .asm, .drw) found in this folder — "
+                    "add models before continuing."
+                ),
+                text_color="#C62828",
+            )
+            if not label.winfo_ismapped():
+                label.pack(anchor="w", pady=(8, 0))
+            return
+        label.pack_forget()
 
     def _refresh_wizard_template_row_controls(self) -> None:
         """Enable or disable Browse and × on visible template rows."""
@@ -2407,6 +2423,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             command=self._on_open_working_directory,
         )
         file_menu.add_separator()
+        file_menu.add_command(label="Stop", command=self._on_file_menu_stop)
         file_menu.add_command(label="Start over...", command=self._on_file_menu_start_over)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self._on_exit)
@@ -2449,6 +2466,12 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return False
         return self._wizard_batch_waiting_on_step(step)
 
+    def _batch_stop_available(self) -> bool:
+        if self._wizard_batch_is_running():
+            return True
+        proc = self._batch_runner_process
+        return proc is not None and proc.poll() is None
+
     def _app_menus_fully_enabled(self) -> bool:
         return (
             self._wizard_step == WIZARD_STEP_SETUP
@@ -2463,6 +2486,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if menubar is None or fm is None:
             return
         fully_enabled = self._app_menus_fully_enabled()
+        batch_stop = self._batch_stop_available()
         for label in ("Settings", "Configuration"):
             try:
                 menubar.entryconfigure(label, state=tk.NORMAL if fully_enabled else tk.DISABLED)
@@ -2484,6 +2508,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 fm.entryconfigure(label, state=tk.NORMAL if fully_enabled else tk.DISABLED)
             except tk.TclError:
                 pass
+        try:
+            fm.entryconfigure("Stop", state=tk.NORMAL if batch_stop else tk.DISABLED)
+        except tk.TclError:
+            pass
         try:
             fm.entryconfigure("Exit", state=tk.NORMAL)
         except tk.TclError:
@@ -2632,8 +2660,32 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "Use Browse to pick a folder, or type a path that already exists on disk.",
         )
 
+    def _wizard_working_directory_has_models(self, working_dir_str: str | None = None) -> bool:
+        """True if the working folder has at least one top-level .prt, .asm, or .drw."""
+        s = (working_dir_str if working_dir_str is not None else self.working_directory.get()).strip()
+        if not s or not _working_directory_exists_as_dir(s):
+            return False
+        return self._working_directory_has_creo_models(s, extensions=_CREO_MODEL_EXTENSIONS_ALL)
+
+    def _warn_wizard_working_directory_missing_models(self) -> bool:
+        """Warn when the working folder has no batchable Creo models. Returns True if missing."""
+        wd = (self.working_directory.get() or "").strip()
+        if not wd or not _working_directory_exists_as_dir(wd):
+            return False
+        if self._wizard_working_directory_has_models(wd):
+            return False
+        types_label = "/".join(f".{ext}" for ext in _CREO_MODEL_EXTENSIONS_ALL)
+        messagebox.showwarning(
+            "Working directory",
+            "No Creo models found in this folder.\n\n"
+            f"Add at least one {types_label} file directly in this directory "
+            "(the app does not look inside subfolders or zip files).",
+        )
+        return True
+
     def _warn_if_working_directory_has_no_creo_models(self) -> None:
         if self._wizard_step == WIZARD_STEP_SETUP:
+            self._warn_wizard_working_directory_missing_models()
             return
         wd = (self.working_directory.get() or "").strip()
         if not wd or not _working_directory_exists_as_dir(wd):
@@ -2722,6 +2774,66 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             except OSError as exc:
                 errors.append(f"{entry}\n{exc}")
         return errors
+
+    def _run_kill_bat(self) -> tuple[bool, str | None]:
+        kill_bat = _app_bundle_dir() / "kill.bat"
+        if not kill_bat.is_file():
+            return False, f"Could not find kill.bat next to the application:\n{kill_bat}"
+        try:
+            run_kw: dict = {
+                "args": [str(kill_bat)],
+                "cwd": str(kill_bat.parent),
+                "check": False,
+            }
+            if sys.platform == "win32":
+                run_kw["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+            subprocess.run(**run_kw)
+        except OSError as exc:
+            return False, str(exc)
+        return True, None
+
+    def _on_file_menu_stop(self) -> None:
+        if not self._batch_stop_available():
+            messagebox.showinfo("Stop", "No batch is running.")
+            return
+        watch = self._wizard_batch_watch
+        step = watch.get("step") if watch else self._wizard_step
+        if not isinstance(step, int):
+            step = self._wizard_step
+        step_label = (
+            WIZARD_STEPPER_LABELS[step]
+            if 0 <= step < len(WIZARD_STEPPER_LABELS)
+            else "batch"
+        )
+        prompt = (
+            f"Stop the running {step_label} batch?\n\n"
+            "This closes the PowerShell runner and runs kill.bat to stop Creo.\n"
+            "Outputs already written are kept.\n\n"
+            "To continue later, run this wizard step again — completed models are skipped."
+        )
+        if not self._show_proceed_cancel_dialog("Stop", prompt):
+            return
+        if watch is not None:
+            self._wizard_capture_failed_models_after_batch(watch)
+        self._cancel_automatic_wizard_chain()
+        self._cancel_post_batch_task_refresh()
+        self._close_batch_runner_window()
+        kill_ok, kill_err = self._run_kill_bat()
+        self._cancel_wizard_batch_output_watch()
+        self._refresh_wizard_ui()
+        if not kill_ok:
+            messagebox.showwarning(
+                "Stop",
+                "Batch stopped, but kill.bat could not run:\n\n"
+                f"{kill_err}\n\n"
+                "Run kill.bat manually if Creo processes are still active.",
+            )
+            return
+        messagebox.showinfo(
+            "Stop",
+            f"Batch stopped on the {step_label} step.\n\n"
+            "Run this step again when you are ready to continue (completed outputs are skipped).",
+        )
 
     def _on_file_menu_start_over(self) -> None:
         wd = (self.working_directory.get() or "").strip()
@@ -3896,6 +4008,162 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         return f"{stem}.jpg"
 
     @classmethod
+    def _batch_runner_xtop_helpers_ps1(cls) -> list[str]:
+        return [
+            f"$XtopDeadChecksRequired = {BATCH_XTOP_DEAD_CHECKS}",
+            f"$XtopRestartWaitSec = {BATCH_XTOP_RESTART_WAIT_SEC}",
+            f"$XtopDeadWindowSec = {BATCH_XTOP_DEAD_WINDOW_SEC}",
+            "",
+            "function Test-XtopAlive {",
+            "    $procs = Get-Process -Name xtop -ErrorAction SilentlyContinue",
+            "    if ($null -eq $procs) { return $false }",
+            "    return (@($procs).Count -gt 0)",
+            "}",
+            "",
+            "function Update-XtopDeadWatch {",
+            "    param(",
+            "        [ref]$DeadStreak,",
+            "        [ref]$FirstDeadAt,",
+            "        [ref]$WatchEnabled",
+            "    )",
+            "    if (Test-XtopAlive) {",
+            "        $DeadStreak.Value = 0",
+            "        $FirstDeadAt.Value = $null",
+            "        $WatchEnabled.Value = $true",
+            "        return $false",
+            "    }",
+            "    if (-not $WatchEnabled.Value) { return $false }",
+            "    $DeadStreak.Value = $DeadStreak.Value + 1",
+            "    if ($null -eq $FirstDeadAt.Value) { $FirstDeadAt.Value = Get-Date }",
+            "    $deadSec = [int][math]::Floor(((Get-Date) - $FirstDeadAt.Value).TotalSeconds)",
+            "    if ($DeadStreak.Value -ge $XtopDeadChecksRequired -and $deadSec -ge $XtopRestartWaitSec) {",
+            "        return $true",
+            "    }",
+            "    return $false",
+            "}",
+        ]
+
+    @classmethod
+    def _batch_runner_xtop_wait_init_ps1(cls, *, indent: str) -> list[str]:
+        return [
+            f"{indent}$xtopDeadStreak = 0",
+            f"{indent}$xtopFirstDeadAt = $null",
+            f"{indent}$xtopWatchEnabled = $false",
+        ]
+
+    @classmethod
+    def _batch_runner_xtop_wait_check_ps1(
+        cls,
+        *,
+        indent: str,
+        chunk_var: str | None = None,
+    ) -> list[str]:
+        lines = [
+            f"{indent}if (Update-XtopDeadWatch -DeadStreak ([ref]$xtopDeadStreak) -FirstDeadAt ([ref]$xtopFirstDeadAt) -WatchEnabled ([ref]$xtopWatchEnabled)) {{",
+            f'{indent}    Write-ChLog ("XTOP GONE: xtop not running for " + $XtopDeadChecksRequired + " consecutive checks (within " + $XtopDeadWindowSec + "s) and no restart within " + $XtopRestartWaitSec + "s; moving on.")',
+        ]
+        if chunk_var is not None:
+            lines.extend(
+                [
+                    f"{indent}    Record-TimedOutChunk -Chunk ${chunk_var} -MissingOutputs $missing",
+                    f"{indent}    $TimedOutFileCount += $missing.Count",
+                    f"{indent}    $SuccessFileCount += ($expected.Count - $missing.Count)",
+                ]
+            )
+        else:
+            lines.extend(
+                [
+                    f"{indent}    $TimedOutFileCount = $missing.Count",
+                    f"{indent}    $SuccessFileCount = $Expected.Count - $missing.Count",
+                ]
+            )
+        lines.extend(
+            [
+                f"{indent}    $timedOut = $true",
+                f"{indent}    break",
+                f"{indent}}}",
+            ]
+        )
+        return lines
+
+    @classmethod
+    def _batch_runner_xtop_manage_wait_timer_ps1(cls, *, indent: str) -> list[str]:
+        """Start or extend output inactivity timer only while xtop.exe is running."""
+        return [
+            f"{indent}if (Test-XtopAlive) {{",
+            f"{indent}    $xtopWatchEnabled = $true",
+            f"{indent}    $waitStart = Get-Date",
+            f"{indent}}}",
+        ]
+
+    @classmethod
+    def _batch_runner_wait_timeout_check_ps1(cls, *, indent: str, timeout_body: list[str]) -> list[str]:
+        """Apply output inactivity timeout only after xtop has started at least once."""
+        i = indent
+        lines = [
+            f"{i}$elapsed = [int][math]::Floor(((Get-Date) - $waitStart).TotalSeconds)",
+            f"{i}if ($xtopWatchEnabled -and $elapsed -ge $OutputTimeoutSec) {{",
+        ]
+        for line in timeout_body:
+            lines.append(f"{i}    {line}")
+        lines.append(f"{i}}}")
+        return lines
+
+    @classmethod
+    def _batch_runner_wait_progress_log_ps1(
+        cls,
+        *,
+        indent: str,
+        names_var: str,
+        extra_tail: str = "",
+    ) -> list[str]:
+        """Log wait status; inactivity seconds only after xtop has started and exited."""
+        i = indent
+        tail = extra_tail
+        return [
+            f"{i}$totalWaitSec = [int][math]::Floor(((Get-Date) - $chunkWaitStart).TotalSeconds)",
+            f"{i}if (-not $xtopWatchEnabled) {{",
+            f"{i}    if ($totalWaitSec -le 4 -or ($totalWaitSec % 30 -eq 0)) {{",
+            f'{i}        Write-ChLog ("WAITING: " + $missing.Count + " of " + ${names_var}.Count + " output file(s) missing (waiting for xtop to start; " + $totalWaitSec + "s total wait)"{tail})',
+            f"{i}    }}",
+            f"{i}}} elseif (Test-XtopAlive) {{",
+            f"{i}    if ($totalWaitSec -le 4 -or ($totalWaitSec % 30 -eq 0)) {{",
+            f'{i}        Write-ChLog ("WAITING: " + $missing.Count + " of " + ${names_var}.Count + " output file(s) missing (xtop running; inactivity timer paused; " + $totalWaitSec + "s total wait)"{tail})',
+            f"{i}    }}",
+            f"{i}}} else {{",
+            f"{i}    if ($elapsed -le 4 -or ($elapsed % 30 -eq 0)) {{",
+            f'{i}        Write-ChLog ("WAITING: " + $missing.Count + " of " + ${names_var}.Count + " output file(s) missing (" + $elapsed + "s with no progress; " + $totalWaitSec + "s total wait)"{tail})',
+            f"{i}    }}",
+            f"{i}}}",
+        ]
+
+    @classmethod
+    def _batch_runner_kill_after_settle_ps1(cls, *, indent: str) -> list[str]:
+        """Settle, wait for xtop.exe to exit, then run kill.bat."""
+        i = indent
+        return [
+            f"{i}Write-ChLog (\"Settling \" + $OutputSettleSec + \"s before kill.bat...\")",
+            f"{i}Start-Sleep -Seconds $OutputSettleSec",
+            f"{i}$xtopExitWaitStart = Get-Date",
+            f"{i}while (Test-XtopAlive) {{",
+            f"{i}    $xtopExitSec = [int][math]::Floor(((Get-Date) - $xtopExitWaitStart).TotalSeconds)",
+            f"{i}    if ($xtopExitSec -le 4 -or ($xtopExitSec % 30 -eq 0)) {{",
+            f'{i}        Write-ChLog ("WAITING: xtop still running (" + $xtopExitSec + "s); waiting for exit before kill.bat.")',
+            f"{i}    }}",
+            f"{i}    Start-Sleep -Seconds 2",
+            f"{i}}}",
+            f'{i}$killParent = [System.IO.Path]::GetDirectoryName($KillBat)',
+            f'{i}Write-ChLog "Running kill.bat (wait)..."',
+            f"{i}try {{",
+            f"{i}    $kp = Start-Process -FilePath $KillBat -WorkingDirectory $killParent `",
+            f"{i}        -Wait -PassThru -NoNewWindow -ErrorAction Stop",
+            f'{i}    Write-ChLog ("kill.bat exit code: " + $kp.ExitCode)',
+            f"{i}}} catch {{",
+            f'{i}    Write-ChLog ("ERROR: kill.bat failed: " + $_.Exception.Message)',
+            f"{i}}}",
+        ]
+
+    @classmethod
     def _build_scan_templates_runner_ps1(
         cls,
         ptcdbatch_bat: Path,
@@ -3935,10 +4203,14 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             '        Write-Host $line -ForegroundColor Green',
             "    } elseif ($Message -match '(?i)^TIMEOUT:') {",
             '        Write-Host $line -ForegroundColor Red',
+            "    } elseif ($Message -match '(?i)^XTOP GONE:') {",
+            '        Write-Host $line -ForegroundColor Red',
             "    } else {",
             '        Write-Host $line',
             "    }",
             "}",
+            "",
+            *cls._batch_runner_xtop_helpers_ps1(),
             "",
             "function Get-MissingOutputs {",
             "    param([string]$Dir, [string[]]$Names)",
@@ -3989,31 +4261,35 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "        exit 1",
             "    }",
             "",
-            r'    Write-ChLog "WAITING: for expected output file(s) to appear (poll every 2s; timer resets each time a file appears)."',
-            "    $waitStart = Get-Date",
+            r'    Write-ChLog "WAITING: for expected output file(s) to appear (poll every 2s; inactivity timer starts when xtop appears; resets when a file appears or while xtop is running)."',
+            "    $chunkWaitStart = Get-Date",
+            "    $waitStart = $chunkWaitStart",
             "    $missing = Get-MissingOutputs -Dir $WorkDir -Names $Expected",
             "    $lastMissingCount = $missing.Count",
             "    $timedOut = $false",
+            *cls._batch_runner_xtop_wait_init_ps1(indent="    "),
             "    while ($true) {",
             "        $missing = Get-MissingOutputs -Dir $WorkDir -Names $Expected",
             "        if ($missing.Count -eq 0) { break }",
             "        if ($missing.Count -lt $lastMissingCount) {",
             "            $delta = $lastMissingCount - $missing.Count",
             r'            Write-ChLog ("PROGRESS: " + $delta + " new output file(s); resetting timer. " + $missing.Count + " of " + $Expected.Count + " remaining.")',
-            "            $waitStart = Get-Date",
+            "            if ($xtopWatchEnabled) { $waitStart = Get-Date }",
             "            $lastMissingCount = $missing.Count",
             "        }",
-            "        $elapsed = [int][math]::Floor(((Get-Date) - $waitStart).TotalSeconds)",
-            "        if ($elapsed -ge $OutputTimeoutSec) {",
-            r'            Write-ChLog ("TIMEOUT: no new output file(s) for " + $elapsed + "s; " + $missing.Count + " of " + $Expected.Count + " still missing.")',
-            "            $TimedOutFileCount = $missing.Count",
-            "            $SuccessFileCount = $Expected.Count - $missing.Count",
-            "            $timedOut = $true",
-            "            break",
-            "        }",
-            "        if ($elapsed -le 4 -or ($elapsed % 30 -eq 0)) {",
-            r'            Write-ChLog ("WAITING: " + $missing.Count + " of " + $Expected.Count + " output file(s) missing (" + $elapsed + "s with no progress).")',
-            "        }",
+            *cls._batch_runner_xtop_manage_wait_timer_ps1(indent="        "),
+            *cls._batch_runner_wait_timeout_check_ps1(
+                indent="        ",
+                timeout_body=[
+                    r'Write-ChLog ("TIMEOUT: no new output file(s) for " + $elapsed + "s; " + $missing.Count + " of " + $Expected.Count + " still missing.")',
+                    "$TimedOutFileCount = $missing.Count",
+                    "$SuccessFileCount = $Expected.Count - $missing.Count",
+                    "$timedOut = $true",
+                    "break",
+                ],
+            ),
+            *cls._batch_runner_wait_progress_log_ps1(indent="        ", names_var="Expected"),
+            *cls._batch_runner_xtop_wait_check_ps1(indent="        "),
             "        Start-Sleep -Seconds 2",
             "    }",
             "    if (-not $timedOut) {",
@@ -4021,18 +4297,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "        $SuccessFileCount = $Expected.Count",
             "    }",
             "",
-            r'    Write-ChLog ("Settling " + $OutputSettleSec + "s before kill.bat...")',
-            "    Start-Sleep -Seconds $OutputSettleSec",
-            "",
-            "    $killParent = [System.IO.Path]::GetDirectoryName($KillBat)",
-            r'    Write-ChLog "Running kill.bat (wait)..."',
-            "    try {",
-            "        $kp = Start-Process -FilePath $KillBat -WorkingDirectory $killParent `",
-            "            -Wait -PassThru -NoNewWindow -ErrorAction Stop",
-            r'        Write-ChLog ("kill.bat exit code: " + $kp.ExitCode)',
-            "    } catch {",
-            r'        Write-ChLog ("ERROR: kill.bat failed: " + $_.Exception.Message)',
-            "    }",
+            *cls._batch_runner_kill_after_settle_ps1(indent="    "),
             "}",
             "}",
             "} finally {",
@@ -4123,10 +4388,14 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             '        Write-Host $line -ForegroundColor Green',
             "    } elseif ($Message -match '(?i)^TIMEOUT:') {",
             '        Write-Host $line -ForegroundColor Red',
+            "    } elseif ($Message -match '(?i)^XTOP GONE:') {",
+            '        Write-Host $line -ForegroundColor Red',
             "    } else {",
             '        Write-Host $line',
             "    }",
             "}",
+            "",
+            *cls._batch_runner_xtop_helpers_ps1(),
             "",
             "function Get-MissingOutputs {",
             "    param([string]$Dir, [string[]]$Names)",
@@ -4212,32 +4481,40 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "        continue",
             "    }",
             "",
-            r'    Write-ChLog "WAITING: for expected output file(s) to appear (poll every 2s; timer resets each time a file appears)."',
-            "    $waitStart = Get-Date",
+            r'    Write-ChLog "WAITING: for expected output file(s) to appear (poll every 2s; inactivity timer starts when xtop appears; resets when a file appears or while xtop is running)."',
+            "    $chunkWaitStart = Get-Date",
+            "    $waitStart = $chunkWaitStart",
             "    $missing = Get-MissingOutputs -Dir $WorkDir -Names $expected",
             "    $lastMissingCount = $missing.Count",
             "    $timedOut = $false",
+            *cls._batch_runner_xtop_wait_init_ps1(indent="    "),
             "    while ($true) {",
             "        $missing = Get-MissingOutputs -Dir $WorkDir -Names $expected",
             "        if ($missing.Count -eq 0) { break }",
             "        if ($missing.Count -lt $lastMissingCount) {",
             "            $delta = $lastMissingCount - $missing.Count",
             r'            Write-ChLog ("PROGRESS: " + $delta + " new output file(s) detected; resetting inactivity timer. " + $missing.Count + " of " + $expected.Count + " remaining.")',
-            "            $waitStart = Get-Date",
+            "            if ($xtopWatchEnabled) { $waitStart = Get-Date }",
             "            $lastMissingCount = $missing.Count",
             "        }",
-            "        $elapsed = [int][math]::Floor(((Get-Date) - $waitStart).TotalSeconds)",
-            "        if ($elapsed -ge $OutputTimeoutSec) {",
-            r'            Write-ChLog ("TIMEOUT: no new output file(s) for " + $elapsed + "s; " + $missing.Count + " of " + $expected.Count + " still missing. First missing: " + $missing[0] + ".")',
-            "            Record-TimedOutChunk -Chunk $chunk -MissingOutputs $missing",
-            "            $TimedOutFileCount += $missing.Count",
-            "            $SuccessFileCount += ($expected.Count - $missing.Count)",
-            "            $timedOut = $true",
-            "            break",
-            "        }",
-            "        if ($elapsed -le 4 -or ($elapsed % 30 -eq 0)) {",
-            r'            Write-ChLog ("WAITING: " + $missing.Count + " of " + $expected.Count + " output file(s) missing (" + $elapsed + "s with no progress). First missing: " + $missing[0] + ".")',
-            "        }",
+            *cls._batch_runner_xtop_manage_wait_timer_ps1(indent="        "),
+            *cls._batch_runner_wait_timeout_check_ps1(
+                indent="        ",
+                timeout_body=[
+                    r'Write-ChLog ("TIMEOUT: no new output file(s) for " + $elapsed + "s; " + $missing.Count + " of " + $expected.Count + " still missing. First missing: " + $missing[0] + ".")',
+                    "Record-TimedOutChunk -Chunk $chunk -MissingOutputs $missing",
+                    "$TimedOutFileCount += $missing.Count",
+                    "$SuccessFileCount += ($expected.Count - $missing.Count)",
+                    "$timedOut = $true",
+                    "break",
+                ],
+            ),
+            *cls._batch_runner_wait_progress_log_ps1(
+                indent="        ",
+                names_var="expected",
+                extra_tail=' + " First missing: " + $missing[0] + "."',
+            ),
+            *cls._batch_runner_xtop_wait_check_ps1(indent="        ", chunk_var="chunk"),
             "        Start-Sleep -Seconds 2",
             "    }",
             "    if (-not $timedOut) {",
@@ -4245,18 +4522,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "        $SuccessFileCount += $expected.Count",
             "    }",
             "",
-            r'    Write-ChLog ("Settling " + $OutputSettleSec + "s before kill.bat...")',
-            "    Start-Sleep -Seconds $OutputSettleSec",
-            "",
-            "    $killParent = [System.IO.Path]::GetDirectoryName($KillBat)",
-            r'    Write-ChLog "Running kill.bat (wait)..."',
-            "    try {",
-            "        $kp = Start-Process -FilePath $KillBat -WorkingDirectory $killParent `",
-            "            -Wait -PassThru -NoNewWindow -ErrorAction Stop",
-            r'        Write-ChLog ("kill.bat exit code: " + $kp.ExitCode)',
-            "    } catch {",
-            r'        Write-ChLog ("ERROR: kill.bat failed: " + $_.Exception.Message)',
-            "    }",
+            *cls._batch_runner_kill_after_settle_ps1(indent="    "),
             "    } finally {",
             "        try {",
             "            if (Test-Path -LiteralPath $dxc) {",
