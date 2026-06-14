@@ -128,6 +128,13 @@
         .check-title { flex-grow: 1; color: #1a1a1a; }
         .summary { background-color: #f0f8ff; padding: 10px; border-radius: 8px; margin-bottom: 20px; }
         .bold-text { font-weight: bold; }
+        .mq-stat-icon {
+            vertical-align: middle;
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+        .mq-issue-desc { display: flex; align-items: center; gap: 3px; margin: 5px 0; }
         .why img { max-width: 100%; }
         .button {
             background-color: #007BFF;
@@ -1208,7 +1215,7 @@
                     <span class="dimmed-button" title="No matching ModelCHECK detail HTML (*.P.html / *.A.html / *.D.html) found in this folder.">No detail file</span>
                     {% endif %}
                 </p>
-                <p><strong>{{ file.stat }}:</strong> {{ file.desc | e }}</p>
+                <p class="mq-issue-desc">{% if file.stat == 'ERROR' %}<img class="mq-stat-icon" src="msgs_error.png" alt="ERROR" width="16" height="16">{% else %}<img class="mq-stat-icon" src="msgs_warning.png" alt="WARNING" width="16" height="16">{% endif %}<span>{{ file.desc | e }}</span></p>
                 <p>{{ file.condensed_msg | e }}</p>
                 <p><strong>Created by:</strong> {{ file.last_saved }} on {{ file.created }}</p>
                 <p><strong>File Size:</strong> {{ file.file_size }}</p>
