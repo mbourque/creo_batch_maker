@@ -2712,8 +2712,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             except tk.TclError:
                 pass
         zip_report_ok = (
-            self._working_directory_index_html_path() is not None
+            self._wizard_step in (WIZARD_STEP_SETUP, WIZARD_STEP_REPORT)
+            and self._working_directory_index_html_path() is not None
             and not self._report_job_running
+            and not self._wizard_batch_is_running()
         )
         try:
             fm.entryconfigure(
