@@ -11,6 +11,7 @@ import subprocess
 import threading
 import time
 import webbrowser
+import zipfile
 import xml.etree.ElementTree as ET
 import tkinter as tk
 import tkinter.filedialog as fd
@@ -54,7 +55,8 @@ _START_TEMPLATE_XML_NAMES: dict[str, str] = {
     "drw": "drawing_template.d.xml",
 }
 # ModelCHECK detail outputs under templates\ removed when Scan Templates finishes (Next >).
-_TEMPLATE_SCAN_DETAIL_SUFFIXES = (".html", ".js", ".png", ".ps1", ".css")
+# Runner scripts (creo-batch-*.ps1) are removed separately — not via this suffix list.
+_TEMPLATE_SCAN_DETAIL_SUFFIXES = (".html", ".js", ".png", ".css")
 
 # Chunk .dxc files: working_dir / f"{CREO_BATCH_BASE}-1.dxc", "-2.dxc", ...
 CREO_BATCH_BASE = "creo-batch"
@@ -94,9 +96,11 @@ WIZARD_BATCH_ETA_MIN_CHUNKS_SMALL = 1
 WIZARD_BATCH_ETA_SMALL_BATCH_MAX_CHUNKS = 2
 WIZARD_BATCH_ETA_ESTIMATING_SUFFIX = " · Estimating time…"
 WIZARD_AUTOMATIC_MODE_MESSAGE = (
-    "Automatic Mode — will run ModelCHECK and JPEG 3D and create Report when done."
+    "Automatic Mode — runs each batch in sequence when the previous step finishes "
+    "(Scan Templates → ModelCHECK → JPEG 3D → Report)."
 )
 AUTOMATIC_MODE_DEFAULT = True
+DEBUG_MODE_DEFAULT = False
 # When no Creo loadpoint / no .ttd list yet, File → New uses this default task (filename + UI label).
 DEFAULT_MODELCHECK_TTD = "modelcheck.ttd"
 DEFAULT_MODELCHECK_DISPLAY = "ModelCHECK"
@@ -110,6 +114,13 @@ TASK_COMBOBOX_FONT = ("Segoe UI", 11)
 _START_OVER_FILE_SUFFIXES = frozenset(
     {".ps1", ".dxc", ".xml", ".html", ".js", ".jpg", ".png", ".log", ".css"}
 )
+_REPORT_ZIP_FOLDER_NAME = "report"
+_REPORT_ZIP_LAUNCHER_BASENAME = "Open Report.bat"
+_REPORT_ZIP_EXTRA_DIRS = ("modchk", "templates")
+_REPORT_ZIP_ASSET_SUFFIXES = frozenset(
+    {".html", ".js", ".jpg", ".jpeg", ".png", ".css", ".gif", ".svg"}
+)
+_WINDOWS_INVALID_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*]')
 WIZARD_STEP_SETUP = 0
 WIZARD_STEP_SCAN = 1
 WIZARD_STEP_MODELCHECK = 2
@@ -135,6 +146,89 @@ def _app_bundle_dir() -> Path:
 def _default_app_settings_path() -> Path:
     """``app_settings.json`` next to the app: only used to persist current form fields for the next run."""
     return _app_bundle_dir() / "app_settings.json"
+
+
+def _safe_report_zip_stem(folder_name: str) -> str:
+    """Filesystem-safe stem for ``{name}-report.zip`` from a working-directory folder name."""
+    stem = _WINDOWS_INVALID_FILENAME_CHARS.sub("_", (folder_name or "").strip()).rstrip(". ")
+    return stem or "report"
+
+
+def _report_zip_basename(working_dir: Path) -> str:
+    return f"{_safe_report_zip_stem(working_dir.name)}-report.zip"
+
+
+def _is_report_zip_top_level_file(path: Path) -> bool:
+    if path.name.casefold() == "statistics.html":
+        return False
+    if path.suffix.casefold() in _REPORT_ZIP_ASSET_SUFFIXES:
+        return True
+    return _CREO_MODEL_TOPLEVEL_RE.match(path.name) is not None
+
+
+def _collect_report_zip_asset_paths(working_dir: Path) -> list[Path]:
+    """Top-level report assets in ``working_dir`` (``index.html``, report siblings, Creo models)."""
+    index_path = working_dir / "index.html"
+    if not index_path.is_file():
+        return []
+    assets: list[Path] = []
+    try:
+        for entry in working_dir.iterdir():
+            if not entry.is_file():
+                continue
+            if not _is_report_zip_top_level_file(entry):
+                continue
+            assets.append(entry)
+    except OSError:
+        return []
+    if index_path not in assets:
+        return []
+    assets.sort(key=lambda p: p.name.casefold())
+    return assets
+
+
+def _collect_report_zip_dir_entries(working_dir: Path, dir_name: str) -> list[tuple[Path, str]]:
+    """Files under ``working_dir/dir_name`` as ``(path, arcname under report/)``."""
+    root = working_dir / dir_name
+    if not root.is_dir():
+        return []
+    entries: list[tuple[Path, str]] = []
+    try:
+        for path in root.rglob("*"):
+            if not path.is_file():
+                continue
+            rel = path.relative_to(root).as_posix()
+            entries.append((path, f"{dir_name}/{rel}"))
+    except OSError:
+        return []
+    entries.sort(key=lambda item: item[1].casefold())
+    return entries
+
+
+def _open_report_bat_text() -> str:
+    return '@echo off\r\nstart "" "%~dp0report\\index.html"\r\n'
+
+
+def build_report_zip(working_dir: Path, zip_path: Path | None = None) -> Path:
+    """Write ``{folder}-report.zip`` with ``report\\`` assets and ``Open Report.bat``."""
+    working_dir = working_dir.expanduser().resolve()
+    assets = _collect_report_zip_asset_paths(working_dir)
+    if not assets:
+        raise FileNotFoundError(f"index.html not found in:\n{working_dir}")
+    if zip_path is None:
+        zip_path = working_dir / _report_zip_basename(working_dir)
+    else:
+        zip_path = zip_path.expanduser().resolve()
+    zip_path.parent.mkdir(parents=True, exist_ok=True)
+    report_prefix = f"{_REPORT_ZIP_FOLDER_NAME}/"
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for asset in assets:
+            zf.write(asset, arcname=report_prefix + asset.name)
+        for dir_name in _REPORT_ZIP_EXTRA_DIRS:
+            for path, rel_arc in _collect_report_zip_dir_entries(working_dir, dir_name):
+                zf.write(path, arcname=report_prefix + rel_arc)
+        zf.writestr(_REPORT_ZIP_LAUNCHER_BASENAME, _open_report_bat_text())
+    return zip_path
 
 
 def _normalize_chunk_size(value: object) -> int:
@@ -334,6 +428,9 @@ def _canonical_app_settings(data: dict[str, object]) -> dict[str, object]:
         "automatic_mode": _normalize_automatic_mode(
             data.get("automatic_mode", AUTOMATIC_MODE_DEFAULT)
         ),
+        "debug_mode": _normalize_automatic_mode(
+            data.get("debug_mode", DEBUG_MODE_DEFAULT)
+        ),
     }
 
 
@@ -374,13 +471,16 @@ def _dxc_path_str(path: Path) -> str:
 
 
 def _clean_templates_dir_scan_detail_files(templates_dir: Path) -> list[str]:
-    """Remove ModelCHECK detail and runner files from templates\\; keep Creo models and .xml."""
+    """Remove ModelCHECK detail files from templates\\; keep Creo models, .xml, and runner .ps1."""
     errors: list[str] = []
+    runner_names = {name.casefold() for name in CREO_BATCH_RUNNER_BASENAMES}
     try:
         if not templates_dir.is_dir():
             return errors
         for entry in templates_dir.iterdir():
             if not entry.is_file():
+                continue
+            if entry.name.casefold() in runner_names:
                 continue
             if entry.name.casefold().endswith(_TEMPLATE_SCAN_DETAIL_SUFFIXES):
                 try:
@@ -502,6 +602,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._output_timeout_sec = BATCH_OUTPUT_WAIT_TIMEOUT_DEFAULT
         self._automatic_mode = AUTOMATIC_MODE_DEFAULT
         self._automatic_mode_var = tk.BooleanVar(master=self, value=AUTOMATIC_MODE_DEFAULT)
+        self._debug_mode = DEBUG_MODE_DEFAULT
+        self._debug_mode_var = tk.BooleanVar(master=self, value=DEBUG_MODE_DEFAULT)
         self._automatic_wizard_chain_job: str | None = None
         self._automatic_chain_phase: str | int | None = None
         self._configuration_menu: tk.Menu | None = None
@@ -828,7 +930,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._close_batch_runner_window()
         if step == WIZARD_STEP_SCAN:
             templates_dir = self._start_templates_dir()
-            if templates_dir is not None:
+            if templates_dir is not None and not self._debug_mode:
                 cleanup_errors = _clean_templates_dir_scan_detail_files(templates_dir)
                 if cleanup_errors:
                     messagebox.showwarning(
@@ -836,6 +938,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                         "Some template detail files could not be removed:\n\n"
                         + "\n\n".join(cleanup_errors),
                     )
+                self._remove_batch_runner_scripts(templates_dir)
             self._wizard_step_outcome[WIZARD_STEP_SCAN] = "done"
             self._set_wizard_step(WIZARD_STEP_MODELCHECK)
         elif step == WIZARD_STEP_MODELCHECK:
@@ -1382,16 +1485,29 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._wizard_batch_watch = None
 
     def _start_wizard_batch_output_watch(
-        self, step: int, batch_dir: Path, scan_templates: bool
+        self,
+        step: int,
+        batch_dir: Path,
+        scan_templates: bool,
+        *,
+        launched_dxc_count: int = 0,
     ) -> None:
         self._cancel_wizard_batch_output_watch()
         self._wizard_step_failed_models.pop(step, None)
+        file_had_dxc = self._batch_dxc_files_exist(batch_dir, scan_templates)
+        file_dxc_count = self._batch_dxc_count(batch_dir, scan_templates)
+        if launched_dxc_count > 0:
+            had_dxc = file_had_dxc or True
+            initial_dxc_count = max(file_dxc_count, launched_dxc_count)
+        else:
+            had_dxc = file_had_dxc
+            initial_dxc_count = file_dxc_count
         self._wizard_batch_watch = {
             "step": step,
             "batch_dir": batch_dir,
             "scan_templates": scan_templates,
-            "had_dxc": self._batch_dxc_files_exist(batch_dir, scan_templates),
-            "initial_dxc_count": self._batch_dxc_count(batch_dir, scan_templates),
+            "had_dxc": had_dxc,
+            "initial_dxc_count": initial_dxc_count,
             "started_at": time.time(),
         }
         self._tick_wizard_batch_output_watch()
@@ -1417,7 +1533,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             step = watch.get("step")
             if step == WIZARD_STEP_JPEG_3D:
                 self._update_create_report_task_list(advance_from_jpeg=False)
-            if step in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
+            if self._automatic_mode and step in (
+                WIZARD_STEP_SCAN,
+                WIZARD_STEP_MODELCHECK,
+                WIZARD_STEP_JPEG_3D,
+            ):
                 self._schedule_automatic_wizard_chain(step)
             return
         self._wizard_batch_watch_job = self.after(
@@ -1437,7 +1557,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
     def _schedule_automatic_wizard_chain(self, completed_step: int) -> None:
         if not self._automatic_mode:
             return
-        if completed_step not in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
+        if completed_step not in (
+            WIZARD_STEP_SCAN,
+            WIZARD_STEP_MODELCHECK,
+            WIZARD_STEP_JPEG_3D,
+        ):
             return
         self._cancel_automatic_wizard_chain()
         self._automatic_chain_phase = completed_step
@@ -1455,8 +1579,41 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         phase = self._automatic_chain_phase
         step = self._wizard_step
 
+        if phase == WIZARD_STEP_SCAN and step == WIZARD_STEP_SCAN:
+            if not self._wizard_batch_ready_for_next(step):
+                self._automatic_wizard_chain_job = self.after(
+                    500, self._run_automatic_wizard_chain
+                )
+                return
+            self._wizard_advance_one_step_after_batch()
+            self._automatic_chain_phase = "start_modelcheck"
+            self._automatic_wizard_chain_job = self.after(300, self._run_automatic_wizard_chain)
+            return
+
+        if phase == "start_modelcheck" and step == WIZARD_STEP_MODELCHECK:
+            if self._wizard_batch_waiting_on_step(step):
+                self._automatic_wizard_chain_job = self.after(
+                    500, self._run_automatic_wizard_chain
+                )
+                return
+            if self._wizard_batch_ready_for_next(step):
+                self._automatic_chain_phase = WIZARD_STEP_MODELCHECK
+                self._run_automatic_wizard_chain()
+                return
+            if self._go_fields_valid():
+                self._automatic_chain_phase = None
+                self._on_wizard_next()
+                return
+            self._automatic_wizard_chain_job = self.after(
+                500, self._run_automatic_wizard_chain
+            )
+            return
+
         if phase == WIZARD_STEP_MODELCHECK and step == WIZARD_STEP_MODELCHECK:
             if not self._wizard_batch_ready_for_next(step):
+                self._automatic_wizard_chain_job = self.after(
+                    500, self._run_automatic_wizard_chain
+                )
                 return
             self._on_wizard_next()
             self._automatic_chain_phase = "start_jpeg"
@@ -1465,6 +1622,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
         if phase == "start_jpeg" and step == WIZARD_STEP_JPEG_3D:
             if self._wizard_batch_waiting_on_step(step):
+                self._automatic_wizard_chain_job = self.after(
+                    500, self._run_automatic_wizard_chain
+                )
                 return
             if self._wizard_batch_ready_for_next(step):
                 self._automatic_chain_phase = WIZARD_STEP_JPEG_3D
@@ -1473,10 +1633,17 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             if self._go_fields_valid():
                 self._automatic_chain_phase = None
                 self._on_wizard_next()
+                return
+            self._automatic_wizard_chain_job = self.after(
+                500, self._run_automatic_wizard_chain
+            )
             return
 
         if phase == WIZARD_STEP_JPEG_3D and step == WIZARD_STEP_JPEG_3D:
             if not self._wizard_batch_ready_for_next(step):
+                self._automatic_wizard_chain_job = self.after(
+                    500, self._run_automatic_wizard_chain
+                )
                 return
             self._on_wizard_next()
             self._automatic_chain_phase = "create_report"
@@ -2452,6 +2619,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             label="Open Working Directory",
             command=self._on_open_working_directory,
         )
+        file_menu.add_command(label="Zip report...", command=self._on_file_menu_zip_report)
         file_menu.add_separator()
         file_menu.add_command(label="Stop", command=self._on_file_menu_stop)
         file_menu.add_command(label="Start over...", command=self._on_file_menu_start_over)
@@ -2472,6 +2640,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             label="Automatic mode",
             variable=self._automatic_mode_var,
             command=self._on_automatic_mode_toggle,
+        )
+        general_settings_menu.add_checkbutton(
+            label="Debug",
+            variable=self._debug_mode_var,
+            command=self._on_debug_mode_toggle,
         )
         menubar.add_cascade(label="Settings", menu=general_settings_menu)
 
@@ -2538,6 +2711,16 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 fm.entryconfigure(label, state=tk.NORMAL if fully_enabled else tk.DISABLED)
             except tk.TclError:
                 pass
+        zip_report_ok = (
+            self._working_directory_index_html_path() is not None
+            and not self._report_job_running
+        )
+        try:
+            fm.entryconfigure(
+                "Zip report...", state=tk.NORMAL if zip_report_ok else tk.DISABLED
+            )
+        except tk.TclError:
+            pass
         try:
             fm.entryconfigure("Stop", state=tk.NORMAL if batch_stop else tk.DISABLED)
         except tk.TclError:
@@ -2655,6 +2838,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     "chunk_size": self._chunk_size,
                     "output_timeout_sec": self._output_timeout_sec,
                     "automatic_mode": self._automatic_mode,
+                    "debug_mode": self._debug_mode,
                 }
             ),
             "",
@@ -2835,9 +3019,17 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             if 0 <= step < len(WIZARD_STEPPER_LABELS)
             else "batch"
         )
+        if self._debug_mode:
+            stop_runner_note = (
+                "This runs kill.bat to stop Creo (Debug mode leaves the PowerShell window open).\n"
+            )
+        else:
+            stop_runner_note = (
+                "This closes the PowerShell runner and runs kill.bat to stop Creo.\n"
+            )
         prompt = (
             f"Stop the running {step_label} batch?\n\n"
-            "This closes the PowerShell runner and runs kill.bat to stop Creo.\n"
+            f"{stop_runner_note}"
             "Outputs already written are kept.\n\n"
             "To continue later, run this wizard step again — completed models are skipped."
         )
@@ -3081,6 +3273,20 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             self._cancel_automatic_wizard_chain()
         self._refresh_wizard_ui()
 
+    def _persist_debug_mode(self, enabled: bool) -> str | None:
+        self._debug_mode = _normalize_automatic_mode(enabled)
+        data = self._read_app_settings_dict()
+        data["debug_mode"] = self._debug_mode
+        return self._write_app_settings_dict(data)
+
+    def _on_debug_mode_toggle(self) -> None:
+        enabled = bool(self._debug_mode_var.get())
+        err = self._persist_debug_mode(enabled)
+        if err:
+            self._debug_mode_var.set(not enabled)
+            self._debug_mode = _normalize_automatic_mode(not enabled)
+            messagebox.showerror("Debug", err)
+
     def _persist_chunk_size(self, chunk_size: int) -> str | None:
         self._chunk_size = _normalize_chunk_size(chunk_size)
         data = self._read_app_settings_dict()
@@ -3226,6 +3432,35 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if not pattern:
             return False
         return re.match(pattern, filename, re.IGNORECASE) is not None
+
+    def _on_file_menu_zip_report(self) -> None:
+        wd = (self.working_directory.get() or "").strip()
+        if not wd or not _working_directory_exists_as_dir(wd):
+            messagebox.showwarning(
+                "Zip report",
+                "Set a working directory that exists on disk before zipping the report.",
+            )
+            return
+        working_dir = Path(wd).expanduser().resolve()
+        if self._working_directory_index_html_path(wd) is None:
+            messagebox.showwarning(
+                "Zip report",
+                "index.html was not found in the working directory.\n\n"
+                "Create the report first.",
+            )
+            return
+        try:
+            zip_path = build_report_zip(working_dir)
+        except OSError as exc:
+            messagebox.showerror(
+                "Zip report",
+                f"Could not create the report zip.\n\n{exc}",
+            )
+            return
+        messagebox.showinfo(
+            "Zip report",
+            f"Created:\n{zip_path}",
+        )
 
     def _on_open_working_directory(self) -> None:
         wd = (self.working_directory.get() or "").strip()
@@ -3807,6 +4042,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             data.get("automatic_mode", AUTOMATIC_MODE_DEFAULT)
         )
         self._automatic_mode_var.set(self._automatic_mode)
+        self._debug_mode = _normalize_automatic_mode(
+            data.get("debug_mode", DEBUG_MODE_DEFAULT)
+        )
+        self._debug_mode_var.set(self._debug_mode)
         self._set_creo_loadpoint_value(str(data.get("creo_loadpoint") or ""))
         self._warn_if_creo_loadpoint_missing_parametric()
         self._set_working_directory_value(str(data.get("working_directory") or ""))
@@ -3994,7 +4233,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             pass
 
     @staticmethod
-    def _cleanup_leftover_batch_files(batch_dir: Path, *, scan_templates: bool) -> None:
+    def _cleanup_leftover_batch_files(
+        batch_dir: Path, *, scan_templates: bool, keep_runner_scripts: bool = False
+    ) -> None:
         """Remove prior GO batch .dxc and runner script before writing new ones."""
         try:
             if not batch_dir.is_dir():
@@ -4002,7 +4243,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             CreoDistributedBatchMakerApp._cleanup_leftover_batch_dxc(
                 batch_dir, scan_templates=scan_templates
             )
-            CreoDistributedBatchMakerApp._remove_batch_runner_scripts(batch_dir)
+            if not keep_runner_scripts:
+                CreoDistributedBatchMakerApp._remove_batch_runner_scripts(batch_dir)
         except OSError:
             pass
 
@@ -4718,7 +4960,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     model_chunks = [[]]
 
             batch_dir.mkdir(parents=True, exist_ok=True)
-            self._cleanup_leftover_batch_files(batch_dir, scan_templates=scan_templates)
+            self._cleanup_leftover_batch_files(
+                batch_dir,
+                scan_templates=scan_templates,
+                keep_runner_scripts=self._debug_mode,
+            )
             if scan_templates:
                 output_dir_attr = _xml_attr_escape(_dxc_path_str(batch_dir))
             else:
@@ -4802,8 +5048,12 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             self._refresh_action_buttons_run()
             return
         self._schedule_post_batch_task_refresh()
+        launched_dxc_count = 1 if scan_templates else len(model_chunks)
         self._start_wizard_batch_output_watch(
-            self._wizard_step, batch_dir, scan_templates
+            self._wizard_step,
+            batch_dir,
+            scan_templates,
+            launched_dxc_count=launched_dxc_count,
         )
         self._refresh_action_buttons_run()
         try:
@@ -4824,7 +5074,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         except Exception as exc:
             return False, f"An error occurred while building master.xml.\n\n{exc}"
         templates_dir = working_dir / "templates"
-        self._remove_batch_runner_scripts(working_dir, templates_dir)
+        if not self._debug_mode:
+            self._remove_batch_runner_scripts(working_dir, templates_dir)
         return True, None
 
     def _set_report_busy(self, busy: bool) -> None:
@@ -4873,6 +5124,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return
 
         written = result.get("written")
+        if written and not self._debug_mode:
+            wd = (self.working_directory.get() or "").strip()
+            if wd and _working_directory_exists_as_dir(wd):
+                self._remove_master_xml_after_report(Path(wd).expanduser().resolve())
         if written and messagebox.askyesno(
             "Report",
             f"Wrote full report (with sidebar):\n{written}\n\nOpen in browser?",
@@ -4884,6 +5139,15 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     "Open Failed",
                     f"Could not open report in browser.\n\n{exc}",
                 )
+
+    def _remove_master_xml_after_report(self, working_dir: Path) -> None:
+        """Drop merged master.xml after a successful report when not in Debug mode."""
+        master = working_dir / "master.xml"
+        try:
+            if master.is_file():
+                master.unlink()
+        except OSError:
+            pass
 
     def _start_report_job(self, working_dir: Path) -> None:
         if self._report_job_running:
@@ -4960,6 +5224,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._batch_runner_process = None
         if proc is None:
             return
+        if self._debug_mode:
+            return
         try:
             if proc.poll() is None:
                 proc.terminate()
@@ -4992,7 +5258,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 "cwd": str(batch_dir),
                 "creationflags": subprocess.CREATE_NEW_CONSOLE,
             }
-            startupinfo = self._console_startupinfo(hidden=self._automatic_mode)
+            startupinfo = self._console_startupinfo(
+                hidden=self._automatic_mode and not self._debug_mode,
+                show_normal=self._debug_mode,
+            )
             if startupinfo is not None:
                 popen_kw["startupinfo"] = startupinfo
             self._batch_runner_process = subprocess.Popen(**popen_kw)
@@ -5006,12 +5275,16 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         return True
 
     @staticmethod
-    def _console_startupinfo(*, hidden: bool = False) -> subprocess.STARTUPINFO | None:
+    def _console_startupinfo(
+        *, hidden: bool = False, show_normal: bool = False
+    ) -> subprocess.STARTUPINFO | None:
         if sys.platform != "win32":
             return None
         info = subprocess.STARTUPINFO()
         info.dwFlags |= getattr(subprocess, "STARTF_USESHOWWINDOW", 1)
-        if hidden:
+        if show_normal:
+            info.wShowWindow = getattr(subprocess, "SW_SHOW", 5)
+        elif hidden:
             info.wShowWindow = getattr(subprocess, "SW_HIDE", 0)
         else:
             info.wShowWindow = getattr(subprocess, "SW_SHOWMINNOACTIVE", 7)

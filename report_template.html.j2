@@ -685,6 +685,14 @@
             mqRebuildSummaryFromDom();
         }
 
+        function mqSyncScoreNavTitle() {
+            var label = scoreViewAdjusted ? 'Adjusted Score' : 'Score';
+            var titleEl = document.getElementById('mq-page-title');
+            if (titleEl) { titleEl.textContent = label; }
+            var navEl = document.getElementById('mq-sidebar-score-link');
+            if (navEl) { navEl.textContent = label; }
+        }
+
         function mqApplySummaryToDom() {
             mqEnsureSummary();
             var warnIssues = mqSummary.warnIssues;
@@ -699,10 +707,7 @@
                 document.getElementById('mq-overall-grade'),
                 mqGradeFromCounts(mqPassBaseline.overall, warnIssues, errIssues)
             );
-            var titleEl = document.getElementById('mq-page-title');
-            if (titleEl) {
-                titleEl.textContent = scoreViewAdjusted ? 'Adjusted Score' : 'Score';
-            }
+            mqSyncScoreNavTitle();
             for (var catName in mqCategoryCards) {
                 if (!mqCategoryCards.hasOwnProperty(catName)) { continue; }
                 var refs = mqCategoryCards[catName];
@@ -1150,8 +1155,8 @@
         </select>
     </div>
     <ul>
-        <li><a href="#summary">Score</a></li>
-        <li><a href="#statistics">Scan Statistics</a></li>
+        <li><a href="#summary" id="mq-sidebar-score-link">Score</a></li>
+        <li><a href="#statistics">Scan Information</a></li>
         <hr>
         {% for section in check_sections %}
         <li title="{{ section.category }}" class="sidebar-check-nav wrapper-{{ section.class }}"

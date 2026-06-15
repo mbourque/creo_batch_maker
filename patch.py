@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-Copy Creo ModelCHECK web assets locally and patch report HTML to use them.
+Copy Creo ModelCHECK ``templates_new`` assets locally and patch report HTML to use them.
 
 Reads ``app_settings.json`` (``creo_loadpoint``, ``working_directory``), copies
-``<loadpoint>/Common Files/modchk`` to ``<working_directory>/modchk``, then
-rewrites ModelCHECK HTML in the working directory so ``file:///.../Common Files/modchk/``
-references become relative ``modchk/`` paths.
+``<loadpoint>/Common Files/modchk/templates_new`` to
+``<working_directory>/modchk/templates_new``, then rewrites ModelCHECK HTML in the
+working directory so ``file:///.../Common Files/modchk/`` references become relative
+``modchk/`` paths.
 
 Skips ``index.html`` (app summary report) and any ``.html`` under ``modchk/``.
 """
@@ -85,7 +86,17 @@ def _modchk_source(loadpoint: Path) -> Path:
             f"ModelCHECK web folder not found under loadpoint:\n{src}\n\n"
             "Expected: <creo_loadpoint>/Common Files/modchk"
         )
+    templates_new = src / "templates_new"
+    if not templates_new.is_dir():
+        raise PatchError(
+            f"ModelCHECK templates_new folder not found:\n{templates_new}\n\n"
+            "Expected: <creo_loadpoint>/Common Files/modchk/templates_new"
+        )
     return src
+
+
+def _templates_new_source(modchk_src: Path) -> Path:
+    return modchk_src / "templates_new"
 
 
 def _path_prefixes_for_replace(modchk_src: Path) -> list[str]:
@@ -127,37 +138,41 @@ def _html_files_to_patch(working_dir: Path) -> list[Path]:
 
 
 def _modchk_dest_looks_usable(dest: Path) -> bool:
-    """Best-effort check that existing local modchk has expected assets."""
-    return (
-        (dest / "templates_new").is_dir()
-        and (dest / "templates_new" / "mctopban.js").is_file()
-        and (dest / "text").is_dir()
-    )
+    """Best-effort check that local modchk/templates_new has expected assets."""
+    templates_new = dest / "templates_new"
+    return templates_new.is_dir() and (templates_new / "mctopban.js").is_file()
 
 
-def copy_modchk(
-    src: Path,
+def copy_modchk_templates_new(
+    modchk_src: Path,
     dest: Path,
     *,
     dry_run: bool = False,
     quiet: bool = False,
     replace_existing: bool = False,
 ) -> None:
+    """Copy only ``modchk/templates_new`` from the Creo loadpoint into ``dest``."""
+    src = _templates_new_source(modchk_src)
+    templates_dest = dest / "templates_new"
     if dest.exists() and not dest.is_dir():
         raise PatchError(f"Cannot create modchk folder; path exists as a file:\n{dest}")
     if dry_run:
         if not quiet:
-            print(f"[dry-run] would copy:\n  {src}\n  -> {dest}")
+            print(f"[dry-run] would copy:\n  {src}\n  -> {templates_dest}")
         return
-    if dest.exists() and dest.is_dir() and not replace_existing and _modchk_dest_looks_usable(dest):
+    if (
+        not replace_existing
+        and _modchk_dest_looks_usable(dest)
+    ):
         if not quiet:
-            print(f"Using existing modchk:\n  {dest}")
+            print(f"Using existing modchk/templates_new:\n  {templates_dest}")
         return
-    if dest.exists():
-        shutil.rmtree(dest)
-    shutil.copytree(src, dest)
+    dest.mkdir(parents=True, exist_ok=True)
+    if templates_dest.exists():
+        shutil.rmtree(templates_dest)
+    shutil.copytree(src, templates_dest)
     if not quiet:
-        print(f"Copied modchk:\n  {src}\n  -> {dest}")
+        print(f"Copied modchk/templates_new:\n  {src}\n  -> {templates_dest}")
 
 
 def run(
@@ -174,7 +189,7 @@ def run(
 
     modchk_src = _modchk_source(loadpoint)
     modchk_dest = working_dir / "modchk"
-    copy_modchk(
+    copy_modchk_templates_new(
         modchk_src,
         modchk_dest,
         dry_run=dry_run,
@@ -219,7 +234,7 @@ def run(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Copy Creo modchk assets locally and patch ModelCHECK HTML reports.",
+        description="Copy Creo modchk/templates_new locally and patch ModelCHECK HTML reports.",
     )
     parser.add_argument(
         "--settings",
