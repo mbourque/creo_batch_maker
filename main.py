@@ -97,13 +97,14 @@ WIZARD_BATCH_ETA_SMALL_BATCH_MAX_CHUNKS = 2
 WIZARD_BATCH_ETA_ESTIMATING_SUFFIX = " · Estimating time…"
 WIZARD_AUTOMATIC_MODE_MESSAGE = (
     "Automatic Mode — runs each batch in sequence when the previous step finishes "
-    "(Scan Templates → ModelCHECK → JPEG 3D → Report)."
+    "(Scan Templates → ModelCHECK → Thumbnails → Report)."
 )
 AUTOMATIC_MODE_DEFAULT = True
 DEBUG_MODE_DEFAULT = False
 # When no Creo loadpoint / no .ttd list yet, File → New uses this default task (filename + UI label).
 DEFAULT_MODELCHECK_TTD = "modelcheck.ttd"
 DEFAULT_MODELCHECK_DISPLAY = "ModelCHECK"
+JPEG_3D_DISPLAY = "Thumbnails"
 SCAN_TEMPLATES_DISPLAY = "Scan Templates"
 CREATE_REPORT_DISPLAY = "Create Report"
 SCAN_TEMPLATES_DXC_BASENAME = "templates.dxc"
@@ -127,7 +128,7 @@ WIZARD_STEP_MODELCHECK = 2
 WIZARD_STEP_JPEG_3D = 3
 WIZARD_STEP_REPORT = 4
 WIZARD_STEP_COUNT = 5
-WIZARD_STEPPER_LABELS = ("Setup", "Templates", "ModelCHECK", "JPEG 3D", "Report")
+WIZARD_STEPPER_LABELS = ("Setup", "Templates", "ModelCHECK", "Thumbnails", "Report")
 WIZARD_STEPPER_FONT_SIZE = 14
 
 
@@ -690,6 +691,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         updated = "Template extraction: updated"
         cleared = "Template extraction: cleared"
         error = "Template extraction: error"
+        if self._wizard_step_outcome.get(WIZARD_STEP_SCAN) == "skipped":
+            ok, err = self._clear_sample_start_mcs()
+            if not ok:
+                return False, err, ""
+            return True, "", cleared
         wd = (self.working_directory.get() or "").strip()
         if not wd:
             return True, "", skipped
@@ -713,6 +719,25 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if not part_path and not asm_path and not drw_path:
             return True, "", cleared
         return True, "", updated
+
+    def _clear_sample_start_mcs(self) -> tuple[bool, str]:
+        """Reset bundled ``configs\\sample_start.mcs`` template blocks (anchor lines only)."""
+        mcs_path = (_app_bundle_dir() / "configs" / "sample_start.mcs").resolve()
+        try:
+            update_sample_start_from_xml.clear_sample_start_template_blocks(mcs_path)
+        except (FileNotFoundError, OSError, ET.ParseError) as exc:
+            return False, str(exc)
+        return True, ""
+
+    def _sync_sample_start_for_modelcheck_go(self) -> tuple[bool, str, str]:
+        """Apply template XML to sample_start.mcs only after Scan Templates completed (not Skip)."""
+        cleared = "Template extraction: cleared"
+        if self._wizard_step_outcome.get(WIZARD_STEP_SCAN) != "done":
+            ok, err = self._clear_sample_start_mcs()
+            if not ok:
+                return False, err, ""
+            return True, "", cleared
+        return self._update_sample_start_from_template_xml_if_present()
 
     def _effective_ttd_filename(self, task_display: str) -> str:
         if self._is_scan_templates_task(task_display):
@@ -823,12 +848,14 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         )
 
     def _is_jpeg_3d_task(self, task_display: str) -> bool:
+        display = (task_display or "").strip().casefold()
+        if display == JPEG_3D_DISPLAY.casefold():
+            return True
         filename = self._task_filename_from_ui(task_display)
         if not filename:
             return False
         if filename.lower() == JPEG_3D_TTD.lower():
             return True
-        display = (task_display or "").strip().casefold()
         if "jpeg" in display and "3d" in display:
             return True
         stem = Path(filename).stem.casefold()
@@ -862,7 +889,15 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
     def _task_filename_from_ui(self, task_display: str) -> str:
         key = (task_display or "").strip()
-        return self._task_display_to_filename.get(key, "")
+        fn = self._task_display_to_filename.get(key, "")
+        if fn:
+            return fn
+        if key.casefold() == JPEG_3D_DISPLAY.casefold():
+            for mapped_fn in self._task_display_to_filename.values():
+                if (mapped_fn or "").lower() == JPEG_3D_TTD.lower():
+                    return mapped_fn
+            return JPEG_3D_TTD
+        return ""
 
     def _task_display_for_ttd_filename(self, ttd_filename: str) -> str | None:
         want = (ttd_filename or "").strip().lower()
@@ -1066,10 +1101,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         )
 
     def _wizard_jpeg_3d_display(self) -> str:
-        return (
-            self._task_display_for_ttd_filename(JPEG_3D_TTD)
-            or "JPEG 3D"
-        )
+        return JPEG_3D_DISPLAY
 
     def _wizard_modelcheck_display(self) -> str:
         return (
@@ -1118,7 +1150,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             )
         if step == WIZARD_STEP_JPEG_3D:
             return (
-                "Export JPEG 3D images for parts and assemblies in the working directory."
+                "Create thumbnail images (.jpg) for parts and assemblies in the working directory."
             )
         if step == WIZARD_STEP_REPORT:
             return (
@@ -1727,7 +1759,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if step == WIZARD_STEP_MODELCHECK:
             return "Run ModelCHECK >"
         if step == WIZARD_STEP_JPEG_3D:
-            return "Run JPEG 3D >"
+            return "Thumbnails >"
         return "Next >"
 
     def _on_wizard_back(self) -> None:
@@ -1745,6 +1777,13 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._cancel_wizard_batch_output_watch()
         self._close_batch_runner_window()
         if step == WIZARD_STEP_SCAN:
+            ok, err = self._clear_sample_start_mcs()
+            if not ok:
+                messagebox.showwarning(
+                    "Scan Templates",
+                    "Could not reset configs\\sample_start.mcs:\n\n" + err,
+                )
+                return
             if self._warn_wizard_working_directory_missing_models():
                 return
             self._wizard_step_outcome[WIZARD_STEP_SCAN] = "skipped"
@@ -2704,13 +2743,21 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "Open...",
             "Save",
             "Save as...",
-            "Open Working Directory",
             "Start over...",
         ):
             try:
                 fm.entryconfigure(label, state=tk.NORMAL if fully_enabled else tk.DISABLED)
             except tk.TclError:
                 pass
+        wd = (self.working_directory.get() or "").strip()
+        open_working_dir_ok = bool(wd) and _working_directory_exists_as_dir(wd)
+        try:
+            fm.entryconfigure(
+                "Open Working Directory",
+                state=tk.NORMAL if open_working_dir_ok else tk.DISABLED,
+            )
+        except tk.TclError:
+            pass
         zip_report_ok = (
             self._wizard_step in (WIZARD_STEP_SETUP, WIZARD_STEP_REPORT)
             and self._working_directory_index_html_path() is not None
@@ -3571,6 +3618,13 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return True
         return False
 
+    def _batch_runner_debug_log_path(self, batch_dir: Path, task_display: str) -> Path | None:
+        """``.log`` beside the runner ``.ps1`` when Debug mode is on."""
+        if not self._debug_mode:
+            return None
+        stem = Path(self._batch_runner_basename_for_task(task_display)).stem
+        return batch_dir / f"{stem}.log"
+
     def _go_fields_valid(self) -> bool:
         wd = (self.working_directory.get() or "").strip()
         lp = (self.creo_loadpoint.get() or "").strip().rstrip("\\/")
@@ -3983,6 +4037,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 self._task_filename_to_description[CREATE_REPORT_DISPLAY] = CREATE_REPORT_DISPLAY
 
             self._task_display_to_filename = {lab: fn for fn, lab in ordered}
+            jpg_fn = next((fn for fn, _lab in ordered if fn.lower() == JPEG_3D_TTD.lower()), None)
+            if jpg_fn:
+                self._task_display_to_filename[JPEG_3D_DISPLAY] = jpg_fn
             display_values = [lab for _fn, lab in ordered]
 
             if len(display_values) <= 1:
@@ -3997,6 +4054,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     ordered.append((CREATE_REPORT_DISPLAY, CREATE_REPORT_DISPLAY))
                     self._task_filename_to_description[CREATE_REPORT_DISPLAY] = CREATE_REPORT_DISPLAY
                 self._task_display_to_filename = {lab: fn for fn, lab in ordered}
+                self._task_display_to_filename.setdefault(JPEG_3D_DISPLAY, JPEG_3D_TTD)
                 self._task_filename_to_description.setdefault(
                     DEFAULT_MODELCHECK_TTD, DEFAULT_MODELCHECK_DISPLAY
                 )
@@ -4438,6 +4496,54 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         ]
 
     @classmethod
+    def _batch_runner_write_chlog_ps1(cls, debug_log_path: Path | None) -> list[str]:
+        """PowerShell ``Write-ChLog`` helper; mirrors console lines to ``debug_log_path`` when set."""
+        lines: list[str] = []
+        if debug_log_path is not None:
+            log_ps = cls._ps_single_quoted_literal(debug_log_path)
+            lines.extend(
+                [
+                    f"$DebugLogPath = {log_ps}",
+                    "try {",
+                    r'    "[$(Get-Date -Format ''yyyy-MM-dd HH:mm:ss'')] Runner log started." | Set-Content -LiteralPath $DebugLogPath -Encoding UTF8',
+                    "} catch { }",
+                    "",
+                ]
+            )
+        lines.extend(
+            [
+                "function Write-ChLog {",
+                "    param([string]$Message)",
+                "    $ts = Get-Date -Format 'HH:mm:ss'",
+                '    $line = "[$ts] $Message"',
+            ]
+        )
+        if debug_log_path is not None:
+            lines.extend(
+                [
+                    "    if ($DebugLogPath) {",
+                    "        try { Add-Content -LiteralPath $DebugLogPath -Value $line -Encoding UTF8 } catch { }",
+                    "    }",
+                ]
+            )
+        lines.extend(
+            [
+                "    if ($Message -match '(?i)^DONE:' -or $Message -match '(?i)^SKIP:') {",
+                '        Write-Host $line -ForegroundColor Green',
+                "    } elseif ($Message -match '(?i)^TIMEOUT:') {",
+                '        Write-Host $line -ForegroundColor Red',
+                "    } elseif ($Message -match '(?i)^XTOP GONE:') {",
+                '        Write-Host $line -ForegroundColor Red',
+                "    } else {",
+                '        Write-Host $line',
+                "    }",
+                "}",
+                "",
+            ]
+        )
+        return lines
+
+    @classmethod
     def _build_scan_templates_runner_ps1(
         cls,
         ptcdbatch_bat: Path,
@@ -4445,6 +4551,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         kill_bat: Path,
         expected_outputs: list[str],
         output_timeout_sec: int,
+        debug_log_path: Path | None = None,
     ) -> str:
         """PowerShell runner for Scan Templates: one templates.dxc, all template models.
 
@@ -4469,21 +4576,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             f"$OutputTimeoutSec = {int(output_timeout_sec)}",
             f"$OutputSettleSec = {BATCH_OUTPUT_SETTLE_SEC}",
             "",
-            "function Write-ChLog {",
-            "    param([string]$Message)",
-            "    $ts = Get-Date -Format 'HH:mm:ss'",
-            '    $line = "[$ts] $Message"',
-            "    if ($Message -match '(?i)^DONE:' -or $Message -match '(?i)^SKIP:') {",
-            '        Write-Host $line -ForegroundColor Green',
-            "    } elseif ($Message -match '(?i)^TIMEOUT:') {",
-            '        Write-Host $line -ForegroundColor Red',
-            "    } elseif ($Message -match '(?i)^XTOP GONE:') {",
-            '        Write-Host $line -ForegroundColor Red',
-            "    } else {",
-            '        Write-Host $line',
-            "    }",
-            "}",
-            "",
+            *cls._batch_runner_write_chlog_ps1(debug_log_path),
             *cls._batch_runner_xtop_helpers_ps1(),
             "",
             "function Get-MissingOutputs {",
@@ -4604,6 +4697,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         output_to_model_per_chunk: list[dict[str, str]],
         task_kind: str,
         output_timeout_sec: int,
+        debug_log_path: Path | None = None,
     ) -> str:
         """PowerShell: per chunk, skip if outputs already exist; else launch ptcdbatch, poll for expected output files, settle, then run kill.bat.
 
@@ -4654,21 +4748,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "",
             *model_map_lines,
             "",
-            "function Write-ChLog {",
-            "    param([string]$Message)",
-            "    $ts = Get-Date -Format 'HH:mm:ss'",
-            '    $line = "[$ts] $Message"',
-            "    if ($Message -match '(?i)^DONE:' -or $Message -match '(?i)^SKIP:') {",
-            '        Write-Host $line -ForegroundColor Green',
-            "    } elseif ($Message -match '(?i)^TIMEOUT:') {",
-            '        Write-Host $line -ForegroundColor Red',
-            "    } elseif ($Message -match '(?i)^XTOP GONE:') {",
-            '        Write-Host $line -ForegroundColor Red',
-            "    } else {",
-            '        Write-Host $line',
-            "    }",
-            "}",
-            "",
+            *cls._batch_runner_write_chlog_ps1(debug_log_path),
             *cls._batch_runner_xtop_helpers_ps1(),
             "",
             "function Get-MissingOutputs {",
@@ -4925,6 +5005,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         kill_bat = _app_bundle_dir() / "kill.bat"
         runner_basename = self._batch_runner_basename_for_task(task_display_raw)
         runner_ps1_path = batch_dir / runner_basename
+        debug_log_path = self._batch_runner_debug_log_path(batch_dir, task_display_raw)
 
         if not ptcdbatch_bat.is_file():
             messagebox.showerror("File Not Found", f"Could not find:\n{ptcdbatch_bat}")
@@ -4936,9 +5017,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             )
             return
 
-        sample_start_note = ""
         if self._is_regular_modelcheck_task(task_display_raw):
-            ok, err, _ = self._update_sample_start_from_template_xml_if_present()
+            ok, err, _ = self._sync_sample_start_for_modelcheck_go()
             if not ok:
                 messagebox.showerror("GO", err)
                 return
@@ -5006,6 +5086,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     kill_bat,
                     scan_expected,
                     self._output_timeout_sec,
+                    debug_log_path,
                 )
             else:
                 num_chunks = len(model_chunks)
@@ -5030,6 +5111,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     output_to_model_per_chunk,
                     self._runner_task_kind(task_display_raw),
                     self._output_timeout_sec,
+                    debug_log_path,
                 )
             runner_ps1_path.write_text(runner_text, encoding="utf-8-sig")
         except OSError as exc:

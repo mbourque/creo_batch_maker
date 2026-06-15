@@ -627,6 +627,38 @@ def replace_drw_blocks(
     return lines[:section_start] + section_lines + lines[section_end:]
 
 
+def _is_template_extracted_line(line: str) -> bool:
+    """True for PRT/ASM/DRW parameter, layer, and symbol lines written from template XML."""
+    return (
+        _is_prt_parameter_line(line)
+        or _is_prt_layer_line(line)
+        or _is_asm_parameter_line(line)
+        or _is_asm_layer_line(line)
+        or _is_drw_parameter_line(line)
+        or _is_drw_layer_line(line)
+        or _is_drw_symbol_line(line)
+    )
+
+
+def _strip_template_extracted_lines(lines: list[str]) -> list[str]:
+    return [line for line in lines if not _is_template_extracted_line(line)]
+
+
+def clear_sample_start_template_blocks(
+    mcs_path: Path,
+    *,
+    dry_run: bool = False,
+) -> None:
+    """Reset PRT/ASM/DRW template blocks in sample_start.mcs to anchor comments only."""
+    if not mcs_path.is_file():
+        raise FileNotFoundError(f"MCS file not found:\n{mcs_path}")
+    original = mcs_path.read_text(encoding="utf-8")
+    updated_lines = _strip_template_extracted_lines(original.splitlines())
+    updated_text = "\n".join(updated_lines) + ("\n" if original.endswith("\n") else "")
+    if not dry_run:
+        mcs_path.write_text(updated_text, encoding="utf-8")
+
+
 def update_sample_start(
     mcs_path: Path,
     *,
@@ -655,11 +687,22 @@ def update_sample_start(
 
     original = mcs_path.read_text(encoding="utf-8")
     updated_lines = original.splitlines()
-    updated_lines = replace_prt_blocks(updated_lines, part_params, part_layers)
-    updated_lines = replace_asm_blocks(updated_lines, asm_params, asm_layers)
-    updated_lines = replace_drw_blocks(
-        updated_lines, drw_params, drw_layers, drw_symbols
-    )
+    if (
+        not part_params
+        and not part_layers
+        and not asm_params
+        and not asm_layers
+        and not drw_params
+        and not drw_layers
+        and not drw_symbols
+    ):
+        updated_lines = _strip_template_extracted_lines(updated_lines)
+    else:
+        updated_lines = replace_prt_blocks(updated_lines, part_params, part_layers)
+        updated_lines = replace_asm_blocks(updated_lines, asm_params, asm_layers)
+        updated_lines = replace_drw_blocks(
+            updated_lines, drw_params, drw_layers, drw_symbols
+        )
 
     updated_text = "\n".join(updated_lines) + ("\n" if original.endswith("\n") else "")
 
