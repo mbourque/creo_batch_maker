@@ -529,6 +529,15 @@ def safe_file_list_id(check_name: str, model: str) -> str:
     return raw
 
 
+def _section_heading_entity_word(files: list[dict]) -> str:
+    """``Drawing`` when every row is a drawing; otherwise ``Model``."""
+    pro_types = {(f.get("pro_type") or "").strip().upper() for f in files}
+    pro_types.discard("")
+    if pro_types == {"DRW"}:
+        return "Drawing"
+    return "Model"
+
+
 def get_check_descriptions(model_checks_file: str) -> dict:
     tree = ET.parse(model_checks_file)
     root = tree.getroot()
@@ -581,13 +590,33 @@ def ensure_shared_placeholder_jpeg(assets_folder: str) -> str:
     return _SHARED_PLACEHOLDER_JPEG
 
 
-def thumbnail_src_for_report(report_assets_dir: str, working_dir: str, display_name: str) -> str:
+def thumbnail_basename_for_model(display_name: str, pro_type: str = "") -> str | None:
+    """Report thumbnail filename: ``stem.model.jpg`` or ``stem.drawing.jpg``."""
+    stem = _model_stem(display_name)
+    if stem is None:
+        return None
+    kind = (pro_type or "").strip().upper()
+    if not kind:
+        m = re.search(r"\.(prt|asm|drw)$", display_name, flags=re.IGNORECASE)
+        kind = m.group(1).upper() if m else ""
+    if kind == "DRW":
+        return f"{stem}.drawing.jpg"
+    return f"{stem}.model.jpg"
+
+
+def thumbnail_src_for_report(
+    report_assets_dir: str,
+    working_dir: str,
+    display_name: str,
+    *,
+    pro_type: str = "",
+) -> str:
     """
     Return a value suitable for ``<img src="…">`` (relative to the report HTML).
 
     - Models with Creo session refs (``<<`` / ``>>``) use the shared placeholder (Windows-safe).
-    - Other models use an existing ``.jpg`` next to the report or in ``working_dir`` if found.
-    - If no ``.jpg`` exists, use the same shared placeholder so the report always shows a thumb.
+    - Parts/assemblies use ``stem.model.jpg``; drawings use ``stem.drawing.jpg``.
+    - If no thumbnail exists, use the same shared placeholder so the report always shows a thumb.
     """
     report_assets_dir = os.path.abspath(report_assets_dir)
     working_dir = os.path.normpath(os.path.abspath(working_dir))
@@ -599,10 +628,8 @@ def thumbnail_src_for_report(report_assets_dir: str, working_dir: str, display_n
     if name_has_creo_path_ref(display_name):
         return _placeholder_src()
 
-    jpg_base = os.path.basename(
-        re.sub(r"\.(prt|asm|drw)$", ".jpg", display_name, flags=re.IGNORECASE)
-    )
-    if not jpg_base or not jpg_base.lower().endswith(".jpg"):
+    jpg_base = thumbnail_basename_for_model(display_name, pro_type)
+    if not jpg_base:
         return _placeholder_src()
 
     for folder in (report_assets_dir, working_dir):
@@ -684,11 +711,16 @@ def create_html_report(
                 continue
 
             if check["stat"] in ("ERROR", "WARNING"):
-                if drag_image_display_name not in thumbnail_cache:
-                    thumbnail_cache[drag_image_display_name] = thumbnail_src_for_report(
-                        report_assets_dir, working_dir, drag_image_display_name
+                pro_type = (file_info.get("pro_type") or "").strip()
+                thumb_key = (drag_image_display_name, pro_type.casefold())
+                if thumb_key not in thumbnail_cache:
+                    thumbnail_cache[thumb_key] = thumbnail_src_for_report(
+                        report_assets_dir,
+                        working_dir,
+                        drag_image_display_name,
+                        pro_type=pro_type,
                     )
-                image_url = thumbnail_cache[drag_image_display_name]
+                image_url = thumbnail_cache[thumb_key]
 
                 check_dict[f"{check['stat']}: {check['name']}"].append(
                     {
@@ -735,6 +767,7 @@ def create_html_report(
                 "category": description_data["category"],
                 "why": description_data["why"],
                 "count": len(files),
+                "entity_word": _section_heading_entity_word(files),
                 "stat_type": "ERRORS" if "ERROR" in check else "WARNINGS",
                 "files": files,
             }

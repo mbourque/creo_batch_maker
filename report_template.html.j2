@@ -1186,7 +1186,7 @@
          data-mq-check-name="{{ section.model_check_name | e }}">
         <div class="check-header">
             <div class="check-title">
-                <h2 id="{{ section.class }}"><span class="bold-text">{{ section.stat_type }}:</span> {{ section.count }} {{ section.name }}</h2>
+                <h2 id="{{ section.class }}"><span class="bold-text">{{ section.stat_type }}:</span> {{ section.count }} {{ section.entity_word }}{% if section.count != 1 %}s{% endif %} with {{ section.name }}</h2>
                 <p><strong>Category:</strong> {{ section.category }}</p>
                 <p>{{ section.description }}</p>
                 <div class="why">{{ section.why | safe }}</div>
