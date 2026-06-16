@@ -22,3 +22,4 @@ MCSI2_TOL            .03
 MCSI3_TOL            .03
 MCSI4_TOL            .03
 MCSI5_TOL            .03
+# PARENT_DIFF_MAX	<number>

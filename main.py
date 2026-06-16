@@ -87,8 +87,10 @@ CREO_BATCH_RUNNER_BASENAMES = (
 # Generated runner: max time to wait for the expected output files of one chunk, in seconds.
 BATCH_OUTPUT_WAIT_TIMEOUT_DEFAULT = 120
 BATCH_OUTPUT_WAIT_TIMEOUT_MIN = 60
-# After all expected outputs for a chunk appear, settle this many seconds before running kill.bat.
+# After all expected outputs for a chunk appear, brief settle when xtop already exited.
 BATCH_OUTPUT_SETTLE_SEC = 5
+# When outputs are done but xtop.exe is still running, wait this long before kill.bat.
+BATCH_XTOP_SETTLE_BEFORE_KILL_SEC = 15
 # xtop.exe: abort chunk wait after N consecutive dead polls with no restart within restart sec (within window sec of first dead poll).
 BATCH_XTOP_DEAD_CHECKS = 2
 BATCH_XTOP_RESTART_WAIT_SEC = 10
@@ -5158,24 +5160,25 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
     @classmethod
     def _batch_runner_kill_after_settle_ps1(cls, *, indent: str) -> list[str]:
-        """Settle, wait for xtop.exe to exit, then run kill.bat."""
+        """Settle after outputs complete; 15s grace if xtop still running, then kill.bat."""
         i = indent
         return [
-            f"{i}Write-ChLog (\"Settling \" + $OutputSettleSec + \"s before kill.bat...\")",
-            f"{i}Start-Sleep -Seconds $OutputSettleSec",
-            f"{i}$xtopExitWaitStart = Get-Date",
-            f"{i}while (Test-XtopAlive) {{",
-            f"{i}    $xtopExitSec = [int][math]::Floor(((Get-Date) - $xtopExitWaitStart).TotalSeconds)",
-            f"{i}    if ($xtopExitSec -le 4 -or ($xtopExitSec % 30 -eq 0)) {{",
-            f'{i}        Write-ChLog ("WAITING: xtop still running (" + $xtopExitSec + "s); waiting for exit before kill.bat.")',
-            f"{i}    }}",
-            f"{i}    Start-Sleep -Seconds 2",
+            f"{i}if (Test-XtopAlive) {{",
+            f'{i}    Write-ChLog ("All output file(s) present; xtop still running — waiting " + $XtopSettleBeforeKillSec + "s before kill.bat...")',
+            f"{i}    Start-Sleep -Seconds $XtopSettleBeforeKillSec",
+            f"{i}    $KillBatNowait = $true",
+            f"{i}}} else {{",
+            f'{i}    Write-ChLog ("Settling " + $OutputSettleSec + "s before kill.bat...")',
+            f"{i}    Start-Sleep -Seconds $OutputSettleSec",
+            f"{i}    $KillBatNowait = $false",
             f"{i}}}",
             f'{i}$killParent = [System.IO.Path]::GetDirectoryName($KillBat)',
+            f'{i}$killArgs = @()',
+            f"{i}if ($KillBatNowait) {{ $killArgs = @('nowait') }}",
             f'{i}Write-ChLog "Running kill.bat (wait)..."',
             f"{i}try {{",
-            f"{i}    $kp = Start-Process -FilePath $KillBat -WorkingDirectory $killParent `",
-            f"{i}        -Wait -PassThru -NoNewWindow -ErrorAction Stop",
+            f"{i}    $kp = Start-Process -FilePath $KillBat -ArgumentList $killArgs `",
+            f"{i}        -WorkingDirectory $killParent -Wait -PassThru -NoNewWindow -ErrorAction Stop",
             f'{i}    Write-ChLog ("kill.bat exit code: " + $kp.ExitCode)',
             f"{i}}} catch {{",
             f'{i}    Write-ChLog ("ERROR: kill.bat failed: " + $_.Exception.Message)',
@@ -5262,6 +5265,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             f"$Expected = {expected_ps}",
             f"$OutputTimeoutSec = {int(output_timeout_sec)}",
             f"$OutputSettleSec = {BATCH_OUTPUT_SETTLE_SEC}",
+            f"$XtopSettleBeforeKillSec = {BATCH_XTOP_SETTLE_BEFORE_KILL_SEC}",
             "",
             *cls._batch_runner_write_chlog_ps1(debug_log_path),
             *cls._batch_runner_xtop_helpers_ps1(),
@@ -5433,6 +5437,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             f"$ChunkBase = '{base}'",
             f"$OutputTimeoutSec = {int(output_timeout_sec)}",
             f"$OutputSettleSec = {BATCH_OUTPUT_SETTLE_SEC}",
+            f"$XtopSettleBeforeKillSec = {BATCH_XTOP_SETTLE_BEFORE_KILL_SEC}",
             "",
             *expected_table_lines,
             "",

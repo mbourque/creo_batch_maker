@@ -30,10 +30,20 @@ E:Invalid external reference for the section entity is encountered
 E:WARNING: External reference not present
 E:WARNING: CUT is entirely outside
 
-W:WARNING: Design intent is unclear
-W:Warning: Design intent is unclear
+W:Design intent is unclear
 W:Model changed since mass props calculated
 W:WARNING: One sided edge found
 W:has been frozen.
-W:currently frozen
 
+W:Relations have errors/warnings
+W:Cannot update placement of component
+E:Invalid left side of assignment
+W:suppressed feature(s) or component(s)
+E:Some relations are no longer satisfied
+W:family table driven and will use pre-Wildfire3 replace functionality
+W:Invalid symbol
+W:Some constraint relations are no longer satisfied
+W:Invalid data type combination at left side of expression
+W:contains obsolete dimension
+
+E:entirely outside the model.
