@@ -170,7 +170,6 @@ def build_master_xml(working_directory=None, output_file=None):
             print(f"Error parsing file {file_path}: {e}")
 
     write_master_xml(checks_dict, out, path_root)
-    print(f"Output file written: {out}")
     return out
 
 

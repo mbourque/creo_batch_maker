@@ -1,21 +1,9 @@
 ! Conditional file for ModelCHECK.
 ! Date: 04-12-2004
 # SET CONFIG FILE
-#IF (MODEL EQ fam) config=(check/check1.mch)(start/sample_start.mcs)(constant/constant1.mcn)(status/sample_status.mcq)
-#IF (MODEL_NAME EQ STD_*) config=(check/check1.mch)(start/sample_start.mcs)(constant/constant1.mcn)(status/sample_status.mcq)
-#IF (EMPTY EQ ??ll) config=(check/check1.mch)(start/sample_start.mcs)(constant/Constant1.mcn)(status/sample_status.mcq)
-#IF (NOSTART EQ NOSTART) config=(check/default_checks.mch)(start/sample_start.mcs)(constant/constant1.mcn)(status/sample_status.mcq)
-#IF (USERNAME EQ ddell) AND (MODEL_UNIT EQ MM) config=(check/default_checks.mch)(start/sample_start.mcs)(constant/mm.mcn)(status/sample_status.mcq)
-#IF (USERNAME EQ ddell) AND (MODEL_UNIT EQ INCH) config=(check/default_checks.mch)(start/sample_start.mcs)(constant/inch.mcn)(status/sample_status.mcq)
-#IF (FT_GENERIC_PRT) config=(check/strict_checks.mch)(start/sample_start.mcs)(constant/mm.mcn)(status/sample_status.mcq)
-#IF (DATE_CREATED GTE 19970418) config=(check/default_checks.mch)(start/sample_start.mcs)(constant/mm.mcn)(status/sample_status.mcq)
-#IF (PRO_VERSION GTE 199842) config=(check/default_checks.mch)(start/sample_start.mcs)(constant/mm.mcn)(status/sample_status.mcq)
-#IF (MODEL_TYPE EQ PRT_SOLID) config=(check/default_checks.mch)(start/sample_start.mcs)(constant/mm.mcn)(status/sample_status.mcq)
-#IF (NOSTART) config=(check/simple_checks.mch)(start/sample_start.mcs)(constant/inch.mcn)(status/sample_status.mcq)
-#IF (MODEL_TYPE EQ ASM_DESIGN) config=(check/simple_checks.mch)(start/sample_start.mcs)(constant/inch.mcn)(status/sample_status.mcq)
-IF (MODEL_UNIT EQ INCH) config=(check/default_checks.mch)(start/sample_start.mcs)(constant/inch.mcn)(status/sample_status.mcq)
-IF (MODEL_UNIT EQ MM) config=(check/default_checks.mch)(start/sample_start.mcs)(constant/mm.mcn)(status/sample_status.mcq)
-ELSE config=(check/default_checks.mch)(start/sample_start.mcs)(constant/mm.mcn)(status/sample_status.mcq)
+IF (MODEL_UNIT EQ INCH) config=(default_checks.mch)(sample_start.mcs)(inch.mcn)(sample_status.mcq)
+IF (MODEL_UNIT EQ MM) config=(default_checks.mch)(sample_start.mcs)(mm.mcn)(sample_status.mcq)
+ELSE config=(default_checks.mch)(sample_start.mcs)(mm.mcn)(sample_status.mcq)
 
 # OVERRIDE CHECKS
 IF (NOCHECK) NOCHECK

@@ -190,13 +190,6 @@ MU_REGENERATE  YN    Y
 #   A - always Ask the user whether to add AND whether to overwrite
 ADD_DUP_INFO_AUTO YNDA          D	D	N	N
 
-
-#ILNK_MC_SRCH_SCRPT   <proitkenv_load_pt>/bin/<script_to_exec_mcilsearch>
-#ILNK_MC_PRVW_SCRPT   <proitkenv_load_pt>/bin/<script_to_exec_mcilchkout>
-#ILNK_MC_DUP_FLDR     folder1
-#ILNK_MC_DUP_FLDR     folder2
-#ILNK_MC_DUP_FLDR     folder3
-
 # Temporary directory for preview files storage
 #DIR_MC_PREVIEW_NT   $TEMP/mc_preview
 
@@ -210,7 +203,7 @@ DIR_MC_PREVIEW   $TEMP/mc_preview
 BURIED_ADVANCED   YN            Y
 
 # Show Report
-SHOW_REPORT       YN            Y       Y       Y       Y
+SHOW_REPORT       YN            Y       N       Y       Y
 
 # PROGRAM NAMES
 PROGRAM          pro
@@ -221,6 +214,26 @@ HTML_FILE_OUTPUT  YN            Y       N       Y       Y
 # For Creo 12 Inseperable Assemblies
 MC_RUN_ON_ASM_COMP	YN	Y	
 
-MC_CHECK_ALL_LEVEL_MBD_ANNTNS	YN	Y	
-MCREGEN_VERIFY_FT_INSTS	YN	Y	
-MC_MBD_IGNORE_DRIVING_DIMS	YN	N	
+# Check all MBD annotations throughout the model hierarchy.
+MC_CHECK_ALL_LEVEL_MBD_ANNTNS	YN	Y
+
+# Verify family table instances regenerate correctly.
+MCREGEN_VERIFY_FT_INSTS	YN	Y
+
+# Ignore driving dimensions when evaluating MBD dimensions.
+MC_MBD_IGNORE_DRIVING_DIMS	YN	N
+
+# Get version information from model metadata.
+MC_GET_VERSION_FROM_META_DATA	YN	Y
+
+# Report errors in merged components found in top-level assemblies.
+MC_MRG_COMP_ERR_IN_TOP_ASM	YN	Y
+
+# Report errors in embedded merged components.
+MC_MRG_EMBED_COMP_ERR	YN	Y
+
+# Report the master material assigned to the model.
+MC_REPORT_MASTER_MATERIAL	YN	Y
+
+# Recompute mass properties before performing mass-related checks.
+MU_MASS_RECOMPUTE	YN	Y

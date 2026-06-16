@@ -1,3 +1,0 @@
-# ModelCHECK relation update sample file
-# weight_kg = pro_mp_mass
-# IR_WEIGHT_KG = pro_mp_mass

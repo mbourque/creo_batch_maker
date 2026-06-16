@@ -758,7 +758,6 @@ def create_html_report(
     wd_norm = os.path.normcase(os.path.normpath(working_dir))
     if os.path.normcase(os.path.normpath(report_assets_dir)) != wd_norm:
         _remove_legacy_hash_placeholders(working_dir)
-    print(f"Output file written: {os.path.abspath(output_file)}")
 
 
 def build_errors_warnings_html(

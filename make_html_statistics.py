@@ -681,6 +681,8 @@ class BatchStatistics:
 
     skeleton_models: int = 0
 
+    templates_scanned: list[str] = field(default_factory=list)
+
     top_features_parts: list[tuple[str, int]] = field(default_factory=list)
 
     top_size_parts: list[tuple[str, float]] = field(default_factory=list)
@@ -1130,12 +1132,85 @@ def _skipped_models_summary_line(skipped_models: list[str]) -> str:
     )
 
 
+TEMPLATE_SCAN_SESSION_BASENAME = "creo-batch-template-scan.json"
+
+
+def _template_scan_session_path(working_dir: str) -> str:
+    return os.path.join(working_dir, "templates", TEMPLATE_SCAN_SESSION_BASENAME)
+
+
+def write_template_scan_session(
+    working_dir: str, outcome: str, kinds: list[str] | None = None
+) -> None:
+    """Record whether Scan Templates ran (done) or was skipped in this wizard session."""
+    path = _template_scan_session_path(working_dir)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    payload: dict[str, object] = {"outcome": outcome}
+    if outcome == "done" and kinds:
+        payload["kinds"] = kinds
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, indent=2)
+        fh.write("\n")
+
+
+def clear_template_scan_session(working_dir: str) -> None:
+    path = _template_scan_session_path(working_dir)
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass
+    except OSError:
+        pass
+
+
+def read_template_scan_session(working_dir: str) -> tuple[str | None, list[str]]:
+    path = _template_scan_session_path(working_dir)
+    if not os.path.isfile(path):
+        return None, []
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return None, []
+    outcome = data.get("outcome")
+    if not isinstance(outcome, str):
+        return None, []
+    raw_kinds = data.get("kinds", [])
+    kinds: list[str] = []
+    if isinstance(raw_kinds, list):
+        for item in raw_kinds:
+            if isinstance(item, str) and item:
+                kinds.append(item)
+    return outcome, kinds
+
+
+def scan_templates_scanned(working_dir: str) -> list[str]:
+    """Model types scanned in this session (empty when skipped or no session record)."""
+    outcome, kinds = read_template_scan_session(working_dir)
+    if outcome != "done":
+        return []
+    return kinds
+
+
+def _templates_scanned_summary_line(kinds: list[str]) -> str:
+    if not kinds:
+        return ""
+    count_words = {1: "one", 2: "two", 3: "all three"}
+    count_word = count_words.get(len(kinds), str(len(kinds)))
+    types_label = ", ".join(kinds)
+    return f"<p><strong>Templates scanned ({count_word}):</strong> {types_label}</p>"
+
+
 
 
 
 def generate_statistics_html(stats: BatchStatistics, *, embedded: bool = False) -> str:
 
     summary_bits: list[str] = []
+
+    templates_line = _templates_scanned_summary_line(stats.templates_scanned)
+    if templates_line:
+        summary_bits.append(templates_line)
 
     if stats.top_level_assembly:
 
@@ -1341,6 +1416,7 @@ def generate_statistics_fragment(
     """Build statistics HTML from an already-parsed ``master.xml`` root."""
     stats = scan_batch_statistics(master_root, master_path=master_path)
     stats.skipped_models = scan_skipped_models(working_dir, master_root)
+    stats.templates_scanned = scan_templates_scanned(working_dir)
     if stats.top_level_assembly:
         stats.top_level_assembly_bom = load_top_level_assembly_bom(
             working_dir,
@@ -1365,6 +1441,7 @@ def write_statistics_html_file(master_xml_path: str, output_path: str) -> str:
     stats = scan_batch_statistics(root, master_path=master_xml_path)
 
     stats.skipped_models = scan_skipped_models(working_dir, root)
+    stats.templates_scanned = scan_templates_scanned(working_dir)
     if stats.top_level_assembly:
         stats.top_level_assembly_bom = load_top_level_assembly_bom(
             working_dir,
