@@ -102,6 +102,6 @@ STD_SHTMTL_THICK_FILE	thick.txt
 
 MC_REGEN_CONFIG_FILE	mc_regen.mcr
 
-PRT_TEMPLATE ./templates/part_template.prt
-DRW_TEMPLATE ./templates/drawing_template.drw
-ASM_TEMPLATE ./templates/assembly_template.asm
+# PRT_TEMPLATE ./templates/part_template.prt
+# DRW_TEMPLATE ./templates/drawing_template.drw
+# ASM_TEMPLATE ./templates/assembly_template.asm

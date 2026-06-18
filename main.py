@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from enum import Enum
 from pathlib import Path
 import json
 import os
@@ -89,15 +90,27 @@ BATCH_OUTPUT_WAIT_TIMEOUT_DEFAULT = 120
 BATCH_OUTPUT_WAIT_TIMEOUT_MIN = 60
 # After all expected outputs for a chunk appear, brief settle when xtop already exited.
 BATCH_OUTPUT_SETTLE_SEC = 5
-# When outputs are done but xtop.exe is still running, wait this long before kill.bat.
-BATCH_XTOP_SETTLE_BEFORE_KILL_SEC = 15
-# xtop.exe: abort chunk wait after N consecutive dead polls with no restart within restart sec (within window sec of first dead poll).
+# xtop.exe: after it exits, wait this long for a new xtop (Creo often restarts between models).
 BATCH_XTOP_DEAD_CHECKS = 2
-BATCH_XTOP_RESTART_WAIT_SEC = 10
-BATCH_XTOP_DEAD_WINDOW_SEC = 30
+BATCH_XTOP_RESTART_WAIT_SEC = 20
 # Wizard polls the batch folder until chunk .dxc files are gone (runner deletes them when done).
 WIZARD_BATCH_DXC_POLL_MS = 3000
 BATCH_TIMEOUT_LOG_PREFIX = "creo-batch-timeouts-"
+BATCH_STOP_FLAG_BASENAME = "creo-batch-stop.requested"
+# Modal dialogs: match wizard primary/secondary buttons (CTk default can look disabled/gray
+# when a modal opens while the main window still shows Waiting… disabled buttons).
+_DIALOG_BTN_PRIMARY_KW = {
+    "fg_color": "#3B8ED0",
+    "hover_color": "#36719F",
+    "text_color": "#FFFFFF",
+}
+_DIALOG_BTN_SECONDARY_KW = {
+    "fg_color": "#ECECEC",
+    "hover_color": "#DDDDDD",
+    "text_color": "#111111",
+    "border_width": 1,
+    "border_color": "#8F98A3",
+}
 _BATCH_TIMEOUT_LOG_HEADER = "Models timed out:"
 _THUMBNAIL_MODEL_SUFFIX = ".model.jpg"
 _THUMBNAIL_DRAWING_SUFFIX = ".drawing.jpg"
@@ -108,6 +121,14 @@ WIZARD_BATCH_ETA_MIN_CHUNKS_DEFAULT = 2
 WIZARD_BATCH_ETA_MIN_CHUNKS_SMALL = 1
 WIZARD_BATCH_ETA_SMALL_BATCH_MAX_CHUNKS = 2
 WIZARD_BATCH_ETA_ESTIMATING_SUFFIX = " · Estimating time…"
+
+
+class TimedOutGoChoice(Enum):
+    SKIP_REST = "skip_rest"
+    RETRY_ALL = "retry_all"
+    RETRY_FAILED_ONLY = "retry_failed_only"
+
+
 WIZARD_AUTOMATIC_MODE_MESSAGE = (
     "Automatic Mode — runs each batch in sequence when the previous step finishes "
     "(Scan Templates → ModelCHECK → Thumbnails → Report)."
@@ -267,22 +288,53 @@ def _resolve_batch_timeout_log_path(log_dir: Path, task_kind: str) -> Path | Non
     return _latest_legacy_batch_timeout_log(log_dir, task_kind)
 
 
+def _creo_model_base_name(name: str) -> str:
+    """``part.prt.2`` → ``part.prt``; ``part.p.xml`` → ``part.prt`` (no revision suffix)."""
+    stripped = (name or "").strip()
+    m = re.match(r"^(.*\.(?:prt|asm|drw))(?:\.\d+)?$", stripped, flags=re.IGNORECASE)
+    if m:
+        return m.group(1)
+    m_xml = re.match(r"^(.*)\.(p|a|d)\.xml$", stripped, flags=re.IGNORECASE)
+    if m_xml:
+        letter = m_xml.group(2).lower()
+        ext = {"p": "prt", "a": "asm", "d": "drw"}[letter]
+        return f"{m_xml.group(1)}.{ext}"
+    return stripped
+
+
 def _parse_batch_timeout_log(path: Path) -> list[str]:
     try:
         text = path.read_text(encoding="utf-8-sig", errors="replace")
     except OSError:
         return []
     models: list[str] = []
+    seen: set[str] = set()
     past_header = False
     header_cf = _BATCH_TIMEOUT_LOG_HEADER.casefold()
+    header_merged_re = re.compile(
+        r"^Models timed out:\s*(.+)$", re.IGNORECASE
+    )
     for line in text.splitlines():
         stripped = line.strip().lstrip("\ufeff")
+        if not stripped:
+            continue
         if not past_header:
             if stripped.casefold() == header_cf:
                 past_header = True
-            continue
-        if stripped:
-            models.append(stripped)
+                continue
+            merged = header_merged_re.match(stripped)
+            if merged:
+                past_header = True
+                stripped = merged.group(1).strip()
+                if not stripped:
+                    continue
+            else:
+                continue
+        base = _creo_model_base_name(stripped)
+        key = base.casefold()
+        if base and key not in seen:
+            seen.add(key)
+            models.append(base)
     return models
 
 
@@ -321,13 +373,68 @@ def _read_batch_failed_models(log_dir: Path, task_kind: str) -> list[str]:
     return _parse_batch_timeout_log(legacy)
 
 
+def _append_batch_timeout_log_models(
+    log_dir: Path, task_kind: str, model_names: list[str]
+) -> None:
+    """Append model base names to the timeout log (deduped); used for dialog skips and recovery."""
+    if not model_names:
+        return
+    log_path = _batch_timeout_log_path(log_dir, task_kind)
+    existing = {
+        _creo_model_base_name(m).casefold()
+        for m in _read_batch_failed_models(log_dir, task_kind)
+    }
+    to_add: list[str] = []
+    for name in model_names:
+        base = _creo_model_base_name(name)
+        key = base.casefold()
+        if base and key not in existing:
+            existing.add(key)
+            to_add.append(base)
+    if not to_add:
+        return
+    header_lines = [
+        f"Task: {task_kind}",
+        f"Started: {time.strftime('%H:%M:%S')}",
+        f"Log file: {log_path}",
+        "",
+        _BATCH_TIMEOUT_LOG_HEADER,
+        "",
+    ]
+    body = "\n".join(to_add) + "\n"
+    for attempt in range(8):
+        try:
+            if log_path.is_file():
+                with log_path.open("rb") as fh:
+                    raw = fh.read()
+                prefix = b""
+                if raw and raw[-1:] not in (b"\n", b"\r"):
+                    prefix = b"\n"
+                with log_path.open("ab") as fh:
+                    if prefix:
+                        fh.write(prefix)
+                    fh.write(body.encode("utf-8"))
+            else:
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+                log_path.write_text(
+                    "\n".join(header_lines) + "\n" + body,
+                    encoding="utf-8",
+                    newline="\n",
+                )
+            return
+        except OSError:
+            if attempt >= 7:
+                return
+            time.sleep(0.25)
+
+
 def _is_batch_timeout_log_name(name: str) -> bool:
     n = name.casefold()
     return n.startswith(BATCH_TIMEOUT_LOG_PREFIX.casefold()) and n.endswith(".txt")
 
 
 def _remove_batch_timeout_logs_in_directory(directory: Path) -> list[str]:
-    """Remove ``creo-batch-timeouts-*.txt`` failure logs; return unlink error lines."""
+    """Remove ``creo-batch-timeouts-*.txt`` failure logs (Start over only); return unlink error lines."""
     errors: list[str] = []
     if not directory.is_dir():
         return errors
@@ -344,21 +451,39 @@ def _remove_batch_timeout_logs_in_directory(directory: Path) -> list[str]:
     return errors
 
 
-def _clear_batch_timeout_logs(batch_dir: Path, task_kind: str) -> None:
-    """Remove failure logs for one task before a new batch run."""
-    if not batch_dir.is_dir():
-        return
-    prefix = f"{BATCH_TIMEOUT_LOG_PREFIX}{task_kind}".casefold()
-    try:
-        for path in batch_dir.iterdir():
-            if not path.is_file():
-                continue
-            if not _is_batch_timeout_log_name(path.name):
-                continue
-            if path.name.casefold().startswith(prefix):
-                path.unlink()
-    except OSError:
-        pass
+def _remove_batch_timeout_log_for_task(log_dir: Path, task_kind: str) -> None:
+    """Remove one phase timeout log (retry all / retry failed only)."""
+    path = _batch_timeout_log_path(log_dir, task_kind)
+    if path.is_file():
+        try:
+            path.unlink()
+        except OSError:
+            pass
+    legacy = _latest_legacy_batch_timeout_log(log_dir, task_kind)
+    if legacy is not None and legacy.is_file() and legacy != path:
+        try:
+            legacy.unlink()
+        except OSError:
+            pass
+
+
+def _paths_for_timed_out_candidates(
+    latest_files: list[Path], candidates: list[str]
+) -> list[Path]:
+    by_base: dict[str, Path] = {}
+    for path in latest_files:
+        by_base[_creo_model_base_name(path.name).casefold()] = path
+    result: list[Path] = []
+    seen: set[str] = set()
+    for name in candidates:
+        key = _creo_model_base_name(name).casefold()
+        if not key or key in seen:
+            continue
+        path = by_base.get(key)
+        if path is not None:
+            seen.add(key)
+            result.append(path)
+    return result
 
 
 def _is_thumbnail_placeholder_name(name: str) -> bool:
@@ -407,6 +532,27 @@ def _directory_has_thumbnail_suffix(directory: Path, middle: str) -> bool:
                 return True
     except OSError:
         pass
+    return False
+
+
+def _jpeg_thumbnail_stem(model_name: str) -> str | None:
+    m_ext = re.match(r"^(.*)\.(prt|asm|drw)(?:\.\d+)?$", model_name, flags=re.IGNORECASE)
+    return m_ext.group(1) if m_ext else None
+
+
+def _jpeg_thumbnail_output_exists(
+    working_dir: Path, model_name: str, task_kind: str
+) -> bool:
+    """True when Creo native ``stem.jpg`` or renamed ``stem.model.jpg`` / ``stem.drawing.jpg`` exists."""
+    stem = _jpeg_thumbnail_stem(model_name)
+    if stem is None:
+        return False
+    if (working_dir / f"{stem}.jpg").is_file():
+        return True
+    if task_kind == "jpeg3d":
+        return (working_dir / f"{stem}{_THUMBNAIL_MODEL_SUFFIX}").is_file()
+    if task_kind == "jpeg2d":
+        return (working_dir / f"{stem}{_THUMBNAIL_DRAWING_SUFFIX}").is_file()
     return False
 
 
@@ -652,6 +798,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._wizard_step = WIZARD_STEP_SETUP
         self._wizard_step_outcome: dict[int, str] = {}
         self._wizard_step_failed_models: dict[int, list[str]] = {}
+        self._wizard_skipped_timeout_models: set[str] = set()
         self._wizard_thumbnails_model_phase_done = False
         self.resizable(False, False)
 
@@ -674,6 +821,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._debug_mode_var = tk.BooleanVar(master=self, value=DEBUG_MODE_DEFAULT)
         self._automatic_wizard_chain_job: str | None = None
         self._automatic_chain_phase: str | int | None = None
+        self._skip_timed_out_prompt_on_go = False
         self._configuration_menu: tk.Menu | None = None
         self._menubar: tk.Menu | None = None
         self._settings_options = [
@@ -1196,6 +1344,360 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             arrowsize=14,
             padding=2,
             font=TASK_COMBOBOX_FONT,
+        )
+
+    def _timeout_task_step_label(self, task_kind: str) -> str:
+        if task_kind == "modelcheck":
+            return "ModelCHECK"
+        if task_kind == "jpeg3d":
+            return "3D thumbnails"
+        if task_kind == "jpeg2d":
+            return "Drawing plots (2D JPEG)"
+        return task_kind
+
+    def _apply_skipped_timeout_models_to_batch(self, latest_files: list[Path]) -> list[Path]:
+        skip = self._wizard_skipped_timeout_models
+        if not skip:
+            return latest_files
+        return [
+            p
+            for p in latest_files
+            if _creo_model_base_name(p.name).casefold() not in skip
+        ]
+
+    def _batch_paths_by_model_base(self, latest_files: list[Path]) -> dict[str, Path]:
+        by_base: dict[str, Path] = {}
+        for path in latest_files:
+            by_base[_creo_model_base_name(path.name).casefold()] = path
+        return by_base
+
+    def _timed_out_models_still_in_batch(
+        self,
+        batch_dir: Path,
+        task_kind: str,
+        latest_files: list[Path],
+        *,
+        working_dir: Path,
+    ) -> list[str]:
+        logged = _read_batch_failed_models(batch_dir, task_kind)
+        if not logged:
+            return []
+        batch_by_base = self._batch_paths_by_model_base(latest_files)
+        skip = self._wizard_skipped_timeout_models
+        candidates: list[str] = []
+        seen: set[str] = set()
+        for logged_name in logged:
+            base = _creo_model_base_name(logged_name).casefold()
+            if base in seen or base not in batch_by_base or base in skip:
+                continue
+            batch_path = batch_by_base[base]
+            if not self._model_still_missing_task_output(
+                working_dir, batch_path.name, task_kind
+            ):
+                continue
+            seen.add(base)
+            candidates.append(_creo_model_base_name(logged_name))
+        return candidates
+
+    @staticmethod
+    def _model_still_missing_task_output(
+        working_dir: Path, model_name: str, task_kind: str
+    ) -> bool:
+        model_path = working_dir / model_name
+        if not model_path.is_file():
+            base = _creo_model_base_name(model_name)
+            try:
+                entries = list(working_dir.iterdir())
+            except OSError:
+                return False
+            for entry in entries:
+                if not entry.is_file():
+                    continue
+                if _creo_model_base_name(entry.name).casefold() == base.casefold():
+                    model_path = entry
+                    break
+            else:
+                return False
+        if task_kind == "modelcheck":
+            out = CreoDistributedBatchMakerApp._expected_output_basename(
+                model_path, is_modelcheck=True
+            )
+            return bool(out) and not (working_dir / out).is_file()
+        if task_kind in ("jpeg3d", "jpeg2d"):
+            return not _jpeg_thumbnail_output_exists(working_dir, model_name, task_kind)
+        return True
+
+    def _timed_out_auto_mode_followup_lines(
+        self,
+        working_dir: Path,
+        batch_dir: Path,
+        current_kind: str,
+    ) -> str:
+        """Counts for later automatic steps (no model names)."""
+        if not self._automatic_mode:
+            return ""
+        parts: list[str] = []
+        if current_kind == "modelcheck":
+            files_3d = self._latest_models_for_task(working_dir, self._wizard_jpeg_3d_display())
+            n_3d = len(
+                self._timed_out_models_still_in_batch(
+                    batch_dir, "jpeg3d", files_3d, working_dir=working_dir
+                )
+            )
+            if n_3d:
+                parts.append(f"3D thumbnails: {n_3d}")
+            disp_2d = self._wizard_jpeg_2d_display()
+            if disp_2d and self._wizard_thumbnails_needs_drawing_phase(str(working_dir)):
+                files_2d = self._latest_models_for_task(working_dir, disp_2d)
+                n_2d = len(
+                    self._timed_out_models_still_in_batch(
+                        batch_dir, "jpeg2d", files_2d, working_dir=working_dir
+                    )
+                )
+                if n_2d:
+                    parts.append(f"drawing plots (2D JPEG): {n_2d}")
+        elif current_kind == "jpeg3d":
+            disp_2d = self._wizard_jpeg_2d_display()
+            if disp_2d and self._wizard_thumbnails_needs_drawing_phase(str(working_dir)):
+                files_2d = self._latest_models_for_task(working_dir, disp_2d)
+                n_2d = len(
+                    self._timed_out_models_still_in_batch(
+                        batch_dir, "jpeg2d", files_2d, working_dir=working_dir
+                    )
+                )
+                if n_2d:
+                    parts.append(f"drawing plots (2D JPEG): {n_2d}")
+        if not parts:
+            return ""
+        return (
+            "\n\nAutomatic mode will run later thumbnail step(s). Prior timed-out models "
+            f"still missing output: {', '.join(parts)}. "
+            "Models you skip now are omitted from those steps too. "
+            "See creo-batch-timeouts-jpeg3d.txt and creo-batch-timeouts-jpeg2d.txt."
+        )
+
+    def _skip_timed_out_models_in_batch(
+        self,
+        latest_files: list[Path],
+        batch_dir: Path,
+        task_kind: str,
+        candidates: list[str],
+    ) -> tuple[list[Path], bool]:
+        """Omit timed-out models from this GO batch. Returns (paths, continue_go)."""
+        if not candidates:
+            return latest_files, True
+        for name in candidates:
+            self._wizard_skipped_timeout_models.add(_creo_model_base_name(name).casefold())
+        _append_batch_timeout_log_models(batch_dir, task_kind, candidates)
+        if task_kind != "jpeg2d":
+            self._wizard_step_failed_models.pop(self._wizard_step, None)
+        filtered = self._apply_skipped_timeout_models_to_batch(latest_files)
+        if not filtered:
+            step_label = self._timeout_task_step_label(task_kind)
+            messagebox.showinfo(
+                "Timed-out models",
+                f"All models for this {step_label} batch were in the timed-out list "
+                "and were skipped.",
+            )
+            return filtered, False
+        return filtered, True
+
+    def _other_models_still_missing_output(
+        self,
+        latest_files: list[Path],
+        working_dir: Path,
+        task_kind: str,
+        candidate_bases: set[str],
+    ) -> list[Path]:
+        """Models still missing output that are not in the timed-out candidate set."""
+        missing: list[Path] = []
+        for path in latest_files:
+            base = _creo_model_base_name(path.name).casefold()
+            if base in candidate_bases:
+                continue
+            if self._model_still_missing_task_output(working_dir, path.name, task_kind):
+                missing.append(path)
+        return missing
+
+    def _auto_timed_out_go_choice(
+        self,
+        latest_files: list[Path],
+        candidates: list[str],
+        working_dir: Path,
+        task_kind: str,
+    ) -> TimedOutGoChoice:
+        """Automatic mode: skip rest while other models need output; else retry failures only."""
+        candidate_bases = {_creo_model_base_name(n).casefold() for n in candidates}
+        if self._other_models_still_missing_output(
+            latest_files, working_dir, task_kind, candidate_bases
+        ):
+            return TimedOutGoChoice.SKIP_REST
+        return TimedOutGoChoice.RETRY_FAILED_ONLY
+
+    def _apply_timed_out_go_choice(
+        self,
+        choice: TimedOutGoChoice,
+        latest_files: list[Path],
+        batch_dir: Path,
+        task_kind: str,
+        candidates: list[str],
+    ) -> tuple[list[Path], bool, int | None]:
+        """Returns (paths for dxc, continue_go, chunk_size_override for this GO only)."""
+        if choice == TimedOutGoChoice.RETRY_ALL:
+            _remove_batch_timeout_log_for_task(batch_dir, task_kind)
+            if task_kind != "jpeg2d":
+                self._wizard_step_failed_models.pop(self._wizard_step, None)
+            return latest_files, True, None
+        if choice == TimedOutGoChoice.RETRY_FAILED_ONLY:
+            _remove_batch_timeout_log_for_task(batch_dir, task_kind)
+            retry_paths = _paths_for_timed_out_candidates(latest_files, candidates)
+            if not retry_paths:
+                return [], False, None
+            if task_kind != "jpeg2d":
+                self._wizard_step_failed_models.pop(self._wizard_step, None)
+            return retry_paths, True, 1
+        filtered, continue_go = self._skip_timed_out_models_in_batch(
+            latest_files, batch_dir, task_kind, candidates
+        )
+        return filtered, continue_go, None
+
+    def _ask_timed_out_models_choice(self, message: str) -> TimedOutGoChoice | None:
+        anchor = self
+        dialog = ctk.CTkToplevel(anchor)
+        dialog.withdraw()
+        dialog.title("Timed-out models")
+        dialog.resizable(False, False)
+        dialog.transient(anchor)
+
+        result: dict[str, TimedOutGoChoice | None] = {"value": None}
+
+        def close(choice: TimedOutGoChoice | None) -> None:
+            result["value"] = choice
+            dialog.destroy()
+
+        ctk.CTkLabel(dialog, text=message, justify="left", wraplength=440).pack(
+            anchor="w", padx=16, pady=(16, 12)
+        )
+        btn_col = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_col.pack(anchor="e", padx=16, pady=(0, 16))
+        buttons: list[ctk.CTkButton] = []
+        for label, choice, primary in (
+            ("Retry failures only (1 per chunk)", TimedOutGoChoice.RETRY_FAILED_ONLY, True),
+            ("Skip failures, run the rest", TimedOutGoChoice.SKIP_REST, False),
+            ("Retry all models", TimedOutGoChoice.RETRY_ALL, False),
+        ):
+            btn = self._mk_dialog_button(
+                btn_col,
+                text=label,
+                width=240,
+                primary=primary,
+                command=lambda c=choice: close(c),
+            )
+            btn.pack(anchor="e", pady=(0, 6))
+            buttons.append(btn)
+        cancel_btn = self._mk_dialog_button(
+            btn_col, text="Cancel", width=88, primary=False, command=lambda: close(None)
+        )
+        cancel_btn.pack(anchor="e", pady=(4, 0))
+        buttons.append(cancel_btn)
+        dialog.bind("<Escape>", lambda _e: close(None))
+        dialog.protocol("WM_DELETE_WINDOW", lambda: close(None))
+
+        def place_centered() -> None:
+            if not dialog.winfo_exists():
+                return
+            try:
+                anchor.deiconify()
+                anchor.update_idletasks()
+            except tk.TclError:
+                pass
+            dialog.update_idletasks()
+            try:
+                _center_toplevel_on_parent(dialog, anchor)
+            except tk.TclError:
+                pass
+
+        def show() -> None:
+            if not dialog.winfo_exists():
+                return
+            dialog.deiconify()
+            place_centered()
+            try:
+                dialog.attributes("-topmost", True)
+                dialog.lift()
+                dialog.focus_force()
+                dialog.after(
+                    200,
+                    lambda: dialog.attributes("-topmost", False) if dialog.winfo_exists() else None,
+                )
+            except tk.TclError:
+                pass
+            dialog.after(50, place_centered)
+            self._repaint_dialog_buttons(dialog, *buttons)
+
+        self._modal_dialog_depth += 1
+        try:
+            dialog.update_idletasks()
+            dialog.after_idle(show)
+            dialog.wait_window()
+        finally:
+            self._modal_dialog_depth = max(0, self._modal_dialog_depth - 1)
+            if anchor is self:
+
+                def _repaint_action_buttons() -> None:
+                    try:
+                        self._refresh_action_buttons_run()
+                        self.update_idletasks()
+                    except tk.TclError:
+                        pass
+
+                self.after_idle(_repaint_action_buttons)
+        return result["value"]
+
+    def _maybe_prompt_and_skip_timed_out_models(
+        self,
+        latest_files: list[Path],
+        batch_dir: Path,
+        working_dir: Path,
+        task_kind: str,
+    ) -> tuple[list[Path], bool, int | None]:
+        """Prompt or auto-apply timed-out model handling. Returns (paths, continue_go, chunk_override)."""
+        silent = self._skip_timed_out_prompt_on_go
+        if silent:
+            self._skip_timed_out_prompt_on_go = False
+
+        candidates = self._timed_out_models_still_in_batch(
+            batch_dir, task_kind, latest_files, working_dir=working_dir
+        )
+        if not candidates:
+            return latest_files, True, None
+
+        if silent:
+            choice = self._auto_timed_out_go_choice(
+                latest_files, candidates, working_dir, task_kind
+            )
+        else:
+            step_label = self._timeout_task_step_label(task_kind)
+            log_name = f"{BATCH_TIMEOUT_LOG_PREFIX}{task_kind}.txt"
+            auto_note = self._timed_out_auto_mode_followup_lines(
+                working_dir, batch_dir, task_kind
+            )
+            message = (
+                f"The last {step_label} run recorded {len(candidates)} timed-out model(s) "
+                "still missing output.\n\n"
+                f"See {log_name} in the working folder for the full list.\n\n"
+                "Retry failures only — run only those models, one per chunk.\n"
+                "Skip failures, run the rest — omit timed-out models from this batch.\n"
+                "Retry all models — include timed-out models and clear the failure log.\n\n"
+                "Cancel — do not start the batch."
+                f"{auto_note}"
+            )
+            choice = self._ask_timed_out_models_choice(message)
+            if choice is None:
+                return latest_files, False, None
+
+        return self._apply_timed_out_go_choice(
+            choice, latest_files, batch_dir, task_kind, candidates
         )
 
     def _wizard_jpeg_3d_display(self) -> str:
@@ -1819,6 +2321,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self.task.set(task_display)
         self._cancel_wizard_batch_output_watch()
         self._close_batch_runner_window()
+        if self._automatic_mode:
+            self._skip_timed_out_prompt_on_go = True
         self._on_go()
         return True
 
@@ -2086,6 +2590,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 return
             if self._go_fields_valid():
                 self._automatic_chain_phase = None
+                self._skip_timed_out_prompt_on_go = True
                 self._on_wizard_next()
                 return
             self._automatic_wizard_chain_job = self.after(
@@ -2116,6 +2621,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 return
             if self._go_fields_valid():
                 self._automatic_chain_phase = None
+                self._skip_timed_out_prompt_on_go = True
                 self._on_wizard_next()
                 return
             self._automatic_wizard_chain_job = self.after(
@@ -2209,6 +2715,22 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._wizard_step_failed_models[step] = models
         return models
 
+    def _resolve_wizard_batch_failed_log_path(self, step: int, log_dir: Path) -> Path | None:
+        if step == WIZARD_STEP_JPEG_3D:
+            for kind in ("jpeg3d", "jpeg2d"):
+                models = _read_batch_failed_models(log_dir, kind)
+                if not models:
+                    continue
+                path = _resolve_batch_timeout_log_path(log_dir, kind)
+                if path is not None:
+                    return path
+            return _resolve_batch_timeout_log_path(log_dir, "jpeg3d")
+        task_display = self._wizard_task_display_for_step(step)
+        if not task_display:
+            return None
+        task_kind = self._runner_task_kind(task_display)
+        return _resolve_batch_timeout_log_path(log_dir, task_kind)
+
     def _refresh_wizard_batch_failed_label(self, step: int, log_dir: Path | None) -> None:
         frame = getattr(self, "wizard_batch_failed_frame", None)
         if frame is None:
@@ -2222,9 +2744,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             self._wizard_batch_failed_log_path = None
             frame.pack_forget()
             return
-        task_display = self._wizard_task_display_for_step(step)
-        task_kind = self._runner_task_kind(task_display) if task_display else ""
-        log_path = _resolve_batch_timeout_log_path(log_dir, task_kind)
+        log_path = self._resolve_wizard_batch_failed_log_path(step, log_dir)
         self._wizard_batch_failed_log_path = log_path
         prefix = getattr(self, "wizard_batch_failed_prefix", None)
         if prefix is not None:
@@ -2264,9 +2784,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         failed = self._wizard_failed_models_for_step(step, batch_dir)
         if not failed:
             return 0, None
-        task_display = self._wizard_task_display_for_step(step)
-        task_kind = self._runner_task_kind(task_display) if task_display else ""
-        return len(failed), _resolve_batch_timeout_log_path(batch_dir, task_kind)
+        return len(failed), self._resolve_wizard_batch_failed_log_path(step, batch_dir)
 
     def _refresh_wizard_report_failure_row(
         self,
@@ -3086,7 +3604,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self.wizard_jpeg_drawing_progress_bar.pack(anchor="w", fill="x")
         self.wizard_jpeg_drawing_progress_bar.set(0)
         self.wizard_batch_automatic_label = ctk.CTkLabel(
-            self.wizard_batch_progress_frame,
+            self.wizard_batch_frame,
             text="",
             font=ctk.CTkFont(size=12),
             text_color="#1565C0",
@@ -3095,7 +3613,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             wraplength=500,
         )
         self.wizard_batch_failed_frame = ctk.CTkFrame(
-            self.wizard_batch_progress_frame,
+            self.wizard_batch_frame,
             fg_color="transparent",
         )
         self.wizard_batch_failed_prefix = ctk.CTkLabel(
@@ -3758,7 +4276,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         )
         if self._debug_mode:
             stop_runner_note = (
-                "This runs kill.bat to stop Creo (Debug mode leaves the PowerShell window open).\n"
+                "This runs kill.bat to stop Creo and signals the runner to exit.\n"
+                "The PowerShell window stays open so you can read the log.\n"
             )
         else:
             stop_runner_note = (
@@ -3776,23 +4295,42 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             self._wizard_capture_failed_models_after_batch(watch)
         self._cancel_automatic_wizard_chain()
         self._cancel_post_batch_task_refresh()
-        self._close_batch_runner_window()
-        kill_ok, kill_err = self._run_kill_bat()
+        batch_dir, _ = self._wizard_batch_dxc_context_for_step(step)
+        if self._debug_mode:
+            self._request_batch_runner_stop(batch_dir)
+            kill_ok, kill_err = self._run_kill_bat()
+        else:
+            self._close_batch_runner_window(force=True)
+            self._close_stray_batch_runner_windows()
+            kill_ok, kill_err = self._run_kill_bat()
         self._cancel_wizard_batch_output_watch()
         self._refresh_wizard_ui()
         if not kill_ok:
-            messagebox.showwarning(
+            self._show_stop_result_message(
+                "warning",
                 "Stop",
                 "Batch stopped, but kill.bat could not run:\n\n"
                 f"{kill_err}\n\n"
                 "Run kill.bat manually if Creo processes are still active.",
             )
             return
-        messagebox.showinfo(
+        self._show_stop_result_message(
+            "info",
             "Stop",
             f"Batch stopped on the {step_label} step.\n\n"
             "Run this step again when you are ready to continue (completed outputs are skipped).",
         )
+
+    def _show_stop_result_message(self, kind: str, title: str, message: str) -> None:
+        """Show Stop result after wizard buttons repaint (avoids gray modal button text)."""
+
+        def show() -> None:
+            if kind == "warning":
+                messagebox.showwarning(title, message)
+            else:
+                messagebox.showinfo(title, message)
+
+        self.after(100, show)
 
     def _on_file_menu_start_over(self) -> None:
         wd = (self.working_directory.get() or "").strip()
@@ -3829,6 +4367,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._refresh_action_buttons()
         self._wizard_step_outcome.clear()
         self._wizard_step_failed_models.clear()
+        self._wizard_skipped_timeout_models.clear()
         self._set_wizard_step(WIZARD_STEP_SETUP)
         if errors:
             messagebox.showwarning(
@@ -3865,6 +4404,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._cancel_automatic_wizard_chain()
         self._wizard_step_outcome.clear()
         self._wizard_step_failed_models.clear()
+        self._wizard_skipped_timeout_models.clear()
         self._refresh_task_options()
         self._set_wizard_step(WIZARD_STEP_SETUP)
 
@@ -4427,6 +4967,32 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             if fn is not None:
                 setattr(fd, name, _filedialog_wrapper(fn))
 
+    @staticmethod
+    def _mk_dialog_button(
+        parent: tk.Misc,
+        *,
+        text: str,
+        command: object,
+        width: int = 80,
+        primary: bool = True,
+    ) -> ctk.CTkButton:
+        style = _DIALOG_BTN_PRIMARY_KW if primary else _DIALOG_BTN_SECONDARY_KW
+        return ctk.CTkButton(parent, text=text, width=width, command=command, **style)
+
+    @staticmethod
+    def _repaint_dialog_buttons(dialog: ctk.CTkToplevel, *buttons: ctk.CTkButton) -> None:
+        """CTkButton can keep a disabled gray look after the main window was Waiting…."""
+
+        def fix() -> None:
+            for btn in buttons:
+                try:
+                    if btn.winfo_exists():
+                        btn.configure(state="normal")
+                except tk.TclError:
+                    pass
+
+        dialog.after_idle(fix)
+
     def _show_app_messagebox(
         self,
         title: str,
@@ -4459,17 +5025,26 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         btn_row.pack(anchor="e", padx=16, pady=(0, 16))
 
         if ask_yes_no:
-            ctk.CTkButton(btn_row, text="No", width=80, command=lambda: close(False)).pack(
-                side="right", padx=(8, 0)
+            no_btn = self._mk_dialog_button(
+                btn_row, text="No", width=80, primary=False, command=lambda: close(False)
             )
-            ctk.CTkButton(btn_row, text="Yes", width=80, command=lambda: close(True)).pack(side="right")
+            yes_btn = self._mk_dialog_button(
+                btn_row, text="Yes", width=80, command=lambda: close(True)
+            )
+            no_btn.pack(side="right", padx=(8, 0))
+            yes_btn.pack(side="right")
             dialog.bind("<Escape>", lambda _e: close(False))
             dialog.protocol("WM_DELETE_WINDOW", lambda: close(False))
+            dialog_buttons = (no_btn, yes_btn)
         else:
-            ctk.CTkButton(btn_row, text="OK", width=80, command=lambda: close(True)).pack(side="right")
+            ok_btn = self._mk_dialog_button(
+                btn_row, text="OK", width=80, command=lambda: close(True)
+            )
+            ok_btn.pack(side="right")
             dialog.bind("<Return>", lambda _e: close(True))
             dialog.bind("<Escape>", lambda _e: close(True))
             dialog.protocol("WM_DELETE_WINDOW", lambda: close(True))
+            dialog_buttons = (ok_btn,)
 
         def place_centered() -> None:
             if not dialog.winfo_exists():
@@ -4498,6 +5073,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             except tk.TclError:
                 pass
             dialog.after(50, place_centered)
+            self._repaint_dialog_buttons(dialog, *dialog_buttons)
 
         self._modal_dialog_depth += 1
         try:
@@ -4540,10 +5116,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         )
         btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
         btn_row.pack(anchor="e", padx=16, pady=(0, 16))
-        cancel_btn = ctk.CTkButton(
-            btn_row, text="Cancel", width=88, command=lambda: close(False)
+        cancel_btn = self._mk_dialog_button(
+            btn_row, text="Cancel", width=88, primary=False, command=lambda: close(False)
         )
-        proceed_btn = ctk.CTkButton(
+        proceed_btn = self._mk_dialog_button(
             btn_row, text="Proceed", width=88, command=lambda: close(True)
         )
         cancel_btn.pack(side="right", padx=(8, 0))
@@ -4581,6 +5157,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             except tk.TclError:
                 pass
             dialog.after(50, place_centered)
+            self._repaint_dialog_buttons(dialog, cancel_btn, proceed_btn)
 
         dialog.bind("<Escape>", lambda _e: close(False))
         dialog.bind("<Return>", lambda _e: close(False))
@@ -4982,6 +5559,24 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             pass
 
     @staticmethod
+    def _clear_batch_stop_flag(batch_dir: Path) -> None:
+        try:
+            flag = batch_dir / BATCH_STOP_FLAG_BASENAME
+            if flag.is_file():
+                flag.unlink()
+        except OSError:
+            pass
+
+    @staticmethod
+    def _request_batch_runner_stop(batch_dir: Path | None) -> None:
+        if batch_dir is None or not batch_dir.is_dir():
+            return
+        try:
+            (batch_dir / BATCH_STOP_FLAG_BASENAME).write_text("", encoding="utf-8")
+        except OSError:
+            pass
+
+    @staticmethod
     def _cleanup_leftover_batch_files(
         batch_dir: Path, *, scan_templates: bool, keep_runner_scripts: bool = False
     ) -> None:
@@ -4992,6 +5587,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             CreoDistributedBatchMakerApp._cleanup_leftover_batch_dxc(
                 batch_dir, scan_templates=scan_templates
             )
+            CreoDistributedBatchMakerApp._clear_batch_stop_flag(batch_dir)
             if not keep_runner_scripts:
                 CreoDistributedBatchMakerApp._remove_batch_runner_scripts(batch_dir)
         except OSError:
@@ -5029,11 +5625,82 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         return f"{stem}.jpg"
 
     @classmethod
+    def _batch_runner_init_stop_ps1(cls, *, cooperative_stop: bool) -> list[str]:
+        if cooperative_stop:
+            return cls._batch_runner_stop_helpers_ps1()
+        return ["$stopRequested = $false", ""]
+
+    @classmethod
+    def _batch_runner_wait_delay_ps1(cls, *, indent: str, cooperative_stop: bool) -> list[str]:
+        if cooperative_stop:
+            return cls._batch_runner_poll_wait_ps1(indent=indent)
+        return [f"{indent}Start-Sleep -Seconds 2"]
+
+    @classmethod
+    def _batch_runner_stop_helpers_ps1(cls) -> list[str]:
+        return [
+            f"$StopFlagPath = Join-Path -Path $WorkDir -ChildPath '{BATCH_STOP_FLAG_BASENAME}'",
+            "$stopRequested = $false",
+            "",
+            "function Test-StopRequested {",
+            "    return (Test-Path -LiteralPath $StopFlagPath)",
+            "}",
+            "",
+            "function Invoke-StopRequested {",
+            '    Write-ChLog "STOPPED: stop requested from app."',
+            "    $script:stopRequested = $true",
+            "}",
+            "",
+            "function Wait-InterruptibleSeconds {",
+            "    param([int]$Seconds)",
+            "    $end = (Get-Date).AddSeconds($Seconds)",
+            "    while ((Get-Date) -lt $end) {",
+            "        if (Test-StopRequested) { return $false }",
+            "        Start-Sleep -Milliseconds 200",
+            "    }",
+            "    return $true",
+            "}",
+            "",
+        ]
+
+    @classmethod
+    def _batch_runner_stop_check_ps1(cls, *, indent: str) -> list[str]:
+        return [
+            f"{indent}if (Test-StopRequested) {{",
+            f"{indent}    Invoke-StopRequested",
+            f"{indent}    break",
+            f"{indent}}}",
+        ]
+
+    @classmethod
+    def _batch_runner_poll_wait_ps1(cls, *, indent: str, seconds: int = 2) -> list[str]:
+        return [
+            f"{indent}if (-not (Wait-InterruptibleSeconds {int(seconds)})) {{",
+            f"{indent}    Invoke-StopRequested",
+            f"{indent}    break",
+            f"{indent}}}",
+        ]
+
+    @classmethod
+    def _batch_runner_stop_exit_ps1(cls, *, indent: str, message: str, sync_timeout_log: bool = False) -> list[str]:
+        lines: list[str] = []
+        if sync_timeout_log:
+            lines.append(f"{indent}Sync-TimeoutLogFromMemory")
+        lines.extend(
+            [
+                f"{indent}if ($stopRequested) {{",
+                f'{indent}    Write-ChLog "{message}"',
+                f"{indent}    return",
+                f"{indent}}}",
+            ]
+        )
+        return lines
+
+    @classmethod
     def _batch_runner_xtop_helpers_ps1(cls) -> list[str]:
         return [
             f"$XtopDeadChecksRequired = {BATCH_XTOP_DEAD_CHECKS}",
             f"$XtopRestartWaitSec = {BATCH_XTOP_RESTART_WAIT_SEC}",
-            f"$XtopDeadWindowSec = {BATCH_XTOP_DEAD_WINDOW_SEC}",
             "",
             "function Test-XtopAlive {",
             "    $procs = Get-Process -Name xtop -ErrorAction SilentlyContinue",
@@ -5065,11 +5732,234 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         ]
 
     @classmethod
+    def _batch_runner_timeout_log_ps1(cls) -> list[str]:
+        """Load existing timeout log on start; append new model names without duplicates."""
+        return [
+            "$TimedOutModels = @{}",
+            "$TimeoutLogInitialized = $false",
+            "$TimeoutLog = Join-Path -Path $WorkDir -ChildPath ('creo-batch-timeouts-' + $TaskKind + '.txt')",
+            "",
+            "function Get-CreoModelBaseName {",
+            "    param([string]$Name)",
+            "    if ($Name -match '^(.*\\.(?:prt|asm|drw))(?:\\.\\d+)?$') { return $Matches[1] }",
+            "    if ($Name -match '^(.*)\\.p\\.xml$') { return ($Matches[1] + '.prt') }",
+            "    if ($Name -match '^(.*)\\.a\\.xml$') { return ($Matches[1] + '.asm') }",
+            "    if ($Name -match '^(.*)\\.d\\.xml$') { return ($Matches[1] + '.drw') }",
+            "    return $Name",
+            "}",
+            "",
+            "function Get-TimeoutLogModelKey {",
+            "    param([string]$Name)",
+            "    $base = Get-CreoModelBaseName $Name",
+            "    if (-not $base) { return '' }",
+            "    return $base.ToLowerInvariant()",
+            "}",
+            "",
+            "function Test-TimedOutModelRecorded {",
+            "    param([string]$Name)",
+            "    $key = Get-TimeoutLogModelKey $Name",
+            "    if (-not $key) { return $true }",
+            "    foreach ($k in $TimedOutModels.Keys) {",
+            "        if ($k -eq $key) { return $true }",
+            "    }",
+            "    return $false",
+            "}",
+            "",
+            "function Register-TimeoutLogModelLine {",
+            "    param([string]$Stripped, [ref]$PastHeader)",
+            "    if (-not $PastHeader.Value) {",
+            "        if ($Stripped -ieq 'Models timed out:') {",
+            "            $PastHeader.Value = $true",
+            "            return $null",
+            "        }",
+            "        if ($Stripped -match '^(?i)Models timed out:\\s*(.+)$') {",
+            "            $PastHeader.Value = $true",
+            "            return $Matches[1].Trim()",
+            "        }",
+            "        return $null",
+            "    }",
+            "    if (-not $Stripped) { return $null }",
+            "    return $Stripped",
+            "}",
+            "",
+            "if (Test-Path -LiteralPath $TimeoutLog) {",
+            "    $pastHeader = $false",
+            "    try {",
+            "        foreach ($line in Get-Content -LiteralPath $TimeoutLog -Encoding UTF8) {",
+            "            $stripped = $line.Trim().TrimStart([char]0xFEFF)",
+            "            $modelLine = Register-TimeoutLogModelLine -Stripped $stripped -PastHeader ([ref]$pastHeader)",
+            "            if (-not $modelLine) { continue }",
+            "            $key = Get-TimeoutLogModelKey $modelLine",
+            "            if ($key -and -not (Test-TimedOutModelRecorded $key)) {",
+            "                $TimedOutModels[$key] = (Get-CreoModelBaseName $modelLine)",
+            "            }",
+            "        }",
+            "    } catch { }",
+            "    $script:TimeoutLogInitialized = $true",
+            "    if ($TimedOutModels.Count -gt 0) {",
+            r'        Write-ChLog ("TIMEOUT LOG: " + $TimedOutModels.Count + " existing timed-out model(s) in " + $TimeoutLog)',
+            "    }",
+            "}",
+            "",
+            "function Initialize-TimeoutLog {",
+            "    if ($TimeoutLogInitialized) { return $true }",
+            "    $header = @(",
+            "        ('Task: ' + $TaskKind),",
+            "        ('Started: ' + (Get-Date -Format 'HH:mm:ss')),",
+            "        ('Log file: ' + $TimeoutLog),",
+            "        '',",
+            "        'Models timed out:',",
+            "        ''",
+            "    )",
+            "    for ($attempt = 1; $attempt -le 8; $attempt++) {",
+            "        try {",
+            "            Set-Content -LiteralPath $TimeoutLog -Value ($header -join [Environment]::NewLine) -Encoding UTF8",
+            "            $script:TimeoutLogInitialized = $true",
+            r'            Write-ChLog ("TIMEOUT LOG: writing timed-out models to " + $TimeoutLog)',
+            "            return $true",
+            "        } catch {",
+            "            if ($attempt -ge 8) {",
+            r'                Write-ChLog ("TIMEOUT LOG: could not create " + $TimeoutLog + " (close it in Notepad if open)")',
+            "                return $false",
+            "            }",
+            "            Start-Sleep -Milliseconds 250",
+            "        }",
+            "    }",
+            "    return $false",
+            "}",
+            "",
+            "function Add-TimeoutLogLine {",
+            "    param([string]$Line)",
+            "    for ($attempt = 1; $attempt -le 8; $attempt++) {",
+            "        try {",
+            "            if (Test-Path -LiteralPath $TimeoutLog) {",
+            "                $raw = [System.IO.File]::ReadAllText($TimeoutLog)",
+            "                if ($raw.Length -gt 0 -and $raw[-1] -notin @([char]10, [char]13)) {",
+            "                    [System.IO.File]::AppendAllText($TimeoutLog, [Environment]::NewLine, [System.Text.UTF8Encoding]::new($false))",
+            "                }",
+            "            }",
+            "            Add-Content -LiteralPath $TimeoutLog -Value $Line -Encoding UTF8",
+            "            return $true",
+            "        } catch {",
+            "            if ($attempt -ge 8) {",
+            r'                Write-ChLog ("TIMEOUT LOG: could not append to " + $TimeoutLog + " (close it in Notepad if open): " + $Line)',
+            "                return $false",
+            "            }",
+            "            Start-Sleep -Milliseconds 250",
+            "        }",
+            "    }",
+            "    return $false",
+            "}",
+            "",
+            "function Record-TimedOutChunk {",
+            "    param([int]$Chunk, [string[]]$MissingOutputs)",
+            "    if ($MissingOutputs.Count -eq 0) { return }",
+            "    if (-not (Initialize-TimeoutLog)) { return }",
+            "    foreach ($mOut in $MissingOutputs) {",
+            "        if (Test-OutputFilePresent -Dir $WorkDir -Name $mOut) { continue }",
+            "        $mName = $null",
+            "        if ($ModelByOutputByChunk.ContainsKey($Chunk)) {",
+            "            $mName = $ModelByOutputByChunk[$Chunk][$mOut]",
+            "        }",
+            "        if (-not $mName) { $mName = $mOut }",
+            "        $key = Get-TimeoutLogModelKey $mName",
+            "        if (-not $key -or (Test-TimedOutModelRecorded $key)) { continue }",
+            "        $base = Get-CreoModelBaseName $mName",
+            "        $TimedOutModels[$key] = $base",
+            "        Add-TimeoutLogLine -Line $base | Out-Null",
+            "    }",
+            "}",
+            "",
+            "function Get-TimeoutLogLinesOnDisk {",
+            "    $onDisk = @{}",
+            "    if (-not (Test-Path -LiteralPath $TimeoutLog)) { return $onDisk }",
+            "    $pastHeader = $false",
+            "    try {",
+            "        foreach ($line in Get-Content -LiteralPath $TimeoutLog -Encoding UTF8) {",
+            "            $stripped = $line.Trim().TrimStart([char]0xFEFF)",
+            "            $modelLine = Register-TimeoutLogModelLine -Stripped $stripped -PastHeader ([ref]$pastHeader)",
+            "            if (-not $modelLine) { continue }",
+            "            $key = Get-TimeoutLogModelKey $modelLine",
+            "            if ($key) { $onDisk[$key] = $true }",
+            "        }",
+            "    } catch { }",
+            "    return $onDisk",
+            "}",
+            "",
+            "function Sync-TimeoutLogFromMemory {",
+            "    if ($TimedOutModels.Count -eq 0) { return }",
+            "    if (-not (Initialize-TimeoutLog)) { return }",
+            "    $onDisk = Get-TimeoutLogLinesOnDisk",
+            "    foreach ($key in @($TimedOutModels.Keys)) {",
+            "        if (-not $key -or $onDisk.ContainsKey($key)) { continue }",
+            "        $base = $TimedOutModels[$key]",
+            "        if (-not $base) { $base = $key }",
+            "        Add-TimeoutLogLine -Line $base | Out-Null",
+            "    }",
+            "}",
+        ]
+
+    @classmethod
+    def _batch_runner_output_file_helpers_ps1(cls) -> list[str]:
+        """JPEG batches: treat renamed ``.model.jpg`` / ``.drawing.jpg`` as satisfying ``stem.jpg``."""
+        return [
+            "function Test-OutputFilePresent {",
+            "    param([string]$Dir, [string]$Name)",
+            "    if (-not $Name) { return $false }",
+            "    $p = Join-Path -Path $Dir -ChildPath $Name",
+            "    if (Test-Path -LiteralPath $p) { return $true }",
+            "    if ($Name -notmatch '(?i)\\.jpg$') { return $false }",
+            "    $stem = $Name.Substring(0, $Name.Length - 4)",
+            "    if ($TaskKind -eq 'jpeg3d') {",
+            "        $alt = Join-Path -Path $Dir -ChildPath ($stem + '.model.jpg')",
+            "        if (Test-Path -LiteralPath $alt) { return $true }",
+            "    }",
+            "    if ($TaskKind -eq 'jpeg2d') {",
+            "        $alt = Join-Path -Path $Dir -ChildPath ($stem + '.drawing.jpg')",
+            "        if (Test-Path -LiteralPath $alt) { return $true }",
+            "    }",
+            "    return $false",
+            "}",
+            "",
+            "function Get-MissingOutputs {",
+            "    param([string]$Dir, [string[]]$Names)",
+            "    $missing = @()",
+            "    foreach ($n in $Names) {",
+            "        if (-not $n) { continue }",
+            "        if (-not (Test-OutputFilePresent -Dir $Dir -Name $n)) { $missing += $n }",
+            "    }",
+            "    return ,$missing",
+            "}",
+            "",
+        ]
+
+    @classmethod
+    def _batch_runner_finalize_chunk_timeout_log_ps1(cls, *, indent: str) -> list[str]:
+        """Record any missing outputs for this chunk and flush the timeout log to disk."""
+        i = indent
+        return [
+            f"{i}$missing = Get-MissingOutputs -Dir $WorkDir -Names $expected",
+            f"{i}if ($missing.Count -gt 0) {{",
+            f"{i}    Record-TimedOutChunk -Chunk $chunk -MissingOutputs $missing",
+            f"{i}    $TimedOutFileCount += $missing.Count",
+            f"{i}    $SuccessFileCount += ($expected.Count - $missing.Count)",
+            f"{i}}} else {{",
+            f'{i}    Write-ChLog ("DONE: all " + $expected.Count + " expected output file(s) present.")',
+            f"{i}    $SuccessFileCount += $expected.Count",
+            f"{i}}}",
+            f"{i}Sync-TimeoutLogFromMemory",
+            f'{i}if ($TimedOutModels.Count -gt 0) {{',
+            f'{i}    Write-ChLog ("TIMEOUT LOG: chunk " + $chunk + " saved; " + $TimedOutModels.Count + " model(s) in " + $TimeoutLog)',
+            f"{i}}}",
+        ]
+
+    @classmethod
     def _batch_runner_xtop_wait_init_ps1(cls, *, indent: str) -> list[str]:
         return [
             f"{indent}$xtopDeadStreak = 0",
             f"{indent}$xtopFirstDeadAt = $null",
             f"{indent}$xtopWatchEnabled = $false",
+            f"{indent}$xtopWasAlive = $false",
         ]
 
     @classmethod
@@ -5081,17 +5971,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
     ) -> list[str]:
         lines = [
             f"{indent}if (Update-XtopDeadWatch -DeadStreak ([ref]$xtopDeadStreak) -FirstDeadAt ([ref]$xtopFirstDeadAt) -WatchEnabled ([ref]$xtopWatchEnabled)) {{",
-            f'{indent}    Write-ChLog ("XTOP GONE: xtop not running for " + $XtopDeadChecksRequired + " consecutive checks (within " + $XtopDeadWindowSec + "s) and no restart within " + $XtopRestartWaitSec + "s; moving on.")',
+            f'{indent}    Write-ChLog ("XTOP GONE: no xtop for " + $XtopRestartWaitSec + "s while waiting for output (no restart); moving on.")',
         ]
-        if chunk_var is not None:
-            lines.extend(
-                [
-                    f"{indent}    Record-TimedOutChunk -Chunk ${chunk_var} -MissingOutputs $missing",
-                    f"{indent}    $TimedOutFileCount += $missing.Count",
-                    f"{indent}    $SuccessFileCount += ($expected.Count - $missing.Count)",
-                ]
-            )
-        else:
+        if chunk_var is None:
             lines.extend(
                 [
                     f"{indent}    $TimedOutFileCount = $missing.Count",
@@ -5109,12 +5991,38 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
     @classmethod
     def _batch_runner_xtop_manage_wait_timer_ps1(cls, *, indent: str) -> list[str]:
-        """Start or extend output inactivity timer only while xtop.exe is running."""
+        """Track xtop; reset inactivity timer on first start and when xtop restarts between models."""
         return [
             f"{indent}if (Test-XtopAlive) {{",
-            f"{indent}    $xtopWatchEnabled = $true",
-            f"{indent}    $waitStart = Get-Date",
+            f"{indent}    if ($xtopWatchEnabled -and -not $xtopWasAlive) {{",
+            f'{indent}        Write-ChLog "XTOP RESTART: xtop running again; resetting inactivity timer."',
+            f"{indent}        $waitStart = Get-Date",
+            f"{indent}        $xtopDeadStreak = 0",
+            f"{indent}        $xtopFirstDeadAt = $null",
+            f"{indent}    }}",
+            f"{indent}    if (-not $xtopWatchEnabled) {{",
+            f"{indent}        $xtopWatchEnabled = $true",
+            f"{indent}        $waitStart = Get-Date",
+            f"{indent}    }}",
+            f"{indent}    $xtopWasAlive = $true",
+            f"{indent}}} else {{",
+            f"{indent}    $xtopWasAlive = $false",
             f"{indent}}}",
+        ]
+
+    @classmethod
+    def _batch_runner_xtop_start_timeout_check_ps1(cls, *, indent: str) -> list[str]:
+        """Fail chunk when xtop never appears within XtopRestartWaitSec after ptcdbatch launch."""
+        i = indent
+        return [
+            f"{i}if (-not $xtopWatchEnabled) {{",
+            f"{i}    $totalWaitSec = [int][math]::Floor(((Get-Date) - $chunkWaitStart).TotalSeconds)",
+            f"{i}    if ($totalWaitSec -ge $XtopRestartWaitSec) {{",
+            f'{i}        Write-ChLog ("XTOP NEVER STARTED: no xtop within " + $XtopRestartWaitSec + "s after launch; moving on.")',
+            f"{i}        $timedOut = $true",
+            f"{i}        break",
+            f"{i}    }}",
+            f"{i}}}",
         ]
 
     @classmethod
@@ -5148,8 +6056,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             f'{i}        Write-ChLog ("WAITING: " + $missing.Count + " of " + ${names_var}.Count + " output file(s) missing (waiting for xtop to start; " + $totalWaitSec + "s total wait)"{tail})',
             f"{i}    }}",
             f"{i}}} elseif (Test-XtopAlive) {{",
-            f"{i}    if ($totalWaitSec -le 4 -or ($totalWaitSec % 30 -eq 0)) {{",
-            f'{i}        Write-ChLog ("WAITING: " + $missing.Count + " of " + ${names_var}.Count + " output file(s) missing (xtop running; inactivity timer paused; " + $totalWaitSec + "s total wait)"{tail})',
+            f"{i}    if ($elapsed -le 4 -or ($elapsed % 30 -eq 0)) {{",
+            f'{i}        Write-ChLog ("WAITING: " + $missing.Count + " of " + ${names_var}.Count + " output file(s) missing (" + $elapsed + "s with no new output; xtop running; " + $totalWaitSec + "s total wait)"{tail})',
             f"{i}    }}",
             f"{i}}} else {{",
             f"{i}    if ($elapsed -le 4 -or ($elapsed % 30 -eq 0)) {{",
@@ -5159,31 +6067,60 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         ]
 
     @classmethod
-    def _batch_runner_kill_after_settle_ps1(cls, *, indent: str) -> list[str]:
-        """Settle after outputs complete; 15s grace if xtop still running, then kill.bat."""
+    def _batch_runner_kill_after_settle_ps1(
+        cls, *, indent: str, names_var: str, cooperative_stop: bool
+    ) -> list[str]:
+        """Run kill.bat after chunk wait ends; message reflects missing outputs vs success."""
         i = indent
-        return [
-            f"{i}if (Test-XtopAlive) {{",
-            f'{i}    Write-ChLog ("All output file(s) present; xtop still running — waiting " + $XtopSettleBeforeKillSec + "s before kill.bat...")',
-            f"{i}    Start-Sleep -Seconds $XtopSettleBeforeKillSec",
-            f"{i}    $KillBatNowait = $true",
-            f"{i}}} else {{",
-            f'{i}    Write-ChLog ("Settling " + $OutputSettleSec + "s before kill.bat...")',
-            f"{i}    Start-Sleep -Seconds $OutputSettleSec",
-            f"{i}    $KillBatNowait = $false",
-            f"{i}}}",
-            f'{i}$killParent = [System.IO.Path]::GetDirectoryName($KillBat)',
-            f'{i}$killArgs = @()',
-            f"{i}if ($KillBatNowait) {{ $killArgs = @('nowait') }}",
-            f'{i}Write-ChLog "Running kill.bat (wait)..."',
-            f"{i}try {{",
-            f"{i}    $kp = Start-Process -FilePath $KillBat -ArgumentList $killArgs `",
-            f"{i}        -WorkingDirectory $killParent -Wait -PassThru -NoNewWindow -ErrorAction Stop",
-            f'{i}    Write-ChLog ("kill.bat exit code: " + $kp.ExitCode)',
-            f"{i}}} catch {{",
-            f'{i}    Write-ChLog ("ERROR: kill.bat failed: " + $_.Exception.Message)',
-            f"{i}}}",
+        lines = [
+            f"{i}$missingAfterWait = Get-MissingOutputs -Dir $WorkDir -Names ${names_var}",
         ]
+        if cooperative_stop:
+            lines.extend(
+                [
+                    f"{i}if ($stopRequested) {{",
+                    f'{i}    Write-ChLog "STOPPED: batch run ended by user."',
+                    f"{i}}} elseif ($timedOut -or $missingAfterWait.Count -gt 0) {{",
+                    f'{i}    Write-ChLog ("Chunk incomplete (" + $missingAfterWait.Count + " output file(s) still missing); running kill.bat...")',
+                    f"{i}}} elseif (Test-XtopAlive) {{",
+                    f'{i}    Write-ChLog "All output file(s) present; xtop still running — running kill.bat..."',
+                    f"{i}}} else {{",
+                    f'{i}    Write-ChLog ("Settling " + $OutputSettleSec + "s before kill.bat...")',
+                    f"{i}    if (-not (Wait-InterruptibleSeconds $OutputSettleSec)) {{",
+                    f"{i}        $stopRequested = $true",
+                    f"{i}    }}",
+                    f"{i}}}",
+                    f"{i}if (-not $stopRequested) {{",
+                ]
+            )
+        else:
+            lines.extend(
+                [
+                    f"{i}if ($timedOut -or $missingAfterWait.Count -gt 0) {{",
+                    f'{i}    Write-ChLog ("Chunk incomplete (" + $missingAfterWait.Count + " output file(s) still missing); running kill.bat...")',
+                    f"{i}}} elseif (Test-XtopAlive) {{",
+                    f'{i}    Write-ChLog "All output file(s) present; xtop still running — running kill.bat..."',
+                    f"{i}}} else {{",
+                    f'{i}    Write-ChLog ("Settling " + $OutputSettleSec + "s before kill.bat...")',
+                    f"{i}    Start-Sleep -Seconds $OutputSettleSec",
+                    f"{i}}}",
+                ]
+            )
+        lines.extend(
+            [
+                f'{i}Write-ChLog "Running kill.bat..."',
+                f"{i}try {{",
+                f"{i}    $kp = Start-Process -FilePath $KillBat `",
+                f"{i}        -WorkingDirectory ([System.IO.Path]::GetDirectoryName($KillBat)) -Wait -PassThru -NoNewWindow -ErrorAction Stop",
+                f'{i}    Write-ChLog ("kill.bat exit code: " + $kp.ExitCode)',
+                f"{i}}} catch {{",
+                f'{i}    Write-ChLog ("ERROR: kill.bat failed: " + $_.Exception.Message)',
+                f"{i}}}",
+            ]
+        )
+        if cooperative_stop:
+            lines.append(f"{i}}}")
+        return lines
 
     @classmethod
     def _batch_runner_write_chlog_ps1(cls, debug_log_path: Path | None) -> list[str]:
@@ -5222,8 +6159,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 '        Write-Host $line -ForegroundColor Green',
                 "    } elseif ($Message -match '(?i)^TIMEOUT:') {",
                 '        Write-Host $line -ForegroundColor Red',
-                "    } elseif ($Message -match '(?i)^XTOP GONE:') {",
+                "    } elseif ($Message -match '(?i)^XTOP (GONE|NEVER STARTED):') {",
                 '        Write-Host $line -ForegroundColor Red',
+                "    } elseif ($Message -match '(?i)^PROGRESS:' -or $Message -match '(?i)new output file\\(s\\)') {",
+                '        Write-Host $line -ForegroundColor Yellow',
                 "    } else {",
                 '        Write-Host $line',
                 "    }",
@@ -5242,6 +6181,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         expected_outputs: list[str],
         output_timeout_sec: int,
         debug_log_path: Path | None = None,
+        cooperative_stop: bool = False,
     ) -> str:
         """PowerShell runner for Scan Templates: one templates.dxc, all template models.
 
@@ -5265,9 +6205,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             f"$Expected = {expected_ps}",
             f"$OutputTimeoutSec = {int(output_timeout_sec)}",
             f"$OutputSettleSec = {BATCH_OUTPUT_SETTLE_SEC}",
-            f"$XtopSettleBeforeKillSec = {BATCH_XTOP_SETTLE_BEFORE_KILL_SEC}",
             "",
             *cls._batch_runner_write_chlog_ps1(debug_log_path),
+            *cls._batch_runner_init_stop_ps1(cooperative_stop=cooperative_stop),
             *cls._batch_runner_xtop_helpers_ps1(),
             "",
             "function Get-MissingOutputs {",
@@ -5323,7 +6263,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "        exit 1",
             "    }",
             "",
-            r'    Write-ChLog "WAITING: for expected output file(s) to appear (poll every 2s; inactivity timer starts when xtop appears; resets when a file appears or while xtop is running)."',
+            r'    Write-ChLog "WAITING: for expected output file(s) to appear (poll every 2s; inactivity timer starts when xtop appears; resets on new output or xtop restart)."',
             "    $chunkWaitStart = Get-Date",
             "    $waitStart = $chunkWaitStart",
             "    $missing = Get-MissingOutputs -Dir $WorkDir -Names $Expected",
@@ -5331,15 +6271,21 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "    $timedOut = $false",
             *cls._batch_runner_xtop_wait_init_ps1(indent="    "),
             "    while ($true) {",
+            *(
+                cls._batch_runner_stop_check_ps1(indent="        ")
+                if cooperative_stop
+                else []
+            ),
             "        $missing = Get-MissingOutputs -Dir $WorkDir -Names $Expected",
             "        if ($missing.Count -eq 0) { break }",
             "        if ($missing.Count -lt $lastMissingCount) {",
             "            $delta = $lastMissingCount - $missing.Count",
             r'            Write-ChLog ("PROGRESS: " + $delta + " new output file(s); resetting timer. " + $missing.Count + " of " + $Expected.Count + " remaining.")',
-            "            if ($xtopWatchEnabled) { $waitStart = Get-Date }",
+            "            $waitStart = Get-Date",
             "            $lastMissingCount = $missing.Count",
             "        }",
             *cls._batch_runner_xtop_manage_wait_timer_ps1(indent="        "),
+            *cls._batch_runner_xtop_start_timeout_check_ps1(indent="        "),
             *cls._batch_runner_wait_timeout_check_ps1(
                 indent="        ",
                 timeout_body=[
@@ -5352,14 +6298,16 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             ),
             *cls._batch_runner_wait_progress_log_ps1(indent="        ", names_var="Expected"),
             *cls._batch_runner_xtop_wait_check_ps1(indent="        "),
-            "        Start-Sleep -Seconds 2",
+            *cls._batch_runner_wait_delay_ps1(indent="        ", cooperative_stop=cooperative_stop),
             "    }",
             "    if (-not $timedOut) {",
             r'        Write-ChLog ("DONE: all " + $Expected.Count + " expected output file(s) present.")',
             "        $SuccessFileCount = $Expected.Count",
             "    }",
             "",
-            *cls._batch_runner_kill_after_settle_ps1(indent="    "),
+            *cls._batch_runner_kill_after_settle_ps1(
+                indent="    ", names_var="Expected", cooperative_stop=cooperative_stop
+            ),
             "}",
             "} finally {",
             "    try {",
@@ -5372,6 +6320,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "    }",
             "}",
             "",
+            *cls._batch_runner_stop_exit_ps1(
+                indent="",
+                message="Scan Templates runner stopped by user request.",
+            ),
             r'Write-ChLog "---------- Batch summary ----------"',
             r'Write-ChLog ("Count of Files Success: " + $SuccessFileCount)',
             r'Write-ChLog ("Count of Files Timed Out: " + $TimedOutFileCount)',
@@ -5392,6 +6344,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         task_kind: str,
         output_timeout_sec: int,
         debug_log_path: Path | None = None,
+        cooperative_stop: bool = False,
     ) -> str:
         """PowerShell: per chunk, skip if outputs already exist; else launch ptcdbatch, poll for expected output files, settle, then run kill.bat.
 
@@ -5437,58 +6390,19 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             f"$ChunkBase = '{base}'",
             f"$OutputTimeoutSec = {int(output_timeout_sec)}",
             f"$OutputSettleSec = {BATCH_OUTPUT_SETTLE_SEC}",
-            f"$XtopSettleBeforeKillSec = {BATCH_XTOP_SETTLE_BEFORE_KILL_SEC}",
             "",
             *expected_table_lines,
             "",
             *model_map_lines,
             "",
             *cls._batch_runner_write_chlog_ps1(debug_log_path),
+            *cls._batch_runner_init_stop_ps1(cooperative_stop=cooperative_stop),
             *cls._batch_runner_xtop_helpers_ps1(),
             "",
-            "function Get-MissingOutputs {",
-            "    param([string]$Dir, [string[]]$Names)",
-            "    $missing = @()",
-            "    foreach ($n in $Names) {",
-            "        if (-not $n) { continue }",
-            "        $p = Join-Path -Path $Dir -ChildPath $n",
-            "        if (-not (Test-Path -LiteralPath $p)) { $missing += $n }",
-            "    }",
-            "    return ,$missing",
-            "}",
-            "",
-            "$TimedOutModels = @{}",
-            "$TimeoutLogInitialized = $false",
+            *cls._batch_runner_output_file_helpers_ps1(),
+            *cls._batch_runner_timeout_log_ps1(),
             "$SuccessFileCount = 0",
             "$TimedOutFileCount = 0",
-            "$TimeoutLog = Join-Path -Path $WorkDir -ChildPath ('creo-batch-timeouts-' + $TaskKind + '.txt')",
-            "",
-            "function Record-TimedOutChunk {",
-            "    param([int]$Chunk, [string[]]$MissingOutputs)",
-            "    if ($MissingOutputs.Count -eq 0) { return }",
-            "    if (-not $TimeoutLogInitialized) {",
-            "        $header = @(",
-            "            ('Task: ' + $TaskKind),",
-            "            ('Started: ' + (Get-Date -Format 'HH:mm:ss')),",
-            "            ('Log file: ' + $TimeoutLog),",
-            "            '',",
-            "            'Models timed out:'",
-            "        )",
-            "        Set-Content -LiteralPath $TimeoutLog -Value $header -Encoding UTF8",
-            "        $script:TimeoutLogInitialized = $true",
-            r'        Write-ChLog ("TIMEOUT LOG: writing timed-out models to " + $TimeoutLog)',
-            "    }",
-            "    foreach ($mOut in $MissingOutputs) {",
-            "        $mName = $null",
-            "        if ($ModelByOutputByChunk.ContainsKey($Chunk)) {",
-            "            $mName = $ModelByOutputByChunk[$Chunk][$mOut]",
-            "        }",
-            "        if (-not $mName) { $mName = $mOut }",
-            "        if ($TimedOutModels.ContainsKey($mName)) { continue }",
-            "        $TimedOutModels[$mName] = $true",
-            "        Add-Content -LiteralPath $TimeoutLog -Value $mName -Encoding UTF8",
-            "    }",
-            "}",
             "",
             r'Write-ChLog "Runner starting. $NumChunks chunk(s). Skips chunks whose outputs already exist; otherwise polls for expected output files."',
             r'Write-ChLog "ptcdbatch: $PtcDbatch"',
@@ -5497,6 +6411,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             r'Write-ChLog ("Output wait timeout: " + $OutputTimeoutSec + " s; settle: " + $OutputSettleSec + " s")',
             "",
             "for ($chunk = 1; $chunk -le $NumChunks; $chunk++) {",
+            *(
+                ["    if ($stopRequested) { break }"]
+                if cooperative_stop
+                else []
+            ),
             r'    Write-ChLog "---------- Chunk $chunk / $NumChunks ----------"',
             '    $dxc = Join-Path -Path $WorkDir -ChildPath ("{0}-{1}.dxc" -f $ChunkBase, $chunk)',
             r'    Write-ChLog "DXC path: $dxc"',
@@ -5527,10 +6446,13 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "            -WindowStyle Hidden -ErrorAction Stop",
             "    } catch {",
             r'        Write-ChLog ("ERROR: failed to start ptcdbatch: " + $_.Exception.Message)',
+            "        Record-TimedOutChunk -Chunk $chunk -MissingOutputs $missing",
+            "        $TimedOutFileCount += $missing.Count",
+            "        Sync-TimeoutLogFromMemory",
             "        continue",
             "    }",
             "",
-            r'    Write-ChLog "WAITING: for expected output file(s) to appear (poll every 2s; inactivity timer starts when xtop appears; resets when a file appears or while xtop is running)."',
+            r'    Write-ChLog "WAITING: for expected output file(s) to appear (poll every 2s; inactivity timer starts when xtop appears; resets on new output or xtop restart)."',
             "    $chunkWaitStart = Get-Date",
             "    $waitStart = $chunkWaitStart",
             "    $missing = Get-MissingOutputs -Dir $WorkDir -Names $expected",
@@ -5538,22 +6460,25 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "    $timedOut = $false",
             *cls._batch_runner_xtop_wait_init_ps1(indent="    "),
             "    while ($true) {",
+            *(
+                cls._batch_runner_stop_check_ps1(indent="        ")
+                if cooperative_stop
+                else []
+            ),
             "        $missing = Get-MissingOutputs -Dir $WorkDir -Names $expected",
             "        if ($missing.Count -eq 0) { break }",
             "        if ($missing.Count -lt $lastMissingCount) {",
             "            $delta = $lastMissingCount - $missing.Count",
             r'            Write-ChLog ("PROGRESS: " + $delta + " new output file(s) detected; resetting inactivity timer. " + $missing.Count + " of " + $expected.Count + " remaining.")',
-            "            if ($xtopWatchEnabled) { $waitStart = Get-Date }",
+            "            $waitStart = Get-Date",
             "            $lastMissingCount = $missing.Count",
             "        }",
             *cls._batch_runner_xtop_manage_wait_timer_ps1(indent="        "),
+            *cls._batch_runner_xtop_start_timeout_check_ps1(indent="        "),
             *cls._batch_runner_wait_timeout_check_ps1(
                 indent="        ",
                 timeout_body=[
                     r'Write-ChLog ("TIMEOUT: no new output file(s) for " + $elapsed + "s; " + $missing.Count + " of " + $expected.Count + " still missing. First missing: " + $missing[0] + ".")',
-                    "Record-TimedOutChunk -Chunk $chunk -MissingOutputs $missing",
-                    "$TimedOutFileCount += $missing.Count",
-                    "$SuccessFileCount += ($expected.Count - $missing.Count)",
                     "$timedOut = $true",
                     "break",
                 ],
@@ -5564,14 +6489,18 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 extra_tail=' + " First missing: " + $missing[0] + "."',
             ),
             *cls._batch_runner_xtop_wait_check_ps1(indent="        ", chunk_var="chunk"),
-            "        Start-Sleep -Seconds 2",
+            *cls._batch_runner_wait_delay_ps1(indent="        ", cooperative_stop=cooperative_stop),
             "    }",
-            "    if (-not $timedOut) {",
-            r'        Write-ChLog ("DONE: all " + $expected.Count + " expected output file(s) present.")',
-            "        $SuccessFileCount += $expected.Count",
-            "    }",
+            *cls._batch_runner_finalize_chunk_timeout_log_ps1(indent="    "),
             "",
-            *cls._batch_runner_kill_after_settle_ps1(indent="    "),
+            *cls._batch_runner_kill_after_settle_ps1(
+                indent="    ", names_var="expected", cooperative_stop=cooperative_stop
+            ),
+            *(
+                ["    if ($stopRequested) { break }"]
+                if cooperative_stop
+                else []
+            ),
             "    } finally {",
             "        try {",
             "            if (Test-Path -LiteralPath $dxc) {",
@@ -5584,6 +6513,12 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "    }",
             "}",
             "",
+            *cls._batch_runner_stop_exit_ps1(
+                indent="",
+                message="Runner stopped by user request.",
+                sync_timeout_log=True,
+            ),
+            "Sync-TimeoutLogFromMemory",
             "if ($TimedOutModels.Count -gt 0) {",
             "    Write-ChLog ('TIMEOUT LOG: ' + $TimedOutModels.Count + ' model(s) recorded in ' + $TimeoutLog)",
             "} else {",
@@ -5727,8 +6662,29 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             models_dir.mkdir(parents=True, exist_ok=True)
             scanned = self._scan_models_non_recursive(models_dir, extensions=scan_extensions)
             latest_files = self._get_latest_model_files(scanned)
+            chunk_size_override: int | None = None
             if scan_templates:
                 latest_files = _sort_scan_template_models(latest_files)
+            else:
+                latest_files = self._apply_skipped_timeout_models_to_batch(latest_files)
+                task_kind = self._runner_task_kind(task_display_raw)
+                if task_kind in ("modelcheck", "jpeg3d", "jpeg2d"):
+                    latest_files, continue_go, chunk_size_override = (
+                        self._maybe_prompt_and_skip_timed_out_models(
+                            latest_files,
+                            batch_dir,
+                            working_dir,
+                            task_kind,
+                        )
+                    )
+                    if not continue_go:
+                        return
+                if not latest_files:
+                    messagebox.showinfo(
+                        "Batch",
+                        "No models left to batch in the working directory.",
+                    )
+                    return
             config_files = (
                 self._scan_modelcheck_config_files(modelcheck_config_dir)
                 if modelcheck_config_dir is not None
@@ -5737,7 +6693,12 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             if scan_templates:
                 model_chunks = [latest_files]
             else:
-                model_chunks = self._chunk_paths(latest_files, self._chunk_size)
+                effective_chunk = (
+                    chunk_size_override
+                    if chunk_size_override is not None
+                    else self._chunk_size
+                )
+                model_chunks = self._chunk_paths(latest_files, effective_chunk)
                 if not model_chunks:
                     model_chunks = [[]]
 
@@ -5787,6 +6748,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     scan_expected,
                     self._output_timeout_sec,
                     debug_log_path,
+                    cooperative_stop=True,
                 )
             else:
                 num_chunks = len(model_chunks)
@@ -5812,6 +6774,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     self._runner_task_kind(task_display_raw),
                     self._output_timeout_sec,
                     debug_log_path,
+                    cooperative_stop=True,
                 )
             runner_ps1_path.write_text(runner_text, encoding="utf-8-sig")
         except OSError as exc:
@@ -5830,12 +6793,6 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             else:
                 thumbnails_phase = _WIZARD_THUMBNAILS_PHASE_3D
                 self._wizard_thumbnails_model_phase_done = False
-        if not scan_templates and task_display_raw:
-            task_kind = self._runner_task_kind(task_display_raw)
-            if task_kind in ("modelcheck", "jpeg3d", "jpeg2d"):
-                _clear_batch_timeout_logs(batch_dir, task_kind)
-                if task_kind != "jpeg2d":
-                    self._wizard_step_failed_models.pop(self._wizard_step, None)
         if not self._launch_batch_runner(working_dir, task_display_raw):
             self._refresh_action_buttons_run()
             return
@@ -6011,13 +6968,13 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._persist_working_directory_and_loadpoint()
         self._start_report_job(working_dir)
 
-    def _close_batch_runner_window(self) -> None:
-        """Close the PowerShell console launched for the current batch runner, if still open."""
+    def _close_batch_runner_window(self, *, force: bool = False) -> None:
+        """Close the tracked PowerShell console launched for the current batch runner."""
         proc = self._batch_runner_process
         self._batch_runner_process = None
         if proc is None:
             return
-        if self._debug_mode:
+        if self._debug_mode and not force:
             return
         try:
             if proc.poll() is None:
@@ -6026,6 +6983,30 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     proc.wait(timeout=2)
                 except subprocess.TimeoutExpired:
                     proc.kill()
+        except OSError:
+            pass
+
+    def _close_stray_batch_runner_windows(self) -> None:
+        """Best-effort: close any PowerShell process running a generated creo-batch-*.ps1 script."""
+        if sys.platform != "win32":
+            return
+        ps_exe = self._resolve_powershell_exe()
+        if not ps_exe:
+            return
+        script = (
+            "$procs = Get-CimInstance Win32_Process "
+            "| Where-Object { $_.Name -ieq 'powershell.exe' -and $_.CommandLine "
+            "-and $_.CommandLine -match 'creo-batch-.*\\.ps1' }; "
+            "foreach ($p in $procs) { "
+            "try { Stop-Process -Id $p.ProcessId -Force -ErrorAction Stop } catch {} "
+            "}"
+        )
+        try:
+            subprocess.run(
+                [ps_exe, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+                check=False,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000),
+            )
         except OSError:
             pass
 
