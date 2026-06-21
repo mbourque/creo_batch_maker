@@ -591,7 +591,7 @@ def ensure_shared_placeholder_jpeg(assets_folder: str) -> str:
 
 
 def thumbnail_basename_for_model(display_name: str, pro_type: str = "") -> str | None:
-    """Report thumbnail filename: ``stem.model.jpg`` or ``stem.drawing.jpg``."""
+    """Report thumbnail filename: ``stem.part.jpg``, ``stem.assembly.jpg``, or ``stem.drawing.jpg``."""
     stem = _model_stem(display_name)
     if stem is None:
         return None
@@ -601,7 +601,29 @@ def thumbnail_basename_for_model(display_name: str, pro_type: str = "") -> str |
         kind = m.group(1).upper() if m else ""
     if kind == "DRW":
         return f"{stem}.drawing.jpg"
-    return f"{stem}.model.jpg"
+    if kind == "ASM":
+        return f"{stem}.assembly.jpg"
+    return f"{stem}.part.jpg"
+
+
+def _thumbnail_report_candidates(display_name: str, pro_type: str = "") -> list[str]:
+    """Preferred thumbnail basenames for the report (new names first, then legacy)."""
+    primary = thumbnail_basename_for_model(display_name, pro_type)
+    if primary is None:
+        return []
+    stem = _model_stem(display_name)
+    if stem is None:
+        return [primary]
+    kind = (pro_type or "").strip().upper()
+    if not kind:
+        m = re.search(r"\.(prt|asm|drw)$", display_name, flags=re.IGNORECASE)
+        kind = m.group(1).upper() if m else ""
+    candidates = [primary]
+    if kind in ("PRT", "ASM"):
+        legacy = f"{stem}.model.jpg"
+        if legacy not in candidates:
+            candidates.append(legacy)
+    return candidates
 
 
 def thumbnail_src_for_report(
@@ -615,7 +637,8 @@ def thumbnail_src_for_report(
     Return a value suitable for ``<img src="…">`` (relative to the report HTML).
 
     - Models with Creo session refs (``<<`` / ``>>``) use the shared placeholder (Windows-safe).
-    - Parts/assemblies use ``stem.model.jpg``; drawings use ``stem.drawing.jpg``.
+    - Parts use ``stem.part.jpg``; assemblies ``stem.assembly.jpg``; drawings ``stem.drawing.jpg``.
+    - Legacy ``stem.model.jpg`` is used when type-specific files are missing.
     - If no thumbnail exists, use the same shared placeholder so the report always shows a thumb.
     """
     report_assets_dir = os.path.abspath(report_assets_dir)
@@ -628,18 +651,19 @@ def thumbnail_src_for_report(
     if name_has_creo_path_ref(display_name):
         return _placeholder_src()
 
-    jpg_base = thumbnail_basename_for_model(display_name, pro_type)
-    if not jpg_base:
+    jpg_candidates = _thumbnail_report_candidates(display_name, pro_type)
+    if not jpg_candidates:
         return _placeholder_src()
 
-    for folder in (report_assets_dir, working_dir):
-        full = os.path.join(folder, jpg_base)
-        if not os.path.isfile(full):
-            continue
-        if os.path.normcase(os.path.normpath(folder)) == os.path.normcase(report_assets_dir):
-            return "./" + quote(jpg_base)
-        rel = os.path.relpath(full, report_assets_dir).replace("\\", "/")
-        return "./" + quote(rel, safe="/")
+    for jpg_base in jpg_candidates:
+        for folder in (report_assets_dir, working_dir):
+            full = os.path.join(folder, jpg_base)
+            if not os.path.isfile(full):
+                continue
+            if os.path.normcase(os.path.normpath(folder)) == os.path.normcase(report_assets_dir):
+                return "./" + quote(jpg_base)
+            rel = os.path.relpath(full, report_assets_dir).replace("\\", "/")
+            return "./" + quote(rel, safe="/")
 
     return _placeholder_src()
 
