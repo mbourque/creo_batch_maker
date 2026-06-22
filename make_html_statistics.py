@@ -1139,14 +1139,26 @@ def _template_scan_session_path(working_dir: str) -> str:
     return os.path.join(working_dir, "templates", TEMPLATE_SCAN_SESSION_BASENAME)
 
 
+def _remove_empty_working_templates_dir(working_dir: str) -> None:
+    """Remove ``working_dir\\templates`` when it exists and has no files."""
+    templates_dir = os.path.join(working_dir, "templates")
+    try:
+        if os.path.isdir(templates_dir) and not os.listdir(templates_dir):
+            os.rmdir(templates_dir)
+    except OSError:
+        pass
+
+
 def write_template_scan_session(
     working_dir: str, outcome: str, kinds: list[str] | None = None
 ) -> None:
-    """Record whether Scan Templates ran (done) or was skipped in this wizard session."""
+    """Write ``templates\\creo-batch-template-scan.json`` when Scan Templates finishes."""
+    if outcome != "done":
+        return
     path = _template_scan_session_path(working_dir)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     payload: dict[str, object] = {"outcome": outcome}
-    if outcome == "done" and kinds:
+    if kinds:
         payload["kinds"] = kinds
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(payload, fh, indent=2)
@@ -1161,6 +1173,7 @@ def clear_template_scan_session(working_dir: str) -> None:
         pass
     except OSError:
         pass
+    _remove_empty_working_templates_dir(working_dir)
 
 
 def read_template_scan_session(working_dir: str) -> tuple[str | None, list[str]]:

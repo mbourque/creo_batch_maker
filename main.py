@@ -336,6 +336,36 @@ def _creo_model_base_name(name: str) -> str:
     return stripped
 
 
+def _modelcheck_expected_output_basenames(model_path: Path) -> list[str]:
+    """ModelCHECK batch: XML plus HTML (``stem.p.xml`` and ``stem.p.html``, etc.)."""
+    name = model_path.name
+    m_ver = re.match(r"^(.*)\.(\d+)$", name)
+    if m_ver:
+        name = m_ver.group(1)
+    m_ext = re.match(r"^(.*)\.(prt|asm|drw)$", name, flags=re.IGNORECASE)
+    if not m_ext:
+        return []
+    stem, letter = m_ext.group(1), m_ext.group(2).lower()[0]
+    return [f"{stem}.{letter}.xml", f"{stem}.{letter}.html"]
+
+
+def _working_dir_has_output_basename(working_dir: Path, basename: str) -> bool:
+    """True when ``basename`` exists as a top-level file (case-insensitive name match)."""
+    if not basename:
+        return False
+    direct = working_dir / basename
+    if direct.is_file():
+        return True
+    key = basename.casefold()
+    try:
+        for entry in working_dir.iterdir():
+            if entry.is_file() and entry.name.casefold() == key:
+                return True
+    except OSError:
+        pass
+    return False
+
+
 def _parse_batch_timeout_log(path: Path) -> list[str]:
     try:
         text = path.read_text(encoding="utf-8-sig", errors="replace")
@@ -919,6 +949,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._wizard_thumbnails_part_phase_done = False
         self._wizard_thumbnails_assembly_phase_done = False
         self._wizard_thumbnails_go_phase: str | None = None
+        self._pending_template_sources: dict[str, Path] = {}
         self.resizable(False, False)
 
         ctk.set_appearance_mode("light")
@@ -1110,11 +1141,12 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if not wd:
             return False
         templates = Path(wd) / "templates"
-        if not templates.is_dir():
-            return False
-        return self._working_directory_has_creo_models(
-            str(templates), extensions=_CREO_MODEL_EXTENSIONS_ALL
-        )
+        if templates.is_dir():
+            if self._working_directory_has_creo_models(
+                str(templates), extensions=_CREO_MODEL_EXTENSIONS_ALL
+            ):
+                return True
+        return bool(self._pending_template_sources)
 
     def _templates_dir_has_scan_xml(self, working_dir_str: str | None = None) -> bool:
         """True when a prior Scan Templates run left ModelCHECK XML in templates\\."""
@@ -1621,10 +1653,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             else:
                 return False
         if task_kind == "modelcheck":
-            out = CreoDistributedBatchMakerApp._expected_output_basename(
-                model_path, is_modelcheck=True
-            )
-            return bool(out) and not (working_dir / out).is_file()
+            for out in _modelcheck_expected_output_basenames(model_path):
+                if not _working_dir_has_output_basename(working_dir, out):
+                    return True
+            return False
         if task_kind in ("jpeg3d_part", "jpeg3d_asm", "jpeg2d", "jpeg3d"):
             return not _jpeg_thumbnail_output_exists(working_dir, model_name, task_kind)
         return True
@@ -1899,11 +1931,39 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         dest = self._template_dest_path(kind)
         return dest is not None and dest.is_file()
 
+    def _template_has_selection(self, kind: str) -> bool:
+        return kind in self._pending_template_sources or self._template_is_set(kind)
+
+    def _materialize_pending_templates(self) -> tuple[bool, str]:
+        """Copy Browse selections into ``working_dir\\templates`` (Scan Templates GO only)."""
+        if not self._pending_template_sources:
+            return True, ""
+        dest_dir = self._start_templates_dir()
+        if dest_dir is None:
+            return False, "Working directory is not set."
+        try:
+            dest_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            return False, f"Could not create templates folder:\n{dest_dir.resolve()}\n\n{exc}"
+        for kind, source in list(self._pending_template_sources.items()):
+            dest = self._template_dest_path(kind)
+            if dest is None:
+                continue
+            try:
+                shutil.copy2(source, dest)
+            except OSError as exc:
+                return (
+                    False,
+                    f"Could not copy template:\n{source}\n\n→\n\n{dest.resolve()}\n\n{exc}",
+                )
+            self._pending_template_sources.pop(kind, None)
+        return True, ""
+
     def _wizard_template_kind_visible(self, kind: str) -> bool:
         """Show a template row for part always; asm/drw only when WD has that type or template is set."""
         if kind == "prt":
             return True
-        if self._template_is_set(kind):
+        if self._template_has_selection(kind):
             return True
         if kind == "asm":
             return self._working_directory_has_creo_models(extensions=("asm",))
@@ -1976,8 +2036,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
     def _on_wizard_clear_template(self, kind: str) -> None:
         if self._wizard_batch_waiting_on_step(WIZARD_STEP_SCAN):
             return
+        had_pending = kind in self._pending_template_sources
+        self._pending_template_sources.pop(kind, None)
         paths = self._template_scan_artifact_paths(kind)
-        if not paths:
+        if not paths and not had_pending:
             return
         errors: list[str] = []
         for path in paths:
@@ -1996,7 +2058,29 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             )
 
     def _templates_upload_count(self) -> int:
-        return sum(1 for kind, _ in _START_TEMPLATE_KINDS if self._template_is_set(kind))
+        return sum(
+            1 for kind, _ in _START_TEMPLATE_KINDS if self._template_has_selection(kind)
+        )
+
+    def _discard_working_templates_on_skip(self) -> None:
+        """Skip Scan Templates: no JSON; drop pending picks; remove folder unless scan XML exists."""
+        self._pending_template_sources.clear()
+        wd = (self.working_directory.get() or "").strip()
+        if not wd or not _working_directory_exists_as_dir(wd):
+            return
+        try:
+            make_html_statistics.clear_template_scan_session(wd)
+        except OSError:
+            pass
+        if self._templates_dir_has_scan_xml(wd):
+            return
+        templates_dir = Path(wd).expanduser() / "templates"
+        if not templates_dir.is_dir():
+            return
+        try:
+            shutil.rmtree(templates_dir)
+        except OSError:
+            pass
 
     def _prepare_wizard_scan_step_for_rescan(self) -> None:
         """Allow Scan Templates > again after the user returns from a later wizard step."""
@@ -2279,10 +2363,23 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 return 0.0, single_running
             return 1.0, single_finished
         if remaining == 0:
+            if phase in (
+                _WIZARD_THUMBNAILS_PHASE_PART,
+                _WIZARD_THUMBNAILS_PHASE_ASSEMBLY,
+                _WIZARD_THUMBNAILS_PHASE_2D,
+            ):
+                return 1.0, single_finished
             return 1.0, f"Batch progress: {initial} of {initial} chunks complete."
         fraction = done / initial
         chunks_word = "chunks" if initial != 1 else "chunk"
-        text = f"Batch progress: {done} of {initial} {chunks_word} complete."
+        if phase in (
+            _WIZARD_THUMBNAILS_PHASE_PART,
+            _WIZARD_THUMBNAILS_PHASE_ASSEMBLY,
+            _WIZARD_THUMBNAILS_PHASE_2D,
+        ):
+            text = f"{single_running.rstrip('…')} — {done} of {initial} {chunks_word} complete."
+        else:
+            text = f"Batch progress: {done} of {initial} {chunks_word} complete."
         text += _batch_progress_eta_suffix(
             watch, done=done, remaining=remaining, initial=initial
         )
@@ -3231,7 +3328,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 return
             if self._warn_wizard_working_directory_missing_models():
                 return
-            self._write_template_scan_session_for_working_dir("skipped")
+            self._discard_working_templates_on_skip()
             self._wizard_step_outcome[WIZARD_STEP_SCAN] = "skipped"
             self._set_wizard_step(WIZARD_STEP_MODELCHECK)
         elif step == WIZARD_STEP_MODELCHECK:
@@ -3360,26 +3457,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 "Set a working directory on the Setup step before choosing a template.",
             )
             return
-        try:
-            dest_dir.mkdir(parents=True, exist_ok=True)
-        except OSError as exc:
-            messagebox.showerror(
-                "Template",
-                f"Could not create templates folder:\n{dest_dir.resolve()}\n\n{exc}",
-            )
-            return
-        dest_name = _START_TEMPLATE_DEST_NAMES.get(kind)
-        if not dest_name:
-            return
-        dest = dest_dir / dest_name
-        try:
-            shutil.copy2(source, dest)
-        except OSError as exc:
-            messagebox.showerror(
-                "Template",
-                f"Could not copy template:\n{source}\n\n→\n\n{dest.resolve()}\n\n{exc}",
-            )
-            return
+        self._pending_template_sources[kind] = source.resolve()
         self._refresh_task_options()
         self._refresh_wizard_template_status()
         self._refresh_wizard_footer()
@@ -3523,8 +3601,14 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 if not self._wizard_template_kind_visible(kind):
                     continue
                 dest = self._template_dest_path(kind)
+                pending = self._pending_template_sources.get(kind)
                 if dest is not None and dest.is_file():
                     label.configure(text=f"Set ({dest.name})", text_color="#2E7D32")
+                elif pending is not None:
+                    label.configure(
+                        text=f"Selected ({pending.name}) — runs on Scan Templates >",
+                        text_color="#111111",
+                    )
                 else:
                     label.configure(text="Not set", text_color="#666666")
             count = self._templates_upload_count()
@@ -4769,6 +4853,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._refresh_action_buttons()
         self._wizard_step_outcome.clear()
         self._wizard_step_failed_models.clear()
+        self._pending_template_sources.clear()
         self._set_wizard_step(WIZARD_STEP_SETUP)
         if errors:
             messagebox.showwarning(
@@ -4805,6 +4890,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._cancel_automatic_wizard_chain()
         self._wizard_step_outcome.clear()
         self._wizard_step_failed_models.clear()
+        self._pending_template_sources.clear()
         self._refresh_task_options()
         self._set_wizard_step(WIZARD_STEP_SETUP)
 
@@ -5944,12 +6030,30 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         return sorted(files, key=lambda p: str(p).lower())
 
     def _scan_modelcheck_config_files(self, directory: Path) -> list[Path]:
-        """Files under a configs folder to embed as ``<ConfigFile>`` in a .dxc."""
-        return [
-            p
-            for p in self._scan_files_recursive(directory)
-            if p.suffix.lower() not in _MODELCHECK_CONFIG_SKIP_SUFFIXES
-        ]
+        """Files under a configs folder to embed as ``<ConfigFile>`` in a .dxc.
+
+        When ``directory`` is the main ``configs\\`` folder, skips ``configs\\templates\\``
+        (template-scan configs only — see ``_modelcheck_config_dir_for_task``).
+        """
+        templates_subdir: Path | None = None
+        try:
+            candidate = (directory / "templates").resolve()
+            if candidate.is_dir():
+                templates_subdir = candidate
+        except OSError:
+            templates_subdir = None
+        files: list[Path] = []
+        for p in self._scan_files_recursive(directory):
+            if p.suffix.lower() in _MODELCHECK_CONFIG_SKIP_SUFFIXES:
+                continue
+            if templates_subdir is not None:
+                try:
+                    p.resolve().relative_to(templates_subdir)
+                    continue
+                except ValueError:
+                    pass
+            files.append(p)
+        return files
 
     def _chunk_paths(self, items: list[Path], chunk_size: int) -> list[list[Path]]:
         if chunk_size <= 0:
@@ -6056,8 +6160,19 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return None
         stem, ext_lower = m_ext.group(1), m_ext.group(2).lower()
         if is_modelcheck:
-            return f"{stem}.{ext_lower[0]}.xml"
+            basenames = _modelcheck_expected_output_basenames(model_path)
+            return basenames[0] if basenames else None
         return f"{stem}.jpg"
+
+    @staticmethod
+    def _append_modelcheck_expected_outputs(
+        names: list[str],
+        out_to_model: dict[str, str],
+        model_path: Path,
+    ) -> None:
+        for out in _modelcheck_expected_output_basenames(model_path):
+            names.append(out)
+            out_to_model[out] = model_path.name
 
     @classmethod
     def _batch_runner_init_stop_ps1(cls, *, cooperative_stop: bool) -> list[str]:
@@ -6343,6 +6458,14 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "    if (-not $Name) { return $false }",
             "    $p = Join-Path -Path $Dir -ChildPath $Name",
             "    if (Test-Path -LiteralPath $p) { return $true }",
+            "    if ($TaskKind -eq 'modelcheck' -and $Name -match '(?i)\\.(p|a|d)\\.(xml|html)$') {",
+            "        $want = $Name.ToLowerInvariant()",
+            "        try {",
+            "            foreach ($entry in [System.IO.Directory]::EnumerateFiles($Dir)) {",
+            "                if ([System.IO.Path]::GetFileName($entry).ToLowerInvariant() -eq $want) { return $true }",
+            "            }",
+            "        } catch { }",
+            "    }",
             "    if ($Name -notmatch '(?i)\\.jpg$') { return $false }",
             "    $stem = $Name.Substring(0, $Name.Length - 4)",
             "    if ($TaskKind -eq 'jpeg3d_part') {",
@@ -7049,6 +7172,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         scan_templates = self._is_scan_templates_task(task_display_raw)
         if scan_templates:
             self._wizard_step_outcome.pop(WIZARD_STEP_SCAN, None)
+            ok, err = self._materialize_pending_templates()
+            if not ok:
+                messagebox.showerror("Templates", err)
+                return
             wd = working_dir_raw.strip()
             if _working_directory_exists_as_dir(wd):
                 make_html_statistics.clear_template_scan_session(wd)
@@ -7292,10 +7419,17 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     names: list[str] = []
                     out_to_model: dict[str, str] = {}
                     for p in chunk:
-                        out = self._expected_output_basename(p, is_modelcheck=use_modelcheck_config)
-                        if out:
-                            names.append(out)
-                            out_to_model[out] = p.name
+                        if use_modelcheck_config:
+                            self._append_modelcheck_expected_outputs(
+                                names, out_to_model, p
+                            )
+                        else:
+                            out = self._expected_output_basename(
+                                p, is_modelcheck=False
+                            )
+                            if out:
+                                names.append(out)
+                                out_to_model[out] = p.name
                     expected_outputs_per_chunk.append(names)
                     output_to_model_per_chunk.append(out_to_model)
                 runner_task_kind = (
