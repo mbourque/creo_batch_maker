@@ -2,6 +2,9 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-06-17 — v1.10.1
+- **ModelCHECK**: fixed UI freeze after **Skip** on Scan Templates (or when refreshing the ModelCHECK step) on folders with many files.
+
 ## 2026-06-17 — v1.10
 
 - **ModelCHECK** batch runner waits for both ModelCHECK XML and HTML (`*.p.html`, `*.a.html`, `*.d.html`) before settling and running `**kill.bat`** (fixes missing **More details…** links when HTML was still being written). 

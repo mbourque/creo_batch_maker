@@ -353,9 +353,11 @@ def _working_dir_has_output_basename(working_dir: Path, basename: str) -> bool:
     """True when ``basename`` exists as a top-level file (case-insensitive name match)."""
     if not basename:
         return False
-    direct = working_dir / basename
-    if direct.is_file():
+    if (working_dir / basename).is_file():
         return True
+    # Windows paths are case-insensitive; avoid scanning huge folders per model.
+    if sys.platform == "win32":
+        return False
     key = basename.casefold()
     try:
         for entry in working_dir.iterdir():
