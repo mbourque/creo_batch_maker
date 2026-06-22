@@ -68,7 +68,7 @@ _TEMPLATE_SCAN_DETAIL_SUFFIXES = (".html", ".js", ".png", ".css")
 
 # Chunk .dxc files: working_dir / f"{CREO_BATCH_BASE}-1.dxc", "-2.dxc", ...
 CREO_BATCH_BASE = "creo-batch"
-# Models per chunk in each .dxc (default 10). User can change via Settings → Chunk size...
+# Models per chunk in each .dxc (default 10). User can change via Settings → Batch settings...
 CREO_BATCH_CHUNK_SIZE_DEFAULT = 10
 CREO_BATCH_CHUNK_SIZE_MIN = 1
 CREO_BATCH_CHUNK_SIZE_MAX = 100
@@ -92,7 +92,7 @@ BATCH_OUTPUT_WAIT_TIMEOUT_MIN = 60
 BATCH_OUTPUT_SETTLE_SEC = 5
 # xtop.exe: fixed wait for first appearance after ptcdbatch launch (XTOP NEVER STARTED).
 BATCH_XTOP_START_WAIT_SEC = 60
-# xtop.exe: after it exits mid-chunk, wait this long for a restart (XTOP GONE); Settings → Xtop gone timeout…
+# xtop.exe: after it exits mid-chunk, wait this long for a restart (XTOP GONE); Settings → Batch settings…
 BATCH_XTOP_DEAD_CHECKS = 2
 BATCH_XTOP_GONE_TIMEOUT_SEC_DEFAULT = 20
 BATCH_XTOP_GONE_TIMEOUT_SEC_MIN = 5
@@ -407,6 +407,19 @@ def _read_batch_failed_models(log_dir: Path, task_kind: str) -> list[str]:
     return _parse_batch_timeout_log(legacy)
 
 
+_JPEG_THUMBNAIL_FAILURE_TASK_KINDS = ("jpeg3d_part", "jpeg3d_asm", "jpeg2d", "jpeg3d")
+
+
+def _read_jpeg_thumbnail_failed_models(log_dir: Path) -> list[str]:
+    """Union of failed models from all thumbnail phase timeout logs (deduped, stable order)."""
+    models: list[str] = []
+    for kind in _JPEG_THUMBNAIL_FAILURE_TASK_KINDS:
+        for model in _read_batch_failed_models(log_dir, kind):
+            if model not in models:
+                models.append(model)
+    return models
+
+
 def _append_batch_timeout_log_models(
     log_dir: Path, task_kind: str, model_names: list[str]
 ) -> None:
@@ -642,10 +655,18 @@ def _batch_eta_min_chunks_done(total_chunks: int) -> int:
 
 
 def _format_batch_eta_remaining(seconds: float) -> str:
-    minutes = max(1, int(round(max(0.0, seconds) / 60)))
-    if minutes == 1:
-        return "~1 min remaining"
-    return f"~{minutes} min remaining"
+    total_minutes = max(1, int(round(max(0.0, seconds) / 60)))
+    if total_minutes < 60:
+        if total_minutes == 1:
+            return "~1 min remaining"
+        return f"~{total_minutes} min remaining"
+    hours = total_minutes // 60
+    mins = total_minutes % 60
+    if mins == 0:
+        hr = "1hr" if hours == 1 else f"{hours}hr"
+        return f"~{hr} remaining"
+    hr = "1hr" if hours == 1 else f"{hours}hr"
+    return f"~{hr} {mins}min remaining"
 
 
 def _batch_progress_eta_suffix(
@@ -1659,8 +1680,6 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         _remove_batch_timeout_log_for_task(batch_dir, task_kind)
         if task_kind == "modelcheck":
             self._wizard_step_failed_models.pop(WIZARD_STEP_MODELCHECK, None)
-        elif task_kind in ("jpeg3d_part", "jpeg3d_asm", "jpeg2d"):
-            self._wizard_step_failed_models.pop(WIZARD_STEP_JPEG_3D, None)
 
     def _resolve_batch_go_models(
         self,
@@ -1695,8 +1714,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     "model(s) still missing output.\n\n"
                     f"See {log_name} in the working folder for the full list.\n\n"
                     "Retry failed only (one model per batch) — one `.dxc` per failed model.\n"
-                    "Retry failed only (normal chunking) — failed models only, using Settings "
-                    "chunk size.\n\n"
+                    "Retry failed only (normal chunking) — failed models only, using batch "
+                    "chunk size from Settings.\n\n"
                     "Cancel — do not start the batch."
                 )
                 choice = self._ask_failed_batch_go_choice(message)
@@ -2792,10 +2811,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         thumbnails_phase: str | None = None,
     ) -> None:
         self._cancel_wizard_batch_output_watch(clear_go_snapshot=False)
-        if step == WIZARD_STEP_MODELCHECK or (
-            step == WIZARD_STEP_JPEG_3D
-            and thumbnails_phase == _WIZARD_THUMBNAILS_PHASE_PART
-        ):
+        if step == WIZARD_STEP_MODELCHECK:
             self._wizard_step_failed_models.pop(step, None)
         file_had_dxc = self._batch_dxc_files_exist(batch_dir, scan_templates)
         file_dxc_count = self._batch_dxc_count(batch_dir, scan_templates)
@@ -3026,58 +3042,24 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
     def _wizard_capture_failed_models_after_batch(self, watch: dict[str, object]) -> None:
         step = watch.get("step")
-        if step not in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
+        if step != WIZARD_STEP_MODELCHECK:
             return
         batch_dir = watch.get("batch_dir")
         if not isinstance(batch_dir, Path):
             return
-        if step == WIZARD_STEP_JPEG_3D:
-            phase = watch.get("thumbnails_phase")
-            if phase == _WIZARD_THUMBNAILS_PHASE_2D:
-                task_kind = "jpeg2d"
-            elif phase == _WIZARD_THUMBNAILS_PHASE_ASSEMBLY:
-                task_kind = "jpeg3d_asm"
-            else:
-                task_kind = "jpeg3d_part"
-        else:
-            task_display = self.task.get() or ""
-            if not task_display:
-                return
-            task_kind = self._runner_task_kind(task_display)
-        models = _read_batch_failed_models(batch_dir, task_kind)
-        if step == WIZARD_STEP_JPEG_3D:
-            existing = list(self._wizard_step_failed_models.get(step, []))
-            for model in models:
-                if model not in existing:
-                    existing.append(model)
-            self._wizard_step_failed_models[step] = existing
-        else:
-            self._wizard_step_failed_models[step] = models
-
-    @staticmethod
-    def _jpeg_failure_log_task_kinds() -> tuple[str, ...]:
-        return ("jpeg3d_part", "jpeg3d_asm", "jpeg2d", "jpeg3d")
+        task_display = self.task.get() or ""
+        if not task_display:
+            return
+        task_kind = self._runner_task_kind(task_display)
+        self._wizard_step_failed_models[step] = _read_batch_failed_models(
+            batch_dir, task_kind
+        )
 
     def _wizard_failed_models_for_step(self, step: int, log_dir: Path) -> list[str]:
         if step not in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
             return []
         if step == WIZARD_STEP_JPEG_3D:
-            if self._wizard_batch_waiting_on_step(step):
-                models: list[str] = []
-                for kind in self._jpeg_failure_log_task_kinds():
-                    for model in _read_batch_failed_models(log_dir, kind):
-                        if model not in models:
-                            models.append(model)
-                return models
-            cached = self._wizard_step_failed_models.get(step)
-            if cached:
-                return cached
-            models = []
-            for kind in self._jpeg_failure_log_task_kinds():
-                for model in _read_batch_failed_models(log_dir, kind):
-                    if model not in models:
-                        models.append(model)
-            return models
+            return _read_jpeg_thumbnail_failed_models(log_dir)
         if self._wizard_batch_waiting_on_step(step):
             task_display = self._wizard_task_display_for_step(step)
             if not task_display:
@@ -3094,7 +3076,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
     def _resolve_wizard_batch_failed_log_path(self, step: int, log_dir: Path) -> Path | None:
         if step == WIZARD_STEP_JPEG_3D:
-            for kind in self._jpeg_failure_log_task_kinds():
+            for kind in _JPEG_THUMBNAIL_FAILURE_TASK_KINDS:
                 models = _read_batch_failed_models(log_dir, kind)
                 if not models:
                     continue
@@ -4295,16 +4277,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
         general_settings_menu = tk.Menu(menubar, tearoff=0)
         general_settings_menu.add_command(
-            label="Chunk size...",
-            command=self._on_chunk_size_settings,
-        )
-        general_settings_menu.add_command(
-            label="Timeout...",
-            command=self._on_timeout_settings,
-        )
-        general_settings_menu.add_command(
-            label="Xtop gone timeout...",
-            command=self._on_xtop_gone_timeout_settings,
+            label="Batch settings...",
+            command=self._on_batch_settings,
         )
         general_settings_menu.add_checkbutton(
             label="Automatic mode",
@@ -4991,203 +4965,154 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             self._debug_mode = _normalize_automatic_mode(not enabled)
             messagebox.showerror("Debug", err)
 
-    def _persist_chunk_size(self, chunk_size: int) -> str | None:
+    def _persist_batch_settings(
+        self,
+        *,
+        chunk_size: int,
+        output_timeout_sec: int,
+        xtop_gone_timeout_sec: int,
+    ) -> str | None:
         self._chunk_size = _normalize_chunk_size(chunk_size)
+        self._output_timeout_sec = _normalize_output_timeout_sec(output_timeout_sec)
+        self._xtop_gone_timeout_sec = _normalize_xtop_gone_timeout_sec(xtop_gone_timeout_sec)
         data = self._read_app_settings_dict()
         data["chunk_size"] = self._chunk_size
-        return self._write_app_settings_dict(data)
-
-    def _on_chunk_size_settings(self) -> None:
-        dialog = self._create_modal_toplevel("Chunk size")
-
-        ctk.CTkLabel(
-            dialog,
-            text=f"Models per batch chunk ({CREO_BATCH_CHUNK_SIZE_MIN}–{CREO_BATCH_CHUNK_SIZE_MAX}):",
-        ).pack(anchor="w", padx=16, pady=(16, 8))
-
-        value_var = tk.StringVar(value=str(self._chunk_size))
-        entry = ctk.CTkEntry(dialog, textvariable=value_var, width=80)
-        entry.pack(anchor="w", padx=16, pady=(0, 12))
-
-        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
-        btn_row.pack(anchor="e", padx=16, pady=(0, 16))
-
-        def close_dialog() -> None:
-            dialog.destroy()
-
-        def on_ok() -> None:
-            raw = value_var.get().strip()
-            try:
-                n = int(raw)
-            except ValueError:
-                def warn() -> None:
-                    messagebox.showwarning(
-                        "Chunk size",
-                        f"Enter a whole number from {CREO_BATCH_CHUNK_SIZE_MIN} to {CREO_BATCH_CHUNK_SIZE_MAX}.",
-                        parent=dialog,
-                    )
-
-                warn()
-                return
-            if n < CREO_BATCH_CHUNK_SIZE_MIN or n > CREO_BATCH_CHUNK_SIZE_MAX:
-                def warn_range() -> None:
-                    messagebox.showwarning(
-                        "Chunk size",
-                        f"Enter a whole number from {CREO_BATCH_CHUNK_SIZE_MIN} to {CREO_BATCH_CHUNK_SIZE_MAX}.",
-                        parent=dialog,
-                    )
-
-                warn_range()
-                return
-            err = self._persist_chunk_size(n)
-            if err:
-
-                def show_err() -> None:
-                    messagebox.showerror("Chunk size", err, parent=dialog)
-
-                show_err()
-                return
-            close_dialog()
-
-        ctk.CTkButton(btn_row, text="OK", width=80, command=on_ok).pack(side="right", padx=(12, 0))
-        ctk.CTkButton(btn_row, text="Cancel", width=80, command=close_dialog).pack(side="right")
-
-        dialog.bind("<Return>", lambda _e: on_ok())
-        dialog.bind("<Escape>", lambda _e: close_dialog())
-        dialog.protocol("WM_DELETE_WINDOW", close_dialog)
-        self._present_modal_toplevel(dialog, focus_widget=entry)
-
-    def _persist_output_timeout_sec(self, timeout_sec: int) -> str | None:
-        self._output_timeout_sec = _normalize_output_timeout_sec(timeout_sec)
-        data = self._read_app_settings_dict()
         data["output_timeout_sec"] = self._output_timeout_sec
-        return self._write_app_settings_dict(data)
-
-    def _on_timeout_settings(self) -> None:
-        dialog = self._create_modal_toplevel("Timeout")
-
-        ctk.CTkLabel(
-            dialog,
-            text=f"Output wait timeout in seconds (minimum {BATCH_OUTPUT_WAIT_TIMEOUT_MIN}):",
-        ).pack(anchor="w", padx=16, pady=(16, 8))
-
-        value_var = tk.StringVar(value=str(self._output_timeout_sec))
-        entry = ctk.CTkEntry(dialog, textvariable=value_var, width=80)
-        entry.pack(anchor="w", padx=16, pady=(0, 12))
-
-        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
-        btn_row.pack(anchor="e", padx=16, pady=(0, 16))
-
-        def close_dialog() -> None:
-            dialog.destroy()
-
-        def on_ok() -> None:
-            raw = value_var.get().strip()
-            if not raw.isdigit():
-
-                def warn_digits() -> None:
-                    messagebox.showwarning(
-                        "Timeout",
-                        f"Enter a whole number of seconds (minimum {BATCH_OUTPUT_WAIT_TIMEOUT_MIN}).",
-                        parent=dialog,
-                    )
-
-                warn_digits()
-                return
-            n = int(raw)
-            if n < BATCH_OUTPUT_WAIT_TIMEOUT_MIN:
-
-                def warn_min() -> None:
-                    messagebox.showwarning(
-                        "Timeout",
-                        f"Enter a whole number of seconds (minimum {BATCH_OUTPUT_WAIT_TIMEOUT_MIN}).",
-                        parent=dialog,
-                    )
-
-                warn_min()
-                return
-            err = self._persist_output_timeout_sec(n)
-            if err:
-
-                def show_err() -> None:
-                    messagebox.showerror("Timeout", err, parent=dialog)
-
-                show_err()
-                return
-            close_dialog()
-
-        ctk.CTkButton(btn_row, text="OK", width=80, command=on_ok).pack(side="right", padx=(12, 0))
-        ctk.CTkButton(btn_row, text="Cancel", width=80, command=close_dialog).pack(side="right")
-
-        dialog.bind("<Return>", lambda _e: on_ok())
-        dialog.bind("<Escape>", lambda _e: close_dialog())
-        dialog.protocol("WM_DELETE_WINDOW", close_dialog)
-        self._present_modal_toplevel(dialog, focus_widget=entry)
-
-    def _persist_xtop_gone_timeout_sec(self, timeout_sec: int) -> str | None:
-        self._xtop_gone_timeout_sec = _normalize_xtop_gone_timeout_sec(timeout_sec)
-        data = self._read_app_settings_dict()
         data["xtop_timeout_sec"] = self._xtop_gone_timeout_sec
         return self._write_app_settings_dict(data)
 
-    def _on_xtop_gone_timeout_settings(self) -> None:
-        dialog = self._create_modal_toplevel("Xtop gone timeout")
+    def _on_batch_settings(self) -> None:
+        dialog = self._create_modal_toplevel("Batch settings")
+        body = ctk.CTkFrame(dialog, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=20, pady=(16, 8))
 
         ctk.CTkLabel(
-            dialog,
-            text=(
-                f"Seconds to wait for xtop.exe to return after it exits mid-chunk "
-                f"(minimum {BATCH_XTOP_GONE_TIMEOUT_SEC_MIN}):\n\n"
-                "Used for XTOP GONE (no restart while waiting for output).\n\n"
-                f"Waiting for xtop to start after launch is fixed at "
-                f"{BATCH_XTOP_START_WAIT_SEC} s (XTOP NEVER STARTED)."
-            ),
+            body,
+            text="ModelCHECK and Thumbnails batch runs",
+            font=ctk.CTkFont(size=14, weight="bold"),
+        ).pack(anchor="w")
+        ctk.CTkLabel(
+            body,
+            text="Re-run GO on a wizard batch step after changing these values so a new runner script is generated.",
             justify="left",
-            wraplength=420,
-        ).pack(anchor="w", padx=16, pady=(16, 8))
+            wraplength=500,
+            text_color="#555555",
+        ).pack(anchor="w", pady=(4, 16))
 
-        value_var = tk.StringVar(value=str(self._xtop_gone_timeout_sec))
-        entry = ctk.CTkEntry(dialog, textvariable=value_var, width=80)
-        entry.pack(anchor="w", padx=16, pady=(0, 12))
+        first_entry: ctk.CTkEntry | None = None
+
+        def add_field(title: str, description: str, initial: str) -> tk.StringVar:
+            nonlocal first_entry
+            block = ctk.CTkFrame(body, fg_color="transparent")
+            block.pack(anchor="w", fill="x", pady=(0, 14))
+            ctk.CTkLabel(block, text=title, font=ctk.CTkFont(weight="bold")).pack(anchor="w")
+            ctk.CTkLabel(
+                block,
+                text=description,
+                justify="left",
+                wraplength=500,
+                text_color="#444444",
+            ).pack(anchor="w", pady=(4, 8))
+            value_var = tk.StringVar(value=initial)
+            entry = ctk.CTkEntry(block, textvariable=value_var, width=88)
+            entry.pack(anchor="w")
+            if first_entry is None:
+                first_entry = entry
+            return value_var
+
+        chunk_var = add_field(
+            f"Chunk size ({CREO_BATCH_CHUNK_SIZE_MIN}–{CREO_BATCH_CHUNK_SIZE_MAX})",
+            "Models per batch chunk (each creo-batch-N.dxc). Smaller chunks show progress "
+            "more often; larger chunks reduce launcher overhead.",
+            str(self._chunk_size),
+        )
+        output_var = add_field(
+            f"Output wait timeout (seconds, minimum {BATCH_OUTPUT_WAIT_TIMEOUT_MIN})",
+            "How long to wait with no new output files before a chunk times out. The timer "
+            "starts when xtop appears for that chunk and resets when a new output file "
+            "appears or xtop restarts between models.",
+            str(self._output_timeout_sec),
+        )
+        xtop_var = add_field(
+            f"Xtop gone timeout (seconds, minimum {BATCH_XTOP_GONE_TIMEOUT_SEC_MIN})",
+            "How long to wait for xtop.exe to return after it exits mid-chunk (XTOP GONE). "
+            f"Waiting for xtop to first appear after launch is fixed at "
+            f"{BATCH_XTOP_START_WAIT_SEC} seconds (XTOP NEVER STARTED).",
+            str(self._xtop_gone_timeout_sec),
+        )
 
         btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
-        btn_row.pack(anchor="e", padx=16, pady=(0, 16))
+        btn_row.pack(anchor="e", padx=20, pady=(0, 16))
 
         def close_dialog() -> None:
             dialog.destroy()
 
         def on_ok() -> None:
-            raw = value_var.get().strip()
-            if not raw.isdigit():
-
-                def warn_digits() -> None:
-                    messagebox.showwarning(
-                        "Xtop gone timeout",
-                        f"Enter a whole number of seconds (minimum {BATCH_XTOP_GONE_TIMEOUT_SEC_MIN}).",
-                        parent=dialog,
-                    )
-
-                warn_digits()
+            chunk_raw = chunk_var.get().strip()
+            try:
+                chunk_n = int(chunk_raw)
+            except ValueError:
+                messagebox.showwarning(
+                    "Batch settings",
+                    f"Chunk size must be a whole number from "
+                    f"{CREO_BATCH_CHUNK_SIZE_MIN} to {CREO_BATCH_CHUNK_SIZE_MAX}.",
+                    parent=dialog,
+                )
                 return
-            n = int(raw)
-            if n < BATCH_XTOP_GONE_TIMEOUT_SEC_MIN:
-
-                def warn_min() -> None:
-                    messagebox.showwarning(
-                        "Xtop gone timeout",
-                        f"Enter a whole number of seconds (minimum {BATCH_XTOP_GONE_TIMEOUT_SEC_MIN}).",
-                        parent=dialog,
-                    )
-
-                warn_min()
+            if chunk_n < CREO_BATCH_CHUNK_SIZE_MIN or chunk_n > CREO_BATCH_CHUNK_SIZE_MAX:
+                messagebox.showwarning(
+                    "Batch settings",
+                    f"Chunk size must be a whole number from "
+                    f"{CREO_BATCH_CHUNK_SIZE_MIN} to {CREO_BATCH_CHUNK_SIZE_MAX}.",
+                    parent=dialog,
+                )
                 return
-            err = self._persist_xtop_gone_timeout_sec(n)
+
+            output_raw = output_var.get().strip()
+            if not output_raw.isdigit():
+                messagebox.showwarning(
+                    "Batch settings",
+                    f"Output wait timeout must be a whole number of seconds "
+                    f"(minimum {BATCH_OUTPUT_WAIT_TIMEOUT_MIN}).",
+                    parent=dialog,
+                )
+                return
+            output_n = int(output_raw)
+            if output_n < BATCH_OUTPUT_WAIT_TIMEOUT_MIN:
+                messagebox.showwarning(
+                    "Batch settings",
+                    f"Output wait timeout must be a whole number of seconds "
+                    f"(minimum {BATCH_OUTPUT_WAIT_TIMEOUT_MIN}).",
+                    parent=dialog,
+                )
+                return
+
+            xtop_raw = xtop_var.get().strip()
+            if not xtop_raw.isdigit():
+                messagebox.showwarning(
+                    "Batch settings",
+                    f"Xtop gone timeout must be a whole number of seconds "
+                    f"(minimum {BATCH_XTOP_GONE_TIMEOUT_SEC_MIN}).",
+                    parent=dialog,
+                )
+                return
+            xtop_n = int(xtop_raw)
+            if xtop_n < BATCH_XTOP_GONE_TIMEOUT_SEC_MIN:
+                messagebox.showwarning(
+                    "Batch settings",
+                    f"Xtop gone timeout must be a whole number of seconds "
+                    f"(minimum {BATCH_XTOP_GONE_TIMEOUT_SEC_MIN}).",
+                    parent=dialog,
+                )
+                return
+
+            err = self._persist_batch_settings(
+                chunk_size=chunk_n,
+                output_timeout_sec=output_n,
+                xtop_gone_timeout_sec=xtop_n,
+            )
             if err:
-
-                def show_err() -> None:
-                    messagebox.showerror("Xtop gone timeout", err, parent=dialog)
-
-                show_err()
+                messagebox.showerror("Batch settings", err, parent=dialog)
                 return
             close_dialog()
 
@@ -5197,7 +5122,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         dialog.bind("<Return>", lambda _e: on_ok())
         dialog.bind("<Escape>", lambda _e: close_dialog())
         dialog.protocol("WM_DELETE_WINDOW", close_dialog)
-        self._present_modal_toplevel(dialog, focus_widget=entry)
+        self._present_modal_toplevel(dialog, focus_widget=first_entry)
 
     def _start_templates_dir(self) -> Path | None:
         wd = (self.working_directory.get() or "").strip()

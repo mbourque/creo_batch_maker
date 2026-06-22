@@ -209,7 +209,7 @@ SHOW_REPORT       YN            Y       N       Y       Y
 PROGRAM          pro
 
 #HTML report creation
-HTML_FILE_OUTPUT  YN            Y       N       Y       Y
+HTML_FILE_OUTPUT  YN            Y       Y       Y       Y
 
 # For Creo 12 Inseperable Assemblies
 MC_RUN_ON_ASM_COMP	YN	Y	
