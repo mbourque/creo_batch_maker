@@ -185,7 +185,7 @@ Note that sometimes unattached features are acceptable, because later features c
         <enabled>Y</enabled>         
     </Check>
     <Check>
-        <Name>Draft Child Features</Name>
+        <Name>Model Integrity</Name>
         <Category>Design Intent Strength</Category>
         <Description>Checks for features that depend on draft geometry as parent references. Draft features are often added later in the design process to satisfy manufacturing requirements, and using them as references for downstream features can weaken design intent and create unstable parent-child relationships. Changes to draft geometry may cause dependent features to fail, regenerate incorrectly, or produce unexpected geometry changes during future modifications. This check helps encourage stronger and more maintainable modeling practices by reducing dependencies on manufacturing-specific finishing features. Draft feature standards and related modeling practices are typically configured through ModelCHECK geometry settings and company modeling standards, while check behavior and reporting are controlled by the DRAFT_CHILD settings in the check.mch configuration file.</Description>
         <ModelCheckName>DRAFT_CHILD</ModelCheckName>
@@ -1091,7 +1091,7 @@ When a model has small geometry, the equivalent absolute accuracy should be two 
     </Check>
     <Check>
         <Name>Sketch Items</Name>
-        <Category>Model Integrity</Category>
+        <Category>Model Complexity</Category>
         <Description>Checks for sketches that contain excessive numbers of sketch entities or overly complex sketch geometry. Large or complicated sketches can make models difficult to understand, slow regeneration performance, increase rebuild instability, and create downstream manufacturing or editing problems. Overly complex sketches are often harder to troubleshoot, modify, and maintain, especially in large or highly parametric models. This check helps encourage simpler, cleaner sketching practices that improve model robustness, readability, and long-term maintainability. Sketch complexity limits are typically configured in the constant.mcn file using MAX_SKETCH_ITEMS and related settings, while check behavior and reporting are controlled by the SKETCH_ITEMS settings in the check.mch configuration file.</Description>
         <ModelCheckName>SKETCH_ITEMS</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1230,7 +1230,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>External Dependencies</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>Model Complexity</Category>
         <Description>Checks for references or dependencies between the current model and external models, assemblies, sketches, geometry, or copied data located outside the model itself. External dependencies can be useful for top-down design workflows, but unmanaged or unnecessary external references can weaken model stability, increase complexity, create regeneration failures, and make models difficult to modify, reuse, or transfer between projects. Broken or unintended external dependencies may also cause downstream issues in assemblies, manufacturing, Windchill, and data management processes. This check helps identify external references so they can be reviewed and managed according to company modeling practices. External reference behavior and related standards are typically controlled through Creo configuration settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the EXTERNAL_DEPS settings in the check.mch configuration file.</Description>
         <ModelCheckName>EXTERNAL_DEPS</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
@@ -1244,7 +1244,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <Check>
         <Name>Dependent Features</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>Model Complexity</Category>
         <Description>Checks for features that are highly dependent on other features through parent-child relationships within the model. While feature dependencies are a normal part of parametric modeling, excessive or poorly managed dependencies can weaken design intent, increase regeneration instability, and make models more difficult to modify, troubleshoot, and maintain. Changes to heavily referenced parent features may unintentionally affect large portions of the model and create cascading failures or unexpected geometry changes. This check helps identify complex dependency structures so models remain stable, maintainable, and easier to update over time. Feature dependency behavior and related modeling standards are managed through model design practices and ModelCHECK configuration settings, while check behavior and reporting are controlled by the DEPENDENT_FEATURE settings in the check.mch configuration file.</Description>
         <ModelCheckName>DEPENDENT_FEATURE</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
@@ -2240,7 +2240,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Flexible Modeling Features</Name>
-        <Category>Design Intent Strength</Category>
+        <Category>Model Integrity</Category>
         <Description>Checks for the presence of flexible modeling features within a part or assembly and verifies that their use complies with company design standards and intended modeling practices. Flexible modeling features allow geometry to be locally modified without fully redefining upstream features, which can be useful for design iteration and quick modifications, but if used excessively or inappropriately they can weaken design intent, create unpredictable regeneration behavior, introduce hidden dependencies, and complicate downstream manufacturing, simulation, and data management processes. This check helps ensure that flexible modeling is used intentionally and controlled so that model stability and consistency are maintained. Flexible modeling rules and feature usage standards are typically governed by Creo modeling practices and ModelCHECK configuration files, while check behavior and reporting are controlled by the FLEXIBLE_MODELING_FEATURES settings in the check.mch configuration file.</Description>
         <ModelCheckName>FLEXIBLE_MODELING_FEATURES</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
@@ -2250,7 +2250,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
 
     <Check>
         <Name>Feature surfaces that may be buried</Name>
-        <Category>Geometry Quality</Category>
+        <Category>Model Integrity</Category>
         <Description>Checks for suspect buried features in the model that may have no exposed or accessible surfaces and are potentially hidden within surrounding geometry, which can indicate modeling errors, incomplete feature definition, or unintended internal geometry. Buried features can cause issues in manufacturing, assembly interpretation, interference detection, and downstream processes such as CAM programming and simulation because they may not be visible or easily accessible for validation or modification. This check helps identify features that may be fully or partially enclosed so they can be reviewed and corrected to ensure model integrity and manufacturability. Buried feature detection rules and geometry validation standards are typically governed by Creo modeling practices and ModelCHECK configuration files, while check behavior and reporting are controlled by the BURIED_SUSPECT settings in the check.mch configuration file.</Description>
         <ModelCheckName>BURIED_SUSPECT</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
