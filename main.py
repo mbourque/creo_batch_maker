@@ -5089,6 +5089,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
         first_entry: ctk.CTkEntry | None = None
 
+        entry_widgets: list[ctk.CTkEntry] = []
+
         def add_field(title: str, description: str, initial: str) -> tk.StringVar:
             nonlocal first_entry
             block = ctk.CTkFrame(body, fg_color="transparent")
@@ -5104,6 +5106,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             value_var = tk.StringVar(value=initial)
             entry = ctk.CTkEntry(block, textvariable=value_var, width=88)
             entry.pack(anchor="w")
+            entry_widgets.append(entry)
             if first_entry is None:
                 first_entry = entry
             return value_var
@@ -5204,13 +5207,29 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 return
             close_dialog()
 
-        ctk.CTkButton(btn_row, text="OK", width=80, command=on_ok).pack(side="right", padx=(12, 0))
-        ctk.CTkButton(btn_row, text="Cancel", width=80, command=close_dialog).pack(side="right")
+        ok_btn = ctk.CTkButton(btn_row, text="OK", width=80, command=on_ok)
+        ok_btn.pack(side="right", padx=(12, 0))
+        cancel_btn = ctk.CTkButton(btn_row, text="Cancel", width=80, command=close_dialog)
+        cancel_btn.pack(side="right")
 
-        dialog.bind("<Return>", lambda _e: on_ok())
+        def bind_return_key(_event: object | None = None) -> str:
+            on_ok()
+            return "break"
+
+        def enable_return_key() -> None:
+            if not dialog.winfo_exists():
+                return
+            for entry in entry_widgets:
+                entry.bind("<Return>", bind_return_key)
+
         dialog.bind("<Escape>", lambda _e: close_dialog())
         dialog.protocol("WM_DELETE_WINDOW", close_dialog)
-        self._present_modal_toplevel(dialog, focus_widget=first_entry)
+        dialog.after(150, enable_return_key)
+        self._run_modal_toplevel_wait(
+            dialog,
+            focus_widget=first_entry,
+            repaints=(ok_btn, cancel_btn),
+        )
 
     def _start_templates_dir(self) -> Path | None:
         wd = (self.working_directory.get() or "").strip()
