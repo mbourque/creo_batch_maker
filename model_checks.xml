@@ -1345,7 +1345,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <Category>MBD Readiness</Category>
         <Description>Checks for model surfaces that are not referenced by dimensions, GDT annotations, notes, surface finish symbols, inspection annotations, or other manufacturing and documentation annotations. Unannotated surfaces may indicate incomplete model-based definition (MBD) practices, missing manufacturing requirements, undocumented inspection criteria, or incomplete engineering communication. Surfaces lacking proper annotation can create ambiguity during manufacturing, quality inspection, assembly, and downstream interpretation of the design intent. This check helps ensure that important surfaces are properly documented and associated with the required annotation information according to company MBD and drafting standards. Annotation requirements and related documentation practices are typically configured through Creo annotation settings and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the SRF_NOT_REF_BY_ANNTN settings in the check.mch configuration file.</Description>
         <ModelCheckName>SRF_NOT_REF_BY_ANNTN</ModelCheckName>
-        <ModelCheckOptions>YNEW W E N W Y</ModelCheckOptions>
+        <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>   
        <hideFromReport>N</hideFromReport>                 
@@ -1356,7 +1356,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <Category>MBD Readiness</Category>
         <Description>Checks whether required annotations are included and properly displayed within defined combination states used for Model-Based Definition (MBD) workflows. Combination states control the visibility of annotations, views, geometry, and display settings used to communicate manufacturing, inspection, assembly, and engineering requirements directly within the 3D model. Missing annotations in combination states can result in incomplete documentation, incorrect manufacturing interpretation, inspection errors, failed design reviews, and downstream communication problems. This check helps ensure that all required dimensions, GDT annotations, notes, and manufacturing information are visible in the appropriate combination states according to company MBD standards. Combination state and annotation requirements are typically configured through Creo MBD settings and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the ANNTN_NOT_ON_COMB_STATE settings in the check.mch configuration file.</Description>
         <ModelCheckName>ANNTN_NOT_ON_COMB_STATE</ModelCheckName>
-        <ModelCheckOptions>YNEW W E N W Y</ModelCheckOptions>
+        <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>            
     </Check>
@@ -2547,7 +2547,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Category>MBD Readiness</Category>
         <Description>Checks for annotations that exist across multiple combined states in the model and verifies that they remain consistent, properly managed, and correctly displayed in each applicable state. Annotations used in combined states (such as simplified representations, configurations, or display states) must remain aligned with design intent to ensure that critical information such as dimensions, notes, GDT, and manufacturing instructions is not missing, duplicated, or inconsistently shown across states. Inconsistencies can lead to incomplete documentation, misinterpretation during manufacturing or inspection, and downstream data quality issues. This check helps ensure that annotations are correctly controlled and consistently represented across all combined states of the model. Combined state annotation rules and display management are typically governed by Creo annotation and representation settings, while check behavior and reporting are controlled by the ANNTN_ON_MULT_COMB_STATE settings in the check.mch configuration file.</Description>
         <ModelCheckName>ANNTN_ON_MULT_COMB_STATE</ModelCheckName>
-        <ModelCheckOptions>YNEW W E N Y</ModelCheckOptions>
+        <ModelCheckOptions>YNEW W W N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
     </Check>

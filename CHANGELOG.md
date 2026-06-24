@@ -2,6 +2,11 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-06-23 — v1.10.3
+- **Scan Templates**: **`configs\sample_start.mcs`** is updated as soon as the scan batch finishes (not only when you run ModelCHECK **GO**).
+- **Scan Templates**: fixed **Browse...** buttons being clipped when multiple template rows are visible.
+- **Automatic mode**: fixed Scan Templates staying on **Waiting…** instead of advancing to ModelCHECK after the scan batch finishes.
+
 ## 2026-06-23 — v1.10.2
 - **Settings → Batch settings…**: dialog stays open (modal, no instant OK from a stray Enter when opened from the menu).
 

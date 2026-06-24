@@ -98,6 +98,8 @@ BATCH_XTOP_GONE_TIMEOUT_SEC_DEFAULT = 20
 BATCH_XTOP_GONE_TIMEOUT_SEC_MIN = 5
 # Wizard polls the batch folder until chunk .dxc files are gone (runner deletes them when done).
 WIZARD_BATCH_DXC_POLL_MS = 3000
+# After the scan-templates runner exits, keep polling for template .xml before failing.
+SCAN_BATCH_RUNNER_EXIT_GRACE_SEC = 15
 BATCH_TIMEOUT_LOG_PREFIX = "creo-batch-timeouts-"
 BATCH_STOP_FLAG_BASENAME = "creo-batch-stop.requested"
 # Modal dialogs: match wizard primary/secondary buttons (CTk default can look disabled/gray
@@ -1111,6 +1113,15 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 return False, err, ""
             return True, "", cleared
         return self._update_sample_start_from_template_xml_if_present()
+
+    def _apply_sample_start_after_template_scan(self) -> None:
+        """Merge template scan XML into sample_start.mcs when Scan Templates batch completes."""
+        ok, err, _note = self._update_sample_start_from_template_xml_if_present()
+        if not ok:
+            messagebox.showwarning(
+                "Scan Templates",
+                "Could not update configs\\sample_start.mcs from template XML:\n\n" + err,
+            )
 
     def _effective_ttd_filename(self, task_display: str) -> str:
         if self._is_scan_templates_task(task_display):
@@ -2324,6 +2335,39 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             )
         return watch
 
+    def _restore_wizard_batch_watch_from_session(self, step: int) -> dict[str, object] | None:
+        """Recreate batch watch after .dxc is gone but template XML is still pending."""
+        watch = self._wizard_batch_watch
+        if watch is not None and watch.get("step") == step:
+            return watch
+        if not self._wizard_batch_session_active_for_step(step):
+            return watch
+        batch_dir, scan_templates = self._wizard_batch_dir_for_step(step)
+        if batch_dir is None:
+            return watch
+        if self._batch_dxc_files_exist(batch_dir, scan_templates):
+            return self._ensure_wizard_batch_watch(step)
+        snap = self._wizard_batch_go_snapshot_for_step(step)
+        if snap is None:
+            return watch
+        started = snap.get("started_at")
+        if not isinstance(started, (int, float)):
+            started = time.time()
+        initial = snap.get("initial_dxc_count")
+        if not isinstance(initial, int) or initial <= 0:
+            initial = 1
+        watch = {
+            "step": step,
+            "batch_dir": batch_dir,
+            "scan_templates": scan_templates,
+            "had_dxc": True,
+            "initial_dxc_count": initial,
+            "started_at": started,
+            "thumbnails_phase": snap.get("thumbnails_phase"),
+        }
+        self._wizard_batch_watch = watch
+        return watch
+
     def _clear_wizard_batch_go_snapshot(self, step: int | None = None) -> None:
         snap = self._wizard_batch_go_snapshot
         if snap is None:
@@ -2858,11 +2902,18 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if self._batch_dxc_files_exist(batch_dir, True):
             return False
         if self._wizard_scan_outputs_complete(batch_dir):
+            watch.pop("runner_exited_at", None)
             return False
         proc = self._batch_runner_process
         if proc is not None:
             code = proc.poll()
             if code is not None:
+                exited_at = watch.get("runner_exited_at")
+                if exited_at is None:
+                    watch["runner_exited_at"] = time.time()
+                    return False
+                if time.time() - float(exited_at) < SCAN_BATCH_RUNNER_EXIT_GRACE_SEC:
+                    return False
                 watch["scan_failed"] = True
                 return True
         return False
@@ -2948,6 +2999,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 batch_dir, scan_templates
             ):
                 watch = self._ensure_wizard_batch_watch(self._wizard_step)
+            else:
+                watch = self._restore_wizard_batch_watch_from_session(self._wizard_step)
         if watch is None:
             return
         try:
@@ -2966,8 +3019,14 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             if watch is None:
                 return
         if self._wizard_scan_batch_failed(watch):
-            self._on_wizard_scan_batch_failed(watch)
+            if watch.get("scan_failed"):
+                self._on_wizard_scan_batch_failed(watch)
+                self._refresh_wizard_ui()
+                return
             self._refresh_wizard_ui()
+            self._wizard_batch_watch_job = self.after(
+                WIZARD_BATCH_DXC_POLL_MS, self._tick_wizard_batch_output_watch
+            )
             return
         ready = self._wizard_batch_outputs_ready(watch)
         thumbnails_continuing = False
@@ -2981,10 +3040,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._refresh_wizard_ui()
         if ready and not thumbnails_continuing:
             step = watch.get("step")
-            if isinstance(step, int):
-                self._clear_wizard_batch_go_snapshot(step)
             if step == WIZARD_STEP_SCAN and self._wizard_scan_step_has_failed():
                 return
+            if step == WIZARD_STEP_SCAN and not watch.get("sample_start_applied"):
+                watch["sample_start_applied"] = True
+                self._apply_sample_start_after_template_scan()
             if step == WIZARD_STEP_JPEG_3D:
                 self._update_create_report_task_list(advance_from_jpeg=False)
             if self._automatic_mode and step in (
@@ -3040,7 +3100,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             if self._wizard_scan_step_has_failed():
                 self._cancel_automatic_wizard_chain()
                 return
-            if not self._wizard_scan_show_next_after_batch(step):
+            if not self._wizard_scan_ready_for_advance(step):
                 self._automatic_wizard_chain_job = self.after(
                     500, self._run_automatic_wizard_chain
                 )
@@ -3283,19 +3343,29 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             log_path_attr="_wizard_report_thumbnails_failed_log_path",
         )
 
-    def _wizard_scan_show_next_after_batch(self, step: int) -> bool:
-        """True when Scan Templates finished in this session (show Next >, not re-scan)."""
-        if step != WIZARD_STEP_SCAN or not self._wizard_batch_ready_for_next(step):
+    def _wizard_scan_ready_for_advance(self, step: int) -> bool:
+        """True when Scan Templates finished in this session (manual Next or Automatic mode)."""
+        if step != WIZARD_STEP_SCAN:
+            return False
+        if self._wizard_scan_step_has_failed():
+            return False
+        if self._wizard_step_has_remaining_dxc(step):
+            return False
+        batch_dir, scan_templates = self._wizard_batch_dir_for_step(step)
+        if batch_dir is None or not scan_templates:
+            return False
+        if not self._wizard_scan_outputs_complete(batch_dir):
+            return False
+        if not self._wizard_batch_session_active_for_step(step):
             return False
         watch = self._wizard_batch_watch
-        if watch is None or watch.get("step") != WIZARD_STEP_SCAN:
-            return False
-        if watch.get("scan_failed"):
-            return False
-        batch_dir = watch.get("batch_dir")
-        if isinstance(batch_dir, Path) and not self._wizard_scan_outputs_complete(batch_dir):
-            return False
+        if watch is not None and watch.get("step") == WIZARD_STEP_SCAN:
+            return bool(watch.get("had_dxc"))
         return True
+
+    def _wizard_scan_show_next_after_batch(self, step: int) -> bool:
+        """True when Scan Templates finished in this session (show Next >, not re-scan)."""
+        return self._wizard_scan_ready_for_advance(step)
 
     def _wizard_batch_primary_action_label(self, step: int) -> str:
         if step == WIZARD_STEP_SCAN:
@@ -3798,14 +3868,14 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 and watch.get("step") == WIZARD_STEP_SCAN
                 and watch.get("scan_failed")
             )
-            if self._wizard_batch_waiting_on_step(step):
-                nxt.configure(text="Waiting…", state="disabled")
-            elif scan_failed:
+            if scan_failed:
                 can_scan = self._templates_upload_count() > 0 and self._go_fields_valid()
                 nxt.configure(
                     text="Scan Templates >",
                     state="normal" if can_scan else "disabled",
                 )
+            elif self._wizard_batch_waiting_on_step(step):
+                nxt.configure(text="Waiting…", state="disabled")
             elif self._wizard_scan_show_next_after_batch(step):
                 nxt.configure(text="Next >", state="normal")
             else:
@@ -3942,15 +4012,6 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 font=ctk.CTkFont(size=12),
                 text_color="#111111",
             ).pack(side="left")
-            status = ctk.CTkLabel(
-                row,
-                text="Not set",
-                anchor="w",
-                font=ctk.CTkFont(size=12),
-                text_color="#666666",
-            )
-            status.pack(side="left", fill="x", expand=True, padx=(0, 8))
-            self._wizard_template_status_labels[kind] = status
             browse_btn = ctk.CTkButton(
                 row,
                 text="Browse...",
@@ -3981,6 +4042,15 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 command=lambda k=kind: self._on_wizard_clear_template(k),
             )
             self._wizard_template_clear_buttons[kind] = clear_btn
+            status = ctk.CTkLabel(
+                row,
+                text="Not set",
+                anchor="w",
+                font=ctk.CTkFont(size=12),
+                text_color="#666666",
+            )
+            status.pack(side="left", fill="x", expand=True, padx=(0, 8))
+            self._wizard_template_status_labels[kind] = status
 
         self.wizard_scan_progress_frame = ctk.CTkFrame(self.wizard_scan_frame, fg_color="transparent")
         self.wizard_scan_progress_label = ctk.CTkLabel(
