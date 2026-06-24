@@ -764,7 +764,7 @@ Since an issue may propagate through the associative chain of references between
     <Check>
         <Name>Unused Parameters</Name>
         <Category>Consistency</Category>
-        <Description>Checks for parameters that exist in the model but are not actively used by relations, drawings, family tables, programs, notes, or downstream processes. Unused parameters can increase model complexity, create confusion, clutter metadata, and make models more difficult to maintain and troubleshoot. Removing unnecessary parameters helps improve model clarity, consistency, and overall data quality while reducing the risk of outdated or misleading information remaining in the design. Parameter usage and cleanup standards are typically managed through parameter definitions in the start.mcs file, while check behavior and reporting are controlled by the PARAM_UNUSED settings in the check.mch configuration file.</Description>
+        <Description>Checks a model for parameters that exist but are not being used or are not part of the approved set of parameters defined by company standards. It helps identify unnecessary, obsolete, or redundant parameters that add clutter and can lead to confusion or maintenance issues. ModelCHECK reports these unused parameters so they can be reviewed and removed, improving model quality and consistency.</Description>
         <ModelCheckName>PARAM_UNUSED</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
         <why>Unused parameters in a model can lead to confusion, increased complexity, and potential errors during the design process. Ensuring that all parameters are necessary and utilized helps maintain model clarity, simplifies modifications, and enhances the overall efficiency and accuracy of the design.
@@ -1272,9 +1272,9 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <!-- DRAWING REPORT CONFIGURATION -->
     <Check>
-        <Name>Boundary Representation Information</Name>
+        <Name>Boundary Information</Name>
         <Category>Geometry Quality</Category>
-        <Description>Checks and reports information related to boundary representation (B-rep) geometry used within the model or drawing. Boundary representation defines the mathematical surfaces, edges, and topology that make up solid and surface geometry in Creo and is fundamental to accurate modeling, manufacturing, simulation, and downstream data exchange processes. Poorly defined or corrupted boundary representation geometry can lead to regeneration failures, invalid surfaces, geometry translation problems, manufacturing errors, and downstream interoperability issues with formats such as STEP or IGES. This check helps identify and review B-rep-related information to improve model integrity, geometry quality, and downstream reliability. Boundary representation quality standards and related geometry settings are typically managed through ModelCHECK geometry configuration files and Creo geometry validation settings, while check behavior and reporting are controlled by the BOUND_INFO settings in the check.mch configuration file.</Description>
+        <Description>Checks Creo drawings to ensure that no views, entities, dimensions, symbols, notes, or tables are located outside the drawing sheet boundary. It is commonly used to identify misplaced drawing content that could affect drawing readability, plotting, or release quality.</Description>
         <ModelCheckName>BOUND_INFO</ModelCheckName>
         <ModelCheckOptions>YNEW W W N E Y</ModelCheckOptions>
         <display>Y</display>
@@ -1510,9 +1510,9 @@ Suppressed features are appropriate if they are only used by particular instance
         <enabled>Y</enabled>         
     </Check>
     <Check>
-        <Name>Drawing Parameters Usage</Name>
+        <Name>Unused Drawing Parameters</Name>
         <Category>Consistency</Category>
-        <Description>Checks whether drawing parameters are actively used and properly referenced within the drawing according to company drafting and documentation standards. Drawing parameters are commonly used to populate title blocks, notes, repeat regions, BOM tables, revision information, manufacturing instructions, and downstream metadata fields. Parameters that exist but are not properly used may indicate incomplete documentation, broken parameter links, outdated metadata, or unnecessary complexity within the drawing. Improper parameter usage can also lead to incorrect title block information, failed automation, Windchill or ERP integration issues, and downstream manufacturing or inspection errors. This check helps ensure that drawing parameters are correctly connected and used throughout the documentation process. Drawing parameter usage rules and related standards are typically configured in the start.mcs file using DRW_PARAMETER and related entries, while check behavior and reporting are controlled by the PARAMS_USED settings in the check.mch configuration file.</Description>
+        <Description>Checks whether a drawing is using the required standard parameters that are driven from model parameters. The expected parameters are defined in the start configuration file using the DRW_PARAMETER option, and ModelCHECK reports a failure if those required parameters are not referenced in the drawing (for example, in title blocks, notes, or tables). This check helps ensure that drawing information remains linked to model data and is not manually entered or missing.</Description>
         <ModelCheckName>PARAMS_USED</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
         <display>Y</display>

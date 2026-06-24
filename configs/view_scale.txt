@@ -1,0 +1,7 @@
+# ModelCHECK Standard View Scales
+#
+1.0
+0.5
+#0.750
+#0.745
+2.0

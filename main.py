@@ -975,7 +975,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._debug_mode = DEBUG_MODE_DEFAULT
         self._debug_mode_var = tk.BooleanVar(master=self, value=DEBUG_MODE_DEFAULT)
         self._automatic_wizard_chain_job: str | None = None
-        self._automatic_chain_phase: str | int | None = None
+        self._automatic_wizard_paused = False
+        self._wizard_report_auto_create_done = False
         self._skip_timed_out_prompt_on_go = False
         self._go_in_progress = False
         self._configuration_menu: tk.Menu | None = None
@@ -1309,6 +1310,13 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return path if path.is_file() else None
         except OSError:
             return None
+
+    def _wizard_should_auto_create_report(self) -> bool:
+        """Automatic mode: one auto Create Report per visit to the report step."""
+        if self._wizard_report_auto_create_done:
+            return False
+        wd = (self.working_directory.get() or "").strip()
+        return _summary_report_inputs_ok(wd)
 
     def _create_report_task_available(self, working_dir_str: str | None = None) -> bool:
         wd = (working_dir_str if working_dir_str is not None else self.working_directory.get()).strip()
@@ -2110,6 +2118,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             self._wizard_thumbnails_part_phase_done = False
             self._wizard_thumbnails_assembly_phase_done = False
             self._wizard_thumbnails_go_phase = None
+        if step == WIZARD_STEP_REPORT and prev != WIZARD_STEP_REPORT:
+            self._wizard_report_auto_create_done = False
         self._wizard_step = step
         task_display = self._wizard_task_display_for_step(step)
         if task_display:
@@ -2221,35 +2231,79 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if step in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
             if self._wizard_step_has_pending_outputs(step):
                 return False
+            if step == WIZARD_STEP_JPEG_3D:
+                return self._working_directory_thumbnails_complete()
             watch = self._wizard_batch_watch
             if watch is not None and watch.get("step") == step:
                 return self._wizard_batch_outputs_ready(watch)
             return True
         return self._wizard_batch_step_already_complete(step)
 
-    def _wizard_batch_ready_for_auto_advance(self, step: int) -> bool:
-        """True when Automatic mode may advance after this batch step.
-
-        Unlike manual Next >, does not require every model output — only that
-        the current batch run finished or every output already existed.
-        """
-        if self._wizard_step_has_remaining_dxc(step):
+    def _wizard_thumbnails_will_chain_after_batch(self, watch: dict[str, object]) -> bool:
+        """True when the batch watcher will rename JPEGs and start the next thumbnail pass."""
+        if watch.get("step") != WIZARD_STEP_JPEG_3D:
             return False
+        if not self._wizard_batch_outputs_ready(watch):
+            return False
+        phase = watch.get("thumbnails_phase", _WIZARD_THUMBNAILS_PHASE_PART)
+        wd_str = (self.working_directory.get() or "").strip()
+        if not wd_str:
+            return False
+        try:
+            wd = Path(wd_str).expanduser().resolve()
+        except OSError:
+            return False
+        if phase == _WIZARD_THUMBNAILS_PHASE_PART:
+            if self._wizard_thumbnails_phase_has_pending(wd, _WIZARD_THUMBNAILS_PHASE_ASSEMBLY):
+                return True
+            if self._wizard_thumbnails_phase_has_pending(wd, _WIZARD_THUMBNAILS_PHASE_2D):
+                return True
+        elif phase == _WIZARD_THUMBNAILS_PHASE_ASSEMBLY:
+            if self._wizard_thumbnails_phase_has_pending(wd, _WIZARD_THUMBNAILS_PHASE_2D):
+                return True
+        return False
+
+    def _wizard_thumbnails_batch_settling(self, watch: dict[str, object]) -> bool:
+        """True after a thumbnail batch finishes but before rename / next pass / Next >."""
+        if watch.get("step") != WIZARD_STEP_JPEG_3D:
+            return False
+        if not self._wizard_batch_outputs_ready(watch):
+            return False
+        if self._working_directory_thumbnails_complete():
+            return False
+        if self._wizard_thumbnails_will_chain_after_batch(watch):
+            return True
+        if self._wizard_step_has_pending_outputs(WIZARD_STEP_JPEG_3D):
+            return False
+        return True
+
+    def _wizard_footer_next_enabled(self) -> bool:
+        """True when the footer Next / step GO button would be enabled."""
+        step = self._wizard_step
         if self._wizard_batch_waiting_on_step(step):
             return False
+        if step == WIZARD_STEP_SETUP:
+            return self._wizard_setup_valid()
         if step == WIZARD_STEP_SCAN:
             watch = self._wizard_batch_watch
-            if watch is not None and watch.get("step") == step:
-                return self._wizard_batch_outputs_ready(watch)
-            return False
-        if step in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
-            if not self._wizard_step_has_pending_outputs(step):
+            scan_failed = (
+                watch is not None
+                and watch.get("step") == WIZARD_STEP_SCAN
+                and watch.get("scan_failed")
+            )
+            if scan_failed:
+                return self._templates_upload_count() > 0 and self._go_fields_valid()
+            if self._wizard_scan_show_next_after_batch(step):
                 return True
-            watch = self._wizard_batch_watch
-            if watch is not None and watch.get("step") == step:
-                return self._wizard_batch_outputs_ready(watch)
-            return False
-        return self._wizard_batch_step_already_complete(step)
+            return self._templates_upload_count() > 0 and self._go_fields_valid()
+        if step in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
+            if self._wizard_batch_ready_for_next(step):
+                return True
+            return self._go_fields_valid()
+        if step == WIZARD_STEP_REPORT:
+            wd = (self.working_directory.get() or "").strip()
+            return _summary_report_inputs_ok(wd) and not self._report_job_running
+        return False
 
     @staticmethod
     def _batch_dxc_files_exist(batch_dir: Path, scan_templates: bool) -> bool:
@@ -2259,6 +2313,70 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return any(batch_dir.glob(f"{CREO_BATCH_BASE}-*.dxc"))
         except OSError:
             return False
+
+    def _wizard_thumbnails_will_chain_after_batch(self, watch: dict[str, object]) -> bool:
+        """True when the batch watcher will rename JPEGs and start the next thumbnail pass."""
+        if watch.get("step") != WIZARD_STEP_JPEG_3D:
+            return False
+        if not self._wizard_batch_outputs_ready(watch):
+            return False
+        phase = watch.get("thumbnails_phase", _WIZARD_THUMBNAILS_PHASE_PART)
+        wd_str = (self.working_directory.get() or "").strip()
+        if not wd_str:
+            return False
+        try:
+            wd = Path(wd_str).expanduser().resolve()
+        except OSError:
+            return False
+        if phase == _WIZARD_THUMBNAILS_PHASE_PART:
+            if self._wizard_thumbnails_phase_has_pending(wd, _WIZARD_THUMBNAILS_PHASE_ASSEMBLY):
+                return True
+            if self._wizard_thumbnails_phase_has_pending(wd, _WIZARD_THUMBNAILS_PHASE_2D):
+                return True
+        elif phase == _WIZARD_THUMBNAILS_PHASE_ASSEMBLY:
+            if self._wizard_thumbnails_phase_has_pending(wd, _WIZARD_THUMBNAILS_PHASE_2D):
+                return True
+        return False
+
+    def _wizard_thumbnails_batch_settling(self, watch: dict[str, object]) -> bool:
+        """True after a thumbnail batch finishes but before rename / next pass / Next >."""
+        if watch.get("step") != WIZARD_STEP_JPEG_3D:
+            return False
+        if not self._wizard_batch_outputs_ready(watch):
+            return False
+        if self._working_directory_thumbnails_complete():
+            return False
+        if self._wizard_step_has_pending_outputs(WIZARD_STEP_JPEG_3D):
+            return False
+        return True
+
+    def _wizard_footer_next_enabled(self) -> bool:
+        """True when the footer Next / step GO button would be enabled."""
+        step = self._wizard_step
+        if self._wizard_batch_waiting_on_step(step):
+            return False
+        if step == WIZARD_STEP_SETUP:
+            return self._wizard_setup_valid()
+        if step == WIZARD_STEP_SCAN:
+            watch = self._wizard_batch_watch
+            scan_failed = (
+                watch is not None
+                and watch.get("step") == WIZARD_STEP_SCAN
+                and watch.get("scan_failed")
+            )
+            if scan_failed:
+                return self._templates_upload_count() > 0 and self._go_fields_valid()
+            if self._wizard_scan_show_next_after_batch(step):
+                return True
+            return self._templates_upload_count() > 0 and self._go_fields_valid()
+        if step in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
+            if self._wizard_batch_ready_for_next(step):
+                return True
+            return self._go_fields_valid()
+        if step == WIZARD_STEP_REPORT:
+            wd = (self.working_directory.get() or "").strip()
+            return _summary_report_inputs_ok(wd) and not self._report_job_running
+        return False
 
     @staticmethod
     def _batch_dxc_count(batch_dir: Path, scan_templates: bool) -> int:
@@ -3052,7 +3170,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 WIZARD_STEP_MODELCHECK,
                 WIZARD_STEP_JPEG_3D,
             ):
-                self._schedule_automatic_wizard_chain(step)
+                self._schedule_automatic_wizard_advance()
             return
         self._wizard_batch_watch_job = self.after(
             WIZARD_BATCH_DXC_POLL_MS, self._tick_wizard_batch_output_watch
@@ -3066,121 +3184,72 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             except tk.TclError:
                 pass
         self._automatic_wizard_chain_job = None
-        self._automatic_chain_phase = None
 
-    def _schedule_automatic_wizard_chain(self, completed_step: int) -> None:
-        if not self._automatic_mode:
+    def _schedule_automatic_wizard_advance(self) -> None:
+        """Automatic mode: timer that clicks Next > / GO when each step is ready."""
+        if not self._automatic_mode or self._automatic_wizard_paused:
             return
-        if completed_step == WIZARD_STEP_SCAN and self._wizard_scan_step_has_failed():
-            self._cancel_automatic_wizard_chain()
+        jid = self._automatic_wizard_chain_job
+        if jid is not None:
+            try:
+                self.after_cancel(jid)
+            except tk.TclError:
+                pass
+        self._automatic_wizard_chain_job = self.after(
+            300, self._tick_automatic_wizard_advance
+        )
+
+    def _tick_automatic_wizard_advance(self) -> None:
+        """Same actions as the footer Next > button, on a short timer."""
+        self._automatic_wizard_chain_job = None
+        if not self._automatic_mode or self._automatic_wizard_paused:
             return
-        if completed_step not in (
+        if self._modal_dialog_depth > 0:
+            self._schedule_automatic_wizard_advance()
+            return
+
+        step = self._wizard_step
+        if step == WIZARD_STEP_SCAN and self._wizard_scan_step_has_failed():
+            return
+
+        if self._wizard_batch_waiting_on_step(step) or self._go_in_progress:
+            self._schedule_automatic_wizard_advance()
+            return
+
+        if step == WIZARD_STEP_REPORT:
+            if not self._report_job_running and self._wizard_should_auto_create_report():
+                self._on_wizard_next(from_auto=True)
+            return
+
+        if self._wizard_footer_next_enabled():
+            self._on_wizard_next(from_auto=True)
+
+        if step in (
             WIZARD_STEP_SCAN,
             WIZARD_STEP_MODELCHECK,
             WIZARD_STEP_JPEG_3D,
+            WIZARD_STEP_REPORT,
+        ):
+            self._schedule_automatic_wizard_advance()
+
+    def _maybe_schedule_automatic_advance(self) -> None:
+        """Start the auto timer when the footer would enable Next > or GO."""
+        if (
+            not self._automatic_mode
+            or self._automatic_wizard_paused
+            or self._automatic_wizard_chain_job is not None
         ):
             return
-        self._cancel_automatic_wizard_chain()
-        self._automatic_chain_phase = completed_step
-        self._automatic_wizard_chain_job = self.after(250, self._run_automatic_wizard_chain)
-
-    def _run_automatic_wizard_chain(self) -> None:
-        self._automatic_wizard_chain_job = None
-        if not self._automatic_mode:
-            self._automatic_chain_phase = None
+        if self._go_in_progress or self._modal_dialog_depth > 0:
             return
-        if self._modal_dialog_depth > 0:
-            self._automatic_wizard_chain_job = self.after(500, self._run_automatic_wizard_chain)
-            return
-
-        phase = self._automatic_chain_phase
         step = self._wizard_step
-
-        if phase == WIZARD_STEP_SCAN and step == WIZARD_STEP_SCAN:
-            if self._wizard_scan_step_has_failed():
-                self._cancel_automatic_wizard_chain()
-                return
-            if not self._wizard_scan_ready_for_advance(step):
-                self._automatic_wizard_chain_job = self.after(
-                    500, self._run_automatic_wizard_chain
-                )
-                return
-            self._wizard_advance_one_step_after_batch()
-            self._automatic_chain_phase = "start_modelcheck"
-            self._automatic_wizard_chain_job = self.after(300, self._run_automatic_wizard_chain)
+        if self._wizard_batch_waiting_on_step(step):
             return
-
-        if phase == "start_modelcheck" and step == WIZARD_STEP_MODELCHECK:
-            if self._wizard_batch_waiting_on_step(step):
-                self._automatic_wizard_chain_job = self.after(
-                    500, self._run_automatic_wizard_chain
-                )
-                return
-            if not self._wizard_step_has_pending_outputs(step):
-                self._automatic_chain_phase = WIZARD_STEP_MODELCHECK
-                self._run_automatic_wizard_chain()
-                return
-            if self._go_fields_valid():
-                self._automatic_chain_phase = None
-                self._skip_timed_out_prompt_on_go = True
-                self._on_wizard_next()
-                return
-            self._automatic_wizard_chain_job = self.after(
-                500, self._run_automatic_wizard_chain
-            )
-            return
-
-        if phase == WIZARD_STEP_MODELCHECK and step == WIZARD_STEP_MODELCHECK:
-            if not self._wizard_batch_ready_for_auto_advance(step):
-                self._automatic_wizard_chain_job = self.after(
-                    500, self._run_automatic_wizard_chain
-                )
-                return
-            self._wizard_advance_one_step_after_batch()
-            self._automatic_chain_phase = "start_jpeg"
-            self._automatic_wizard_chain_job = self.after(300, self._run_automatic_wizard_chain)
-            return
-
-        if phase == "start_jpeg" and step == WIZARD_STEP_JPEG_3D:
-            if self._wizard_batch_waiting_on_step(step):
-                self._automatic_wizard_chain_job = self.after(
-                    500, self._run_automatic_wizard_chain
-                )
-                return
-            if not self._wizard_step_has_pending_outputs(step):
-                self._automatic_chain_phase = WIZARD_STEP_JPEG_3D
-                self._run_automatic_wizard_chain()
-                return
-            if self._go_fields_valid():
-                self._automatic_chain_phase = None
-                self._skip_timed_out_prompt_on_go = True
-                self._on_wizard_next()
-                return
-            self._automatic_wizard_chain_job = self.after(
-                500, self._run_automatic_wizard_chain
-            )
-            return
-
-        if phase == WIZARD_STEP_JPEG_3D and step == WIZARD_STEP_JPEG_3D:
-            if not self._wizard_batch_ready_for_auto_advance(step):
-                self._automatic_wizard_chain_job = self.after(
-                    500, self._run_automatic_wizard_chain
-                )
-                return
-            self._wizard_advance_one_step_after_batch()
-            self._automatic_chain_phase = "create_report"
-            self._automatic_wizard_chain_job = self.after(300, self._run_automatic_wizard_chain)
-            return
-
-        if phase == "create_report" and step == WIZARD_STEP_REPORT:
-            if self._report_job_running:
-                self._automatic_wizard_chain_job = self.after(500, self._run_automatic_wizard_chain)
-                return
-            wd = (self.working_directory.get() or "").strip()
-            if _summary_report_inputs_ok(wd):
-                self._automatic_chain_phase = None
-                self._on_wizard_next()
-            return
+        if step == WIZARD_STEP_SCAN and self._wizard_scan_show_next_after_batch(step):
+            self._schedule_automatic_wizard_advance()
+        elif step in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D, WIZARD_STEP_REPORT):
+            if self._wizard_footer_next_enabled():
+                self._schedule_automatic_wizard_advance()
 
     def _wizard_batch_step_already_complete(self, step: int) -> bool:
         """True only when this step's batch already finished earlier in this session."""
@@ -3196,7 +3265,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if watch is not None and watch.get("step") == step:
             if self._wizard_step_has_remaining_dxc(step):
                 return True
-            return not self._wizard_batch_outputs_ready(watch)
+            if not self._wizard_batch_outputs_ready(watch):
+                return True
+            if step == WIZARD_STEP_JPEG_3D and self._wizard_thumbnails_batch_settling(watch):
+                return True
+            return False
         return self._wizard_batch_in_progress_for_step(step)
 
     def _wizard_capture_failed_models_after_batch(self, watch: dict[str, object]) -> None:
@@ -3343,11 +3416,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             log_path_attr="_wizard_report_thumbnails_failed_log_path",
         )
 
-    def _wizard_scan_ready_for_advance(self, step: int) -> bool:
-        """True when Scan Templates finished in this session (manual Next or Automatic mode)."""
-        if step != WIZARD_STEP_SCAN:
-            return False
-        if self._wizard_scan_step_has_failed():
+    def _wizard_scan_show_next_after_batch(self, step: int) -> bool:
+        """True when Scan Templates finished in this session (show Next >, not re-scan)."""
+        if step != WIZARD_STEP_SCAN or self._wizard_scan_step_has_failed():
             return False
         if self._wizard_step_has_remaining_dxc(step):
             return False
@@ -3356,16 +3427,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return False
         if not self._wizard_scan_outputs_complete(batch_dir):
             return False
-        if not self._wizard_batch_session_active_for_step(step):
-            return False
-        watch = self._wizard_batch_watch
-        if watch is not None and watch.get("step") == WIZARD_STEP_SCAN:
-            return bool(watch.get("had_dxc"))
-        return True
-
-    def _wizard_scan_show_next_after_batch(self, step: int) -> bool:
-        """True when Scan Templates finished in this session (show Next >, not re-scan)."""
-        return self._wizard_scan_ready_for_advance(step)
+        return self._wizard_batch_session_active_for_step(step)
 
     def _wizard_batch_primary_action_label(self, step: int) -> str:
         if step == WIZARD_STEP_SCAN:
@@ -3381,12 +3443,14 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return
         if self._wizard_batch_waiting_on_step(self._wizard_step):
             return
+        self._automatic_wizard_paused = True
         self._cancel_automatic_wizard_chain()
         self._cancel_wizard_batch_output_watch()
         self._set_wizard_step(self._wizard_step - 1)
 
     def _on_wizard_skip_step(self) -> None:
         step = self._wizard_step
+        self._automatic_wizard_paused = False
         self._cancel_automatic_wizard_chain()
         self._cancel_wizard_batch_output_watch()
         self._close_batch_runner_window()
@@ -3411,7 +3475,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             self._set_wizard_step(WIZARD_STEP_REPORT)
             self._update_create_report_task_list(advance_from_jpeg=False)
 
-    def _on_wizard_next(self) -> None:
+    def _on_wizard_next(self, *, from_auto: bool = False) -> None:
+        if from_auto and self._automatic_wizard_paused:
+            return
+        if not from_auto:
+            self._automatic_wizard_paused = False
         step = self._wizard_step
         if step == WIZARD_STEP_SETUP:
             if not self._wizard_setup_valid():
@@ -3457,6 +3525,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 return
             if self._go_in_progress:
                 return
+            if from_auto:
+                self._skip_timed_out_prompt_on_go = True
             self._on_go()
             return
         if step in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
@@ -3469,6 +3539,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 return
             if step == WIZARD_STEP_JPEG_3D:
                 self.task.set(self._wizard_thumbnails_task_display_to_run())
+            if from_auto:
+                self._skip_timed_out_prompt_on_go = True
             self._on_go()
             return
         if step == WIZARD_STEP_REPORT:
@@ -3913,6 +3985,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 open_rpt.configure(state="normal" if not busy else "disabled")
         if step == WIZARD_STEP_SETUP:
             self._refresh_wizard_setup_status()
+        self._maybe_schedule_automatic_advance()
         self._refresh_menu_bar_state()
 
     def _build_ui(self) -> None:
@@ -4926,6 +4999,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._wizard_step_outcome.clear()
         self._wizard_step_failed_models.clear()
         self._pending_template_sources.clear()
+        self._wizard_report_auto_create_done = False
+        self._automatic_wizard_paused = False
         self._set_wizard_step(WIZARD_STEP_SETUP)
         if errors:
             messagebox.showwarning(
@@ -7637,6 +7712,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             wd = (self.working_directory.get() or "").strip()
             if wd and _working_directory_exists_as_dir(wd):
                 self._remove_master_xml_after_report(Path(wd).expanduser().resolve())
+        if written:
+            self._cancel_automatic_wizard_chain()
+            self._wizard_report_auto_create_done = True
         if written and messagebox.askyesno(
             "Report",
             f"Wrote full report (with sidebar):\n{written}\n\nOpen in browser?",
@@ -7661,6 +7739,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
     def _start_report_job(self, working_dir: Path) -> None:
         if self._report_job_running:
             return
+        self._cancel_automatic_wizard_chain()
         self._set_report_busy(True)
         settings_path = _default_app_settings_path()
         wd = str(working_dir)

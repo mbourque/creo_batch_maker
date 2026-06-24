@@ -2,10 +2,15 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-06-24 — v1.11.0
+- **Automatic mode**: replaced the multi-step internal chain with a simple timer that calls the same **Next >** / **GO** handler as manual mode when each batch step is ready, so Scan Templates advances to ModelCHECK reliably after the scan completes.
+- **Create Report**: fixed **Open in browser?** appearing repeatedly in Automatic mode after a successful build (the auto timer no longer re-triggers **Create Report**; use **Create Report** manually anytime to rebuild, even when `index.html` already exists).
+- **Automatic mode**: **< Back** pauses auto-advance until you click **Next >**, **Skip**, or a step action (**Scan Templates >**, **Run ModelCHECK >**, etc.) yourself.
+- **Thumbnails** / **Automatic mode**: fixed advancing to **Create Report** before all thumbnail passes finished (part → assembly → drawing) and before `*.part.jpg` / `*.assembly.jpg` / `*.drawing.jpg` rename — drawing thumbnails were often skipped and JPEGs stayed as plain `*.jpg`. Automatic mode now uses the same **Waiting…** / **Next >** rules as the footer and does not advance until each step is fully finished.
+
 ## 2026-06-23 — v1.10.3
 - **Scan Templates**: **`configs\sample_start.mcs`** is updated as soon as the scan batch finishes (not only when you run ModelCHECK **GO**).
 - **Scan Templates**: fixed **Browse...** buttons being clipped when multiple template rows are visible.
-- **Automatic mode**: fixed Scan Templates staying on **Waiting…** instead of advancing to ModelCHECK after the scan batch finishes.
 
 ## 2026-06-23 — v1.10.2
 - **Settings → Batch settings…**: dialog stays open (modal, no instant OK from a stray Enter when opened from the menu).
