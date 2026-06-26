@@ -102,6 +102,8 @@ WIZARD_BATCH_DXC_POLL_MS = 3000
 SCAN_BATCH_RUNNER_EXIT_GRACE_SEC = 15
 BATCH_TIMEOUT_LOG_PREFIX = "creo-batch-timeouts-"
 BATCH_STOP_FLAG_BASENAME = "creo-batch-stop.requested"
+# After writing the stop flag, wait briefly for the runner to exit before force-killing.
+BATCH_STOP_COOPERATIVE_WAIT_SEC = 2.0
 # Modal dialogs: match wizard primary/secondary buttons (CTk default can look disabled/gray
 # when a modal opens while the main window still shows Waiting… disabled buttons).
 _DIALOG_BTN_PRIMARY_KW = {
@@ -136,6 +138,7 @@ WIZARD_BATCH_ETA_ESTIMATING_SUFFIX = " · Estimating time…"
 
 class FailedBatchGoChoice(Enum):
     """When a failure log lists models still missing output."""
+    BATCH_ALL_PENDING = "batch_all_pending"
     FAILED_ONE_PER_MODEL = "failed_one_per_model"
     FAILED_NORMAL_CHUNK = "failed_normal_chunk"
 
@@ -1703,7 +1706,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         btn_col.pack(anchor="e", padx=16, pady=(0, 16))
         buttons: list[ctk.CTkButton] = []
         for label, choice, primary in (
-            ("Retry failed only (one model per batch)", FailedBatchGoChoice.FAILED_ONE_PER_MODEL, True),
+            ("Batch all still missing (normal chunking)", FailedBatchGoChoice.BATCH_ALL_PENDING, True),
+            ("Retry failed only (one model per batch)", FailedBatchGoChoice.FAILED_ONE_PER_MODEL, False),
             ("Retry failed only (normal chunking)", FailedBatchGoChoice.FAILED_NORMAL_CHUNK, False),
         ):
             btn = self._mk_dialog_button(
@@ -1734,6 +1738,16 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if task_kind == "modelcheck":
             self._wizard_step_failed_models.pop(WIZARD_STEP_MODELCHECK, None)
 
+    def _clear_step_failure_logs(self, step: int, batch_dir: Path | None) -> None:
+        """Clear timeout failure logs for a wizard batch step (e.g. after Stop)."""
+        if batch_dir is None:
+            return
+        if step == WIZARD_STEP_MODELCHECK:
+            self._clear_batch_failure_log_for_task(batch_dir, "modelcheck")
+        elif step == WIZARD_STEP_JPEG_3D:
+            for kind in _JPEG_THUMBNAIL_FAILURE_TASK_KINDS:
+                self._clear_batch_failure_log_for_task(batch_dir, kind)
+
     def _resolve_batch_go_models(
         self,
         latest_files: list[Path],
@@ -1756,24 +1770,25 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             batch_dir, task_kind, latest_files, working_dir=working_dir
         )
 
-        if failed_candidates:
-            if silent:
-                choice = FailedBatchGoChoice.FAILED_ONE_PER_MODEL
-            else:
-                step_label = self._timeout_task_step_label(task_kind)
-                log_name = f"{BATCH_TIMEOUT_LOG_PREFIX}{task_kind}.txt"
-                message = (
-                    f"The last {step_label} run recorded {len(failed_candidates)} failed "
-                    "model(s) still missing output.\n\n"
-                    f"See {log_name} in the working folder for the full list.\n\n"
-                    "Retry failed only (one model per batch) — one `.dxc` per failed model.\n"
-                    "Retry failed only (normal chunking) — failed models only, using batch "
-                    "chunk size from Settings.\n\n"
-                    "Cancel — do not start the batch."
-                )
-                choice = self._ask_failed_batch_go_choice(message)
-                if choice is None:
-                    return pending, False, None, False
+        if failed_candidates and not silent:
+            step_label = self._timeout_task_step_label(task_kind)
+            log_name = f"{BATCH_TIMEOUT_LOG_PREFIX}{task_kind}.txt"
+            message = (
+                f"The last {step_label} run recorded {len(failed_candidates)} failed "
+                f"model(s) still missing output ({len(pending)} total still need output).\n\n"
+                f"See {log_name} in the working folder for the full list.\n\n"
+                "Batch all still missing — every model without output, using batch chunk size "
+                "from Settings.\n"
+                "Retry failed only (one model per batch) — one `.dxc` per failed model.\n"
+                "Retry failed only (normal chunking) — failed models only, using batch "
+                "chunk size from Settings.\n\n"
+                "Cancel — do not start the batch."
+            )
+            choice = self._ask_failed_batch_go_choice(message)
+            if choice is None:
+                return pending, False, None, False
+            if choice == FailedBatchGoChoice.BATCH_ALL_PENDING:
+                return pending, True, None, False
             retry_paths = _paths_for_timed_out_candidates(latest_files, failed_candidates)
             if not retry_paths:
                 return [], False, None, False
@@ -2216,6 +2231,14 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if watch is not None and watch.get("step") == step:
             return self._wizard_batch_outputs_ready(watch)
         return False
+
+    def _wizard_batch_ready_for_auto_advance(self, step: int) -> bool:
+        """Automatic mode: advance after this step's batch run finished (even if outputs remain)."""
+        if step not in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
+            return False
+        if not self._wizard_batch_session_active_for_step(step):
+            return False
+        return self._wizard_batch_runner_finished_for_step(step)
 
     def _wizard_batch_ready_for_next(self, step: int) -> bool:
         """True when this step's required outputs are complete and Next should show."""
@@ -2985,7 +3008,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         )
 
     def _on_wizard_scan_batch_failed(self, watch: dict[str, object]) -> None:
-        """Stop automatic mode and block advance when template scan did not succeed."""
+        """Pause auto-advance when template scan did not succeed (checkbox unchanged)."""
         watch["scan_failed"] = True
         self._cancel_automatic_wizard_chain()
         self._wizard_step_outcome.pop(WIZARD_STEP_SCAN, None)
@@ -3001,7 +3024,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 log_hint = f"\n\nSee log:\n{log_path}"
         messagebox.showerror(
             "Scan Templates failed",
-            "Template scan did not complete. Automatic mode has been stopped.\n\n"
+            "Template scan did not complete. Auto-advance is paused until you continue manually.\n\n"
+            "The Automatic mode checkbox in Settings is not changed.\n\n"
             "Fix the issue and use Scan Templates > to try again."
             + log_hint,
         )
@@ -3533,6 +3557,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             if self._wizard_batch_waiting_on_step(step):
                 return
             if self._wizard_batch_ready_for_next(step):
+                self._wizard_advance_one_step_after_batch()
+                return
+            if from_auto and self._wizard_batch_ready_for_auto_advance(step):
                 self._wizard_advance_one_step_after_batch()
                 return
             if self._go_in_progress:
@@ -4563,6 +4590,13 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return
         fully_enabled = self._app_menus_fully_enabled()
         batch_stop = self._batch_stop_available()
+        try:
+            if bool(self._automatic_mode_var.get()) != self._automatic_mode:
+                self._automatic_mode_var.set(self._automatic_mode)
+            if bool(self._debug_mode_var.get()) != self._debug_mode:
+                self._debug_mode_var.set(self._debug_mode)
+        except tk.TclError:
+            pass
         for label in ("Settings", "Configuration"):
             try:
                 menubar.entryconfigure(label, state=tk.NORMAL if fully_enabled else tk.DISABLED)
@@ -4924,20 +4958,17 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "Outputs already written are kept.\n\n"
             "To continue later, run this wizard step again — completed models are skipped."
         )
-        if not self._show_proceed_cancel_dialog("Stop", prompt):
+        if not self._show_proceed_cancel_dialog("Stop", prompt, default_proceed=True):
             return
+        self._automatic_wizard_paused = True
+        self._cancel_automatic_wizard_chain()
         if watch is not None:
             self._wizard_capture_failed_models_after_batch(watch)
-        self._cancel_automatic_wizard_chain()
         self._cancel_post_batch_task_refresh()
-        batch_dir, _ = self._wizard_batch_dxc_context_for_step(step)
-        if self._debug_mode:
-            self._request_batch_runner_stop(batch_dir)
-            kill_ok, kill_err = self._run_kill_bat()
-        else:
-            self._close_batch_runner_window(force=True)
-            self._close_stray_batch_runner_windows()
-            kill_ok, kill_err = self._run_kill_bat()
+        batch_dir, scan_templates = self._wizard_batch_dxc_context_for_step(step)
+        kill_ok, kill_err = self._execute_batch_stop(batch_dir, scan_templates)
+        if step in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
+            self._clear_step_failure_logs(step, batch_dir)
         self._cancel_wizard_batch_output_watch()
         self._refresh_wizard_ui()
         if not kill_ok:
@@ -4955,6 +4986,30 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             f"Batch stopped on the {step_label} step.\n\n"
             "Run this step again when you are ready to continue (completed outputs are skipped).",
         )
+
+    def _execute_batch_stop(
+        self, batch_dir: Path | None, scan_templates: bool
+    ) -> tuple[bool, str | None]:
+        """Signal the runner, wait briefly, force-close if needed, clean .dxc, run kill.bat."""
+        self._request_batch_runner_stop(batch_dir)
+        proc = self._batch_runner_process
+        if proc is not None and proc.poll() is None:
+            deadline = time.time() + BATCH_STOP_COOPERATIVE_WAIT_SEC
+            while time.time() < deadline:
+                if proc.poll() is not None:
+                    break
+                try:
+                    self.update_idletasks()
+                except tk.TclError:
+                    break
+                time.sleep(0.2)
+        if not self._debug_mode:
+            self._close_batch_runner_window(force=True)
+            self._close_stray_batch_runner_windows()
+        if batch_dir is not None and batch_dir.is_dir():
+            self._cleanup_leftover_batch_dxc(batch_dir, scan_templates=scan_templates)
+            self._clear_batch_stop_flag(batch_dir)
+        return self._run_kill_bat()
 
     def _show_stop_result_message(self, kind: str, title: str, message: str) -> None:
         """Show Stop result after wizard buttons repaint (avoids gray modal button text)."""
@@ -5148,6 +5203,15 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             notepad = Path(system_root) / "notepad.exe"
         subprocess.Popen([str(notepad), str(target)], close_fds=True)
 
+    def _merge_session_into_app_settings_dict(self, data: dict[str, object]) -> dict[str, object]:
+        """Keep checkbox/batch settings from memory so merge writes cannot drop them."""
+        data["automatic_mode"] = self._automatic_mode
+        data["debug_mode"] = self._debug_mode
+        data["chunk_size"] = self._chunk_size
+        data["output_timeout_sec"] = self._output_timeout_sec
+        data["xtop_timeout_sec"] = self._xtop_gone_timeout_sec
+        return data
+
     def _read_app_settings_dict(self) -> dict[str, object]:
         path = _default_app_settings_path()
         if not path.is_file():
@@ -5168,8 +5232,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
     def _persist_automatic_mode(self, enabled: bool) -> str | None:
         self._automatic_mode = _normalize_automatic_mode(enabled)
-        data = self._read_app_settings_dict()
-        data["automatic_mode"] = self._automatic_mode
+        data = self._merge_session_into_app_settings_dict(self._read_app_settings_dict())
         return self._write_app_settings_dict(data)
 
     def _on_automatic_mode_toggle(self) -> None:
@@ -5186,8 +5249,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
     def _persist_debug_mode(self, enabled: bool) -> str | None:
         self._debug_mode = _normalize_automatic_mode(enabled)
-        data = self._read_app_settings_dict()
-        data["debug_mode"] = self._debug_mode
+        data = self._merge_session_into_app_settings_dict(self._read_app_settings_dict())
         return self._write_app_settings_dict(data)
 
     def _on_debug_mode_toggle(self) -> None:
@@ -5208,10 +5270,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._chunk_size = _normalize_chunk_size(chunk_size)
         self._output_timeout_sec = _normalize_output_timeout_sec(output_timeout_sec)
         self._xtop_gone_timeout_sec = _normalize_xtop_gone_timeout_sec(xtop_gone_timeout_sec)
-        data = self._read_app_settings_dict()
-        data["chunk_size"] = self._chunk_size
-        data["output_timeout_sec"] = self._output_timeout_sec
-        data["xtop_timeout_sec"] = self._xtop_gone_timeout_sec
+        data = self._merge_session_into_app_settings_dict(self._read_app_settings_dict())
         return self._write_app_settings_dict(data)
 
     def _on_batch_settings(self) -> None:
@@ -5777,8 +5836,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 self.after_idle(_repaint_action_buttons)
         return result["value"]
 
-    def _show_proceed_cancel_dialog(self, title: str, message: str) -> bool:
-        """Return True when the user clicks Proceed (Cancel is the default)."""
+    def _show_proceed_cancel_dialog(
+        self, title: str, message: str, *, default_proceed: bool = False
+    ) -> bool:
+        """Return True when the user clicks Proceed (Cancel is the default unless overridden)."""
         anchor = self
         dialog = ctk.CTkToplevel(anchor)
         dialog.withdraw()
@@ -5805,62 +5866,18 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         )
         cancel_btn.pack(side="right", padx=(8, 0))
         proceed_btn.pack(side="right")
-
-        def place_centered() -> None:
-            if not dialog.winfo_exists():
-                return
-            try:
-                anchor.deiconify()
-                anchor.update_idletasks()
-            except tk.TclError:
-                pass
-            dialog.update_idletasks()
-            try:
-                _center_toplevel_on_parent(dialog, anchor)
-            except tk.TclError:
-                pass
-
-        def show() -> None:
-            if not dialog.winfo_exists():
-                return
-            dialog.deiconify()
-            place_centered()
-            try:
-                dialog.attributes("-topmost", True)
-                dialog.lift()
-                cancel_btn.focus_set()
-                dialog.after(
-                    200,
-                    lambda: dialog.attributes("-topmost", False)
-                    if dialog.winfo_exists()
-                    else None,
-                )
-            except tk.TclError:
-                pass
-            dialog.after(50, place_centered)
-            self._repaint_dialog_buttons(dialog, cancel_btn, proceed_btn)
+        default_btn = proceed_btn if default_proceed else cancel_btn
 
         dialog.bind("<Escape>", lambda _e: close(False))
-        dialog.bind("<Return>", lambda _e: close(False))
+        dialog.bind("<Return>", lambda _e: close(default_proceed))
         dialog.protocol("WM_DELETE_WINDOW", lambda: close(False))
 
-        self._modal_dialog_depth += 1
-        try:
-            dialog.update_idletasks()
-            dialog.after_idle(show)
-            dialog.wait_window()
-        finally:
-            self._modal_dialog_depth = max(0, self._modal_dialog_depth - 1)
-            if anchor is self:
-
-                def _repaint_action_buttons() -> None:
-                    try:
-                        self._refresh_action_buttons_run()
-                        self.update_idletasks()
-                    except tk.TclError:
-                        pass
-
-                self.after_idle(_repaint_action_buttons)
+        self._run_modal_toplevel_wait(
+            dialog,
+            anchor=anchor,
+            focus_widget=default_btn,
+            repaints=(cancel_btn, proceed_btn),
+        )
         return result["value"]
 
     def _create_modal_toplevel(self, title: str) -> ctk.CTkToplevel:
@@ -6031,7 +6048,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         data["xtop_timeout_sec"] = _normalize_xtop_gone_timeout_sec(
             data.get("xtop_timeout_sec", self._xtop_gone_timeout_sec)
         )
-        self._write_app_settings_dict(data)
+        self._write_app_settings_dict(self._merge_session_into_app_settings_dict(data))
 
     def _apply_settings_data(self, data: dict[str, object]) -> None:
         """Apply settings from a dict (same keys as app_settings.json). Refreshes task list and menu."""

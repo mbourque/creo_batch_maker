@@ -2,17 +2,33 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-06-26 — v1.11.2
+
+- **Automatic mode**: after a **ModelCHECK** or **Thumbnails** batch run finishes (all chunks done), the wizard now advances to the next step even when some models timed out or still lack output — it no longer immediately starts another batch on the same step. Manual **Next >** still requires all outputs; use **Run ModelCHECK >** / **Thumbnails >** to continue a partial step.
+
+## 2026-06-26 — v1.11.1
+
+- **Stop**: fixed confirmation dialog flashing or dismissing behind the wizard during a batch; **Proceed** is the default for **Stop** ( **Start over…** still defaults to **Cancel** ).
+- **Stop**: normal mode now signals the runner (`creo-batch-stop.requested`), waits briefly for a clean exit, then force-closes the runner if needed, removes leftover `.dxc` files, and runs `kill.bat` — stopping a scan or batch should work on the first try more reliably.
+- **Stop** / **Automatic mode**: fixed the batch auto-restarting right after **Stop** — automatic advance is now paused (like **< Back**) until you click **Next >**, **Skip**, or a step **GO** button yourself.
+- **ModelCHECK** / **Automatic mode**: fixed failed-model retries using one model per `creo-batch-N.dxc` instead of normal chunk size (e.g. 10) when the timeout log was present — auto now batches **all** models still missing output (not only the failure-log list). **Stop** clears the failure log so the next run matches the “still need output” count on screen.
+- **ModelCHECK** / **Thumbnails**: when a failure log exists, manual **GO** now offers **Batch all still missing (normal chunking)** (default) as well as retry-failed-only choices.
+- **Automatic mode**: fixed `app_settings.json` autosave sometimes writing a stale `automatic_mode: false` while the checkbox was still on in the session (could look unchecked after restart). Scan-failed dialog no longer implies Automatic mode was turned off — only auto-advance pauses.
+
 ## 2026-06-24 — v1.11.0
+
 - **Automatic mode**: replaced the multi-step internal chain with a simple timer that calls the same **Next >** / **GO** handler as manual mode when each batch step is ready, so Scan Templates advances to ModelCHECK reliably after the scan completes.
 - **Create Report**: fixed **Open in browser?** appearing repeatedly in Automatic mode after a successful build (the auto timer no longer re-triggers **Create Report**; use **Create Report** manually anytime to rebuild, even when `index.html` already exists).
 - **Automatic mode**: **< Back** pauses auto-advance until you click **Next >**, **Skip**, or a step action (**Scan Templates >**, **Run ModelCHECK >**, etc.) yourself.
 - **Thumbnails** / **Automatic mode**: fixed advancing to **Create Report** before all thumbnail passes finished (part → assembly → drawing) and before `*.part.jpg` / `*.assembly.jpg` / `*.drawing.jpg` rename — drawing thumbnails were often skipped and JPEGs stayed as plain `*.jpg`. Automatic mode now uses the same **Waiting…** / **Next >** rules as the footer and does not advance until each step is fully finished.
 
 ## 2026-06-23 — v1.10.3
-- **Scan Templates**: **`configs\sample_start.mcs`** is updated as soon as the scan batch finishes (not only when you run ModelCHECK **GO**).
+
+- **Scan Templates**: `**configs\sample_start.mcs`** is updated as soon as the scan batch finishes (not only when you run ModelCHECK **GO**).
 - **Scan Templates**: fixed **Browse...** buttons being clipped when multiple template rows are visible.
 
 ## 2026-06-23 — v1.10.2
+
 - **Settings → Batch settings…**: dialog stays open (modal, no instant OK from a stray Enter when opened from the menu).
 
 ## 2026-06-22 — v1.10.1
@@ -183,3 +199,4 @@ Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. 
 ## 2026-04-09 — v1.0
 
 - **Initial release**: added the first version of the main application script.
+
