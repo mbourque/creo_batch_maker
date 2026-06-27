@@ -151,7 +151,7 @@ Note that sometimes unattached features are acceptable, because later features c
 ]]></why>
     </Check>
     <Check>
-        <Name>Material Density Definition</Name>
+        <Name>Undefined Material Density</Name>
         <Category>Consistency</Category>
         <Description>Checks whether materials assigned to the model contain valid and properly defined density values used for mass property calculations and downstream analysis. Accurate material density is critical for correct weight calculations, center of gravity results, simulation accuracy, structural analysis, manufacturing estimates, and BOM data. Missing, incorrect, or unrealistic density values can lead to inaccurate mass properties, poor engineering decisions, and downstream manufacturing or performance issues. This check helps ensure that all assigned materials contain appropriate density definitions that comply with company and engineering standards. Material assignments and approved material definitions are typically managed through Creo material libraries and ModelCHECK material settings, while check behavior and reporting are controlled by the DEF_DENSITY settings in the check.mch configuration file.</Description>
         <ModelCheckName>DEF_DENSITY</ModelCheckName>
@@ -489,7 +489,7 @@ Since an issue may propagate through the associative chain of references between
         <enabled>Y</enabled>         
     </Check>
     <Check>
-        <Name>Insert Mode Usage</Name>
+        <Name>Insert Mode On</Name>
         <Category>Model Integrity</Category>
         <Description>Checks whether the model is currently using Insert Mode or contains features affected by Insert Mode operations within the feature tree. Insert Mode allows users to temporarily roll back the model history to add, modify, suppress, or troubleshoot features earlier in the regeneration sequence, but improper or unfinished use of Insert Mode can create unstable models, incomplete geometry, suppressed downstream features, and unexpected regeneration behavior. Leaving models in Insert Mode may also cause confusion, hidden geometry changes, and downstream manufacturing or documentation issues. This check helps ensure that Insert Mode is used intentionally and that models are fully regenerated and restored to a stable state before release or downstream use. Check behavior and reporting are controlled by the INSERT_MODE settings in the check.mch configuration file.</Description>
         <ModelCheckName>INSERT_MODE</ModelCheckName>
@@ -899,7 +899,7 @@ Retrieval and regeneration issues in models with family tables are more serious 
         </why>
     </Check>
     <Check>
-        <Name>Relation Comments</Name>
+        <Name>Relations Without Comments</Name>
         <Category>Design Intent Strength</Category>
         <Description>Checks whether relations within the model include meaningful comments or documentation to explain their purpose and behavior. Relations often control important parametric logic, calculations, feature behavior, and automation within a model, and undocumented relations can make models difficult to understand, troubleshoot, or modify over time. Adding clear comments improves readability, maintainability, collaboration, and long-term support of complex parametric designs. Relation definitions and standards are typically configured in the start.mcs file using PRT_RELATION, ASM_RELATION, and related entries, while check behavior and reporting are controlled by the RELATION_COMM settings in the check.mch configuration file.</Description>
         <ModelCheckName>RELATION_COMM</ModelCheckName>
@@ -2423,7 +2423,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
 
     <Check>
-        <Name>Parent Difference</Name>
+        <Name>Parent Reference Issues</Name>
         <Category>Design Intent Strength</Category>
         <Description>Checks for features in the model whose parent-child relationships differ from expected design intent or from the original feature structure defined during model creation. This includes identifying cases where features have been reordered, reattached, or unintentionally linked to different parent features, which can occur due to edits, regeneration changes, or geometry modifications. Incorrect parent relationships can compromise model stability, lead to unexpected regeneration behavior, break downstream features, and create inconsistencies in design intent and documentation. This check helps ensure that the feature hierarchy remains consistent, predictable, and aligned with the intended modeling structure. Parent-child relationship rules and model integrity standards are typically governed by Creo feature dependency behavior and ModelCHECK configuration files, while check behavior and reporting are controlled by the PARENT_DIFF settings in the check.mch configuration file.</Description>
         <ModelCheckName>PARENT_DIFF</ModelCheckName>
