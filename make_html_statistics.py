@@ -887,6 +887,41 @@ _MQ_STATS_CSS = """
 .mq-stats-embedded button.mq-health-jump:hover { background: #f1f5f9; }
 .mq-stats-embedded button.mq-health-jump:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 
+.mq-complexity-table { width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+.mq-complexity-head {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 8px 10px; border-bottom: 1px solid #e2e8f0;
+  font-size: 0.78rem; text-transform: uppercase; letter-spacing: .04em;
+  color: #64748b; font-weight: 600; background: #fff;
+}
+.mq-complexity-head .mq-complexity-model { flex: 1; min-width: 0; text-align: left; }
+.mq-complexity-head .mq-complexity-val { width: 5.5rem; text-align: right; flex-shrink: 0; }
+.mq-complexity-row, .mq-stats-embedded button.mq-complexity-jump {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 8px 10px; border-bottom: 1px solid #e2e8f0;
+  font-size: 0.88rem; box-sizing: border-box;
+}
+.mq-complexity-row .mq-complexity-model, .mq-stats-embedded button.mq-complexity-jump .mq-complexity-model {
+  flex: 1; min-width: 0; text-align: left;
+  color: #1a1a1a; font-weight: normal; text-decoration: none;
+}
+.mq-complexity-row .mq-complexity-val, .mq-stats-embedded button.mq-complexity-jump .mq-complexity-val {
+  width: 5.5rem; text-align: right; flex-shrink: 0;
+  font-weight: 600; color: #0f172a; text-decoration: none;
+}
+.mq-stats-embedded button.mq-complexity-jump {
+  border: none; background: transparent; text-align: left; font: inherit; color: #1a1a1a;
+  cursor: pointer; margin: 0; text-decoration: none;
+}
+.mq-stats-embedded button.mq-complexity-jump:hover { background: #f1f5f9; }
+.mq-stats-embedded button.mq-complexity-jump:hover .mq-complexity-model,
+.mq-stats-embedded button.mq-complexity-jump:hover .mq-complexity-val {
+  color: #1a1a1a; text-decoration: none;
+}
+.mq-stats-embedded button.mq-complexity-jump:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
+.mq-complexity-table > .mq-complexity-row:last-child,
+.mq-complexity-table > button.mq-complexity-jump:last-of-type { border-bottom: none; }
+
 .mq-inst-names { line-height: 1.45; }
 
 .mq-skipped-names { color: #334155; }
@@ -1056,6 +1091,43 @@ def _bom_row(row: BomComponentRow, *, embedded: bool, collapsed: bool = False) -
             f'data-mq-model-jump="{_esc(row.name)}">{inner}</button>'
         )
     return f'<div class="mq-bom-row{rest_cls}"{hidden_attr}>{inner}</div>'
+
+
+def _complexity_row(model: str, value_html: str, *, embedded: bool) -> str:
+    display = _esc(_model_display_lower(model))
+    inner = (
+        f'<span class="mq-complexity-model">{display}</span>'
+        f'<span class="mq-complexity-val">{value_html}</span>'
+    )
+    if embedded:
+        return (
+            f'<button type="button" class="mq-complexity-jump" '
+            f'data-mq-model-jump="{_esc(model)}">{inner}</button>'
+        )
+    return f'<div class="mq-complexity-row">{inner}</div>'
+
+
+def _complexity_table_block(
+    *,
+    title: str,
+    value_heading: str,
+    rows_html: str,
+) -> str:
+    return f"""
+
+      <div>
+
+        <h3 style="font-size:0.95rem;margin:0 0 8px 0">{title}</h3>
+
+        <div class="mq-complexity-table">
+          <div class="mq-complexity-head">
+            <span class="mq-complexity-model">Model</span>
+            <span class="mq-complexity-val">{value_heading}</span>
+          </div>
+          {rows_html}
+        </div>
+
+      </div>"""
 
 
 def _top_level_bom_section(
@@ -1326,7 +1398,7 @@ def generate_statistics_html(stats: BatchStatistics, *, embedded: bool = False) 
 
   <div class="mq-section">
 
-    <h2>At a glance</h2>
+    <h2>Biggest problems:</h2>
 
     {''.join(health_rows)}
 
@@ -1335,17 +1407,13 @@ def generate_statistics_html(stats: BatchStatistics, *, embedded: bool = False) 
 
 
     top_feat_rows = "".join(
-
-        f"<tr><td>{_esc(_model_display_lower(m))}</td><td>{n}</td></tr>"
+        _complexity_row(m, str(n), embedded=embedded)
         for m, n in stats.top_features_parts
-
     )
 
     top_size_rows = "".join(
-
-        f"<tr><td>{_esc(_model_display_lower(m))}</td><td>{sz:.2f} MB</td></tr>"
+        _complexity_row(m, f"{sz:.2f} MB", embedded=embedded)
         for m, sz in stats.top_size_parts
-
     )
 
     complexity_snapshot_section = ""
@@ -1356,27 +1424,23 @@ def generate_statistics_html(stats: BatchStatistics, *, embedded: bool = False) 
 
         if top_feat_rows:
 
-            snapshot_parts.append(f"""
-
-      <div>
-
-        <h3 style="font-size:0.95rem;margin:0 0 8px 0">Top parts by features</h3>
-
-        <table class="mq-table"><thead><tr><th>Model</th><th>Features</th></tr></thead><tbody>{top_feat_rows}</tbody></table>
-
-      </div>""")
+            snapshot_parts.append(
+                _complexity_table_block(
+                    title="Top parts by features",
+                    value_heading="Features",
+                    rows_html=top_feat_rows,
+                )
+            )
 
         if top_size_rows:
 
-            snapshot_parts.append(f"""
-
-      <div>
-
-        <h3 style="font-size:0.95rem;margin:0 0 8px 0">Top parts by file size</h3>
-
-        <table class="mq-table"><thead><tr><th>Model</th><th>Size</th></tr></thead><tbody>{top_size_rows}</tbody></table>
-
-      </div>""")
+            snapshot_parts.append(
+                _complexity_table_block(
+                    title="Top parts by file size",
+                    value_heading="Size",
+                    rows_html=top_size_rows,
+                )
+            )
 
         snapshot_parts.append("</div>")
 

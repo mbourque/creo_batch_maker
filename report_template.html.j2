@@ -511,10 +511,55 @@
 
         function setViewFilterAll() {
             var sel = document.getElementById('sidebar-view-filter');
+            var mode = document.body.getAttribute('data-mq-view-filter') || 'all';
+            if (mode === 'all' && sel && sel.value === 'all') { return; }
             if (sel) { sel.value = 'all'; }
             document.body.removeAttribute('data-mq-view-filter');
             mqSyncSidebarNav();
             mqApplySidebarNavOrder('all');
+        }
+
+        var mqModelJumpTargets = null;
+
+        function mqEnsureModelJumpIndex() {
+            if (mqModelJumpTargets) { return; }
+            mqModelJumpTargets = Object.create(null);
+            var rows = document.querySelectorAll('.file-list[data-mq-model]');
+            for (var i = 0; i < rows.length; i++) {
+                var key = (rows[i].getAttribute('data-mq-model') || '').toLowerCase();
+                if (key && !mqModelJumpTargets[key]) {
+                    mqModelJumpTargets[key] = rows[i];
+                }
+            }
+        }
+
+        function jumpToModel(modelName) {
+            if (!modelName) { return; }
+            var mode = document.body.getAttribute('data-mq-view-filter') || 'all';
+            if (mode !== 'all') { setViewFilterAll(); }
+            mqEnsureModelJumpIndex();
+            var target = mqModelJumpTargets[modelName.toLowerCase()];
+            if (!target || !document.body.contains(target)) { return; }
+            if (target.id) {
+                window.location.hash = target.id;
+            }
+            target.classList.add('mq-bom-scroll-target');
+            setTimeout(function () { target.classList.remove('mq-bom-scroll-target'); }, 2500);
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function initModelJumps() {
+            var btns = document.querySelectorAll(
+                '.mq-bom-jump[data-mq-model-jump], .mq-complexity-jump[data-mq-model-jump]'
+            );
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    jumpToModel(this.getAttribute('data-mq-model-jump'));
+                });
+            }
+            if (window.requestIdleCallback) {
+                requestIdleCallback(function () { mqEnsureModelJumpIndex(); }, { timeout: 3000 });
+            }
         }
 
         function jumpToHealthCheck(checkName) {
@@ -550,37 +595,6 @@
             for (var i = 0; i < bars.length; i++) {
                 bars[i].addEventListener('click', function () {
                     jumpToHealthCheck(this.getAttribute('data-mq-health-check'));
-                });
-            }
-        }
-
-        function jumpToModel(modelName) {
-            if (!modelName) { return; }
-            setViewFilterAll();
-            var needle = modelName.toLowerCase();
-            var target = null;
-            var rows = document.querySelectorAll('.file-list[data-mq-model]');
-            for (var i = 0; i < rows.length; i++) {
-                var m = (rows[i].getAttribute('data-mq-model') || '').toLowerCase();
-                if (m === needle) {
-                    target = rows[i];
-                    break;
-                }
-            }
-            if (!target || !document.body.contains(target)) { return; }
-            if (target.id) {
-                window.location.hash = target.id;
-            }
-            target.classList.add('mq-bom-scroll-target');
-            setTimeout(function () { target.classList.remove('mq-bom-scroll-target'); }, 2500);
-            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-
-        function initModelJumps() {
-            var btns = document.querySelectorAll('.mq-bom-jump[data-mq-model-jump]');
-            for (var i = 0; i < btns.length; i++) {
-                btns[i].addEventListener('click', function () {
-                    jumpToModel(this.getAttribute('data-mq-model-jump'));
                 });
             }
         }

@@ -30,7 +30,7 @@
 
     <!-- PART REPORT CONFIGURATION -->
     <Check>
-        <Name>Accuracy Information</Name>
+        <Name>Model Accuracy</Name>
         <Category>Geometry Quality</Category>
         <Description>Checks and reports the geometric accuracy settings used within the model, including relative or absolute accuracy definitions that control how precisely geometry is calculated and regenerated. Proper accuracy settings are critical for maintaining stable geometry, reliable Boolean operations, successful feature regeneration, accurate mass properties, and high-quality downstream manufacturing, simulation, and data exchange processes. Accuracy values that are too loose can create gaps, failed geometry, and regeneration problems, while excessively tight accuracy can negatively impact performance and model complexity. This check helps ensure that model accuracy settings are appropriate and consistent with company standards and intended model usage. Accuracy limits and related standards are typically configured in the constant.mcn file using settings such as ACCURACY_LOW, ACCURACY_UPP, MIN_ABS_ACCURACY, and MAX_ABS_ACCURACY, while check behavior and reporting are controlled by the ACCURACY_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>ACCURACY_INFO</ModelCheckName>
@@ -121,7 +121,7 @@ Note that sometimes unattached features are acceptable, because later features c
         <enabled>Y</enabled>         
     </Check>
     <Check>
-        <Name>Cylindrical Cut Slots</Name>
+        <Name>Cylinder Cuts and Slots</Name>
         <Category>Model Integrity</Category>
         <Description>Checks for slot or cut features that could be more appropriately modeled as standard cylindrical holes. Using proper hole features instead of manually created cylindrical cuts or slot geometry improves model clarity, manufacturing consistency, hole table support, downstream automation, and compatibility with machining and CAM processes. Nonstandard cut geometry may reduce feature recognition, complicate manufacturing documentation, and make models more difficult to maintain or modify. This check helps encourage the use of standard hole definitions and cleaner modeling practices where appropriate. Hole standards and related geometry definitions are typically configured through ModelCHECK configuration files and external hole definition tables, while check behavior and reporting are controlled by the CYL_CUT_SLOTS settings in the check.mch configuration file.</Description>
         <ModelCheckName>CYL_CUT_SLOTS</ModelCheckName>
@@ -130,7 +130,7 @@ Note that sometimes unattached features are acceptable, because later features c
         <enabled>Y</enabled>         
     </Check>
     <Check>
-        <Name>Cylindrical Diameters</Name>
+        <Name>Cylindrical Cut/Slot Diameters</Name>
         <Category>Consistency</Category>
         <Description>Checks whether cylindrical features such as holes, shafts, pins, or round cut geometry use approved or standardized diameter values according to company and manufacturing standards. Controlling cylindrical diameters helps ensure manufacturability, tooling compatibility, standard hardware usage, and consistency across designs. Incorrect, nonstandard, or excessively precise diameters can create machining difficulties, increase manufacturing cost, complicate inspection, and reduce compatibility with standard components and downstream automation processes. This check helps identify cylindrical geometry that may need to be adjusted to approved standard sizes or tolerances. Standard diameter values are typically configured through external hole and diameter definition files referenced by the start.mcs configuration, while check behavior and reporting are controlled by the CYL_DIAMS settings in the check.mch configuration file.</Description>
         <ModelCheckName>CYL_DIAMS</ModelCheckName>
@@ -185,7 +185,7 @@ Note that sometimes unattached features are acceptable, because later features c
         <enabled>Y</enabled>         
     </Check>
     <Check>
-        <Name>Model Integrity</Name>
+        <Name>Draft Children</Name>
         <Category>Design Intent Strength</Category>
         <Description>Checks for features that depend on draft geometry as parent references. Draft features are often added later in the design process to satisfy manufacturing requirements, and using them as references for downstream features can weaken design intent and create unstable parent-child relationships. Changes to draft geometry may cause dependent features to fail, regenerate incorrectly, or produce unexpected geometry changes during future modifications. This check helps encourage stronger and more maintainable modeling practices by reducing dependencies on manufacturing-specific finishing features. Draft feature standards and related modeling practices are typically configured through ModelCHECK geometry settings and company modeling standards, while check behavior and reporting are controlled by the DRAFT_CHILD settings in the check.mch configuration file.</Description>
         <ModelCheckName>DRAFT_CHILD</ModelCheckName>
@@ -345,7 +345,7 @@ Layers can only organize view items such as datums, surface quilts, and componen
         </why>
     </Check>
     <Check>
-        <Name>Extra Parameters</Name>
+        <Name>Non-Start-Part Parameters</Name>
         <Category>Consistency</Category>
         <Description>Checks for parameters that exist in the model but are not part of the approved company parameter standards or required metadata definitions. Extra or unnecessary parameters can increase model complexity, create confusion, introduce inconsistent metadata, and interfere with automation, drawings, Windchill integration, BOM generation, ERP mapping, and downstream manufacturing processes. Obsolete or duplicate parameters may also make models more difficult to maintain and troubleshoot over time. This check helps ensure that models contain only approved and necessary parameter data according to company standards. Approved and unwanted parameter definitions are typically configured in the start.mcs file using PRT_PARAMETER, ASM_PARAMETER, DRW_PARAMETER, PRT_PARAM_UNWANTED, ASM_PARAM_UNWANTED, and related entries, while check behavior and reporting are controlled by the EXTRA_PARAMS settings in the check.mch configuration file.</Description>
         <ModelCheckName>EXTRA_PARAMS</ModelCheckName>
@@ -395,7 +395,7 @@ Layers can only organize view items such as datums, surface quilts, and componen
         <enabled>Y</enabled>         
     </Check>
     <Check>
-        <Name>Feature Template Default Values</Name>
+        <Name>Family Table Default Values</Name>
         <Category>Consistency</Category>
         <Description>Checks whether feature templates use the correct default values defined by company modeling standards. Feature templates are commonly used to standardize frequently used geometry, manufacturing features, annotations, and design practices across models and projects. Incorrect or inconsistent default values can lead to nonstandard geometry, improper manufacturing settings, incorrect metadata, and downstream automation or documentation issues. This check helps ensure that template-driven features are created with approved starting values and consistent configuration behavior. Feature template standards and default value definitions are typically managed through Creo template configuration files and ModelCHECK setup definitions, while check behavior and reporting are controlled by the FT_DEF_VALS settings in the check.mch configuration file.</Description>
         <ModelCheckName>FT_DEF_VALS</ModelCheckName>
@@ -659,7 +659,7 @@ Since an issue may propagate through the associative chain of references between
         <enabled>Y</enabled>         
     </Check>
     <Check>
-        <Name>Merge Features</Name>
+        <Name>Merged or Cutout Features</Name>
         <Category>Model Complexity</Category>
         <Description>Checks for the presence and use of merge or Boolean merge features within the model. Merge features are commonly used to combine separate bodies, imported geometry, quilts, or component geometry into a single solid or unified geometry definition. While merge operations can be useful for simplifying geometry and integrating external data, excessive or poorly managed merge features can weaken design intent, complicate feature history, reduce model readability, and create regeneration or geometry quality problems. Improper merge operations may also introduce hidden geometry defects, unstable references, and downstream manufacturing or simulation issues. This check helps identify merge feature usage so it can be reviewed and managed according to company modeling standards and best practices. Merge feature behavior and related standards are managed through Creo modeling practices and ModelCHECK configuration settings, while check behavior and reporting are controlled by the MERGE_FEAT settings in the check.mch configuration file.</Description>
         <ModelCheckName>MERGE_FEAT</ModelCheckName>
@@ -785,7 +785,7 @@ Since an issue may propagate through the associative chain of references between
         <enabled>Y</enabled>         
     </Check>
     <Check>
-        <Name>Plane Child Features</Name>
+        <Name>Datum Planes without Children</Name>
         <Category>Design Intent Strength</Category>
         <Description>Checks whether datum planes have dependent child features that reference them within the model. Datum planes that are unused or improperly referenced may indicate unnecessary construction geometry, weak design intent, or poorly organized model structure. Ensuring that datum planes are meaningfully used helps improve model stability, maintainability, and clarity while supporting robust parametric behavior during regeneration and future modifications. Plane usage expectations and related standards are typically configured in the start.mcs file using PRT_DATUM_PLANE and ASM_DATUM_PLANE entries, while check behavior and reporting are controlled by the PLANE_CHILD settings in the check.mch configuration file.</Description>
         <ModelCheckName>PLANE_CHILD</ModelCheckName>
@@ -1341,7 +1341,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <enabled>Y</enabled>         
     </Check>
     <Check>
-        <Name>Surfaces not Annotated</Name>
+        <Name>Surfaces without GDT Annotations</Name>
         <Category>MBD Readiness</Category>
         <Description>Checks for model surfaces that are not referenced by dimensions, GDT annotations, notes, surface finish symbols, inspection annotations, or other manufacturing and documentation annotations. Unannotated surfaces may indicate incomplete model-based definition (MBD) practices, missing manufacturing requirements, undocumented inspection criteria, or incomplete engineering communication. Surfaces lacking proper annotation can create ambiguity during manufacturing, quality inspection, assembly, and downstream interpretation of the design intent. This check helps ensure that important surfaces are properly documented and associated with the required annotation information according to company MBD and drafting standards. Annotation requirements and related documentation practices are typically configured through Creo annotation settings and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the SRF_NOT_REF_BY_ANNTN settings in the check.mch configuration file.</Description>
         <ModelCheckName>SRF_NOT_REF_BY_ANNTN</ModelCheckName>
@@ -1362,7 +1362,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
 
     <Check>
-        <Name>Annotations missing a surface reference</Name>
+        <Name>Annotations Not Referencing Any Surface</Name>
         <Category>MBD Readiness</Category>
         <Description>Checks for annotations that are not associated with or attached to specific model surfaces or geometry references. Annotations without valid surface references may indicate incomplete Model-Based Definition (MBD) practices, broken annotation associations, improperly placed dimensions, or unclear manufacturing and inspection requirements. Unreferenced annotations can create ambiguity during design review, manufacturing, quality inspection, and downstream interpretation of the model, increasing the risk of errors and inconsistent documentation. This check helps ensure that annotations remain properly connected to the intended geometry and accurately communicate design intent according to company MBD and drafting standards. Annotation association requirements and related documentation practices are typically configured through Creo annotation settings and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the ANNTN_MISSING_SURF_REF settings in the check.mch configuration file.</Description>
         <ModelCheckName>ANNTN_MISSING_SURF_REF</ModelCheckName>
@@ -1634,7 +1634,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <enabled>Y</enabled>         
     </Check>
     <Check>
-        <Name>Frozen Components</Name>
+        <Name>Frozen or Suspended Components</Name>
         <Category>Model Integrity</Category>
         <Description>Checks for components that have been frozen within an assembly and verifies that their usage aligns with company modeling and design control practices. Frozen components are typically locked in place to prevent updates or regeneration, which can help stabilize critical portions of an assembly during development. However, excessive or inappropriate use of frozen components can mask design issues, prevent necessary updates, weaken model associativity, and lead to inconsistencies between intended and actual design state. This check helps identify frozen components so they can be reviewed to ensure they are intentionally and appropriately used within the assembly. Component freeze behavior and related assembly control practices are typically managed through Creo assembly settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the FRZ_COMPONENTS settings in the check.mch configuration file.</Description>
         <ModelCheckName>FRZ_COMPONENTS</ModelCheckName>
@@ -2553,7 +2553,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
 
     <Check>
-        <Name>Annotation Semantic Reference Text Verification</Name>
+        <Name>Annotations with incorrect surface references</Name>
         <Category>MBD Readiness</Category>
         <Description>Checks whether annotation semantic reference text in the model is valid, properly defined, and correctly linked to its referenced model entities such as geometry, features, or parameters. Semantic references are used to maintain associative annotation behavior, ensuring that annotations update correctly when the underlying model changes. Invalid, broken, or missing semantic reference text can result in lost associativity, incorrect annotation placement, or outdated manufacturing and inspection information, which can compromise model-based definition integrity and downstream processes. This check helps ensure that all semantic references are correctly maintained, functional, and consistent with the current model state. Semantic reference validation rules and annotation associativity behavior are typically managed through Creo annotation and MBD settings, while check behavior and reporting are controlled by the ANNTN_SEM_REF_TEXT_VERIFY settings in the check.mch configuration file.</Description>
         <ModelCheckName>ANNTN_SEM_REF_TEXT_VERIFY</ModelCheckName>

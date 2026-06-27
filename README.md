@@ -75,7 +75,7 @@ Click **Run ModelCHECK >** to batch your models. The app only processes models t
 
 ### Thumbnails
 
-Click **Thumbnails >**. The app runs part, assembly, and drawing passes when those model types exist.
+Click **Thumbnails >**. The app runs part, assembly, and drawing passes when those model types exist. Each pass uses its own chunk files; progress bars reflect **this session’s** passes (not leftover files from an earlier run). When a pass finishes, its bar shows **100%** before the next pass starts.
 
 Same ideas as ModelCHECK: **Waiting…**, **Failed (N)**, **Next >** when complete, or **Skip**.
 
@@ -92,7 +92,7 @@ Open **Settings** from the menu:
 | Option | Purpose |
 |--------|---------|
 | **Batch settings…** | Models per chunk (default 10), output wait timeout, xtop timeout. |
-| **Automatic mode** | Runs each step in sequence when the previous batch finishes. Moves to the next wizard step even if some models failed — use **Run ModelCHECK >** / **Thumbnails >** later to retry. Manual **Next >** still requires all outputs. |
+| **Automatic mode** | Runs each step in sequence when the previous batch finishes. On **Thumbnails**, runs part, then assembly, then drawing (when those types exist) before moving on — even if some models failed. Manual **Next >** still requires all outputs. |
 | **Debug** | Show batch console windows and keep log files (for troubleshooting). |
 
 ## File menu (common actions)

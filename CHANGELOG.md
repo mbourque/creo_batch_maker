@@ -2,6 +2,31 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-06-27 — v1.11.16
+
+- **ModelCHECK** / **Thumbnails** / **Automatic mode**: wizard progress bars track each batch pass correctly (separate chunk `.dxc` names per pass), refresh while the runner is active, reach **100%** when the runner finishes and all chunk files are gone (`*-run.complete` supports **Debug mode**), hold briefly before auto-advance, and no longer skip ahead of the bar.
+- **Thumbnails**: three progress rows (part → assembly → drawing) reflect the active pass — no **waiting to start** while that pass is running, including fast single-chunk runs and automatic chaining.
+- **Batch runner**: better handling when **xtop** restarts quickly between chunks (avoids false **XTOP GONE** / timer issues).
+- **Report**: **Model Complexity** rows are clickable like **Biggest problems** (plain text, row hover, jump to model); **Open in browser?** after **Create Report** stays modal on top (no flash behind the main window).
+
+## 2026-06-26 — v1.11.6
+
+- **Thumbnails** / **Automatic mode**: fixed part thumbnails restarting in a loop — the auto timer could start a new part batch before the watcher marked the pass finished; auto now waits for the watcher and chains part → assembly → drawing without re-running a finished pass.
+- **Thumbnails**: each pass progress bar now shows **finished** when that pass’s batch run completes (even when some models failed), not **waiting to start**.
+
+## 2026-06-26 — v1.11.5
+
+- **Batch runner**: pauses **3 seconds** after **kill.bat** before the next chunk (or pre-chunk cleanup) so Creo/db batch processes can finish exiting — reduces **XTOP NEVER STARTED** on the following chunk when kill and launch were too close together.
+
+## 2026-06-26 — v1.11.4
+
+- **Thumbnails** / **Automatic mode**: fixed restarting the part pass after part thumbnails finished — automatic mode now chains **assembly** then **drawing** (when those model types exist) instead of re-running part because some models still lack output.
+- **Batch runner**: runs **kill.bat** before each chunk when **xtop** is still running from the prior chunk, and clears a stuck stale **xtop** after 20s so the runner can detect a fresh **xtop** (fixes **XTOP NEVER STARTED** when **xtop** was already running).
+
+## 2026-06-26 — v1.11.3
+
+- **Thumbnails** / **Automatic mode**: fixed advancing to **Create Report** after only the part pass — assembly and drawing passes now run first when those model types exist (same as manual mode).
+
 ## 2026-06-26 — v1.11.2
 
 - **Automatic mode**: after a **ModelCHECK** or **Thumbnails** batch run finishes (all chunks done), the wizard now advances to the next step even when some models timed out or still lack output — it no longer immediately starts another batch on the same step. Manual **Next >** still requires all outputs; use **Run ModelCHECK >** / **Thumbnails >** to continue a partial step.
