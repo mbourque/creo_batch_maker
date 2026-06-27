@@ -4,6 +4,7 @@ Windows app that runs Creo ModelCHECK, thumbnails, and a quality report on model
 
 ## Quick start
 **Download all files** - put in a new directory without spaces in the path like `c:\dev\creo_batch`
+
 **No Python needed** — double-click `main.exe`, or from PowerShell:
 
 ```powershell
