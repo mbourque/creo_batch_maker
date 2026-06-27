@@ -3,7 +3,7 @@
 Windows app that runs Creo ModelCHECK, thumbnails, and a quality report on models in a folder.
 
 ## Quick start
-
+**Download all files** - put in a new directory without spaces in the path like `c:\dev\creo_batch`
 **No Python needed** — double-click `main.exe`, or from PowerShell:
 
 ```powershell
@@ -22,7 +22,6 @@ python .\main.py
 ## Before you begin
 
 - **Windows** with a Creo loadpoint (`Parametric\bin\ptcdbatch.bat` must exist).
-- Put `kill.bat` next to the app (`main.exe` or `main.py`).
 - Choose a **working directory** with your `.prt`, `.asm`, and/or `.drw` files at the top level (not in subfolders).
 - The working directory path must **not contain spaces** for batch steps.
 
