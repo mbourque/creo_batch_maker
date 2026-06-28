@@ -1023,6 +1023,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._automatic_wizard_paused = False
         self._wizard_report_auto_create_done = False
         self._skip_timed_out_prompt_on_go = False
+        self._session_failed_batch_go_choice: FailedBatchGoChoice | None = None
         self._go_in_progress = False
         self._configuration_menu: tk.Menu | None = None
         self._menubar: tk.Menu | None = None
@@ -1858,9 +1859,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         btn_col.pack(anchor="e", padx=16, pady=(0, 16))
         buttons: list[ctk.CTkButton] = []
         for label, choice, primary in (
-            ("Batch all still missing (normal chunking)", FailedBatchGoChoice.BATCH_ALL_PENDING, True),
-            ("Retry failed only (one model per batch)", FailedBatchGoChoice.FAILED_ONE_PER_MODEL, False),
+            ("Retry failed only (one model per batch)", FailedBatchGoChoice.FAILED_ONE_PER_MODEL, True),
             ("Retry failed only (normal chunking)", FailedBatchGoChoice.FAILED_NORMAL_CHUNK, False),
+            ("Batch all still missing (normal chunking)", FailedBatchGoChoice.BATCH_ALL_PENDING, False),
         ):
             btn = self._mk_dialog_button(
                 btn_col,
@@ -1922,23 +1923,37 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             batch_dir, task_kind, latest_files, working_dir=working_dir
         )
 
-        if failed_candidates and not silent:
-            step_label = self._timeout_task_step_label(task_kind)
-            log_name = f"{BATCH_TIMEOUT_LOG_PREFIX}{task_kind}.txt"
-            message = (
-                f"The last {step_label} run recorded {len(failed_candidates)} failed "
-                f"model(s) still missing output ({len(pending)} total still need output).\n\n"
-                f"See {log_name} in the working folder for the full list.\n\n"
-                "Batch all still missing — every model without output, using batch chunk size "
-                "from Settings.\n"
-                "Retry failed only (one model per batch) — one `.dxc` per failed model.\n"
-                "Retry failed only (normal chunking) — failed models only, using batch "
-                "chunk size from Settings.\n\n"
-                "Cancel — do not start the batch."
-            )
-            choice = self._ask_failed_batch_go_choice(message)
+        if failed_candidates:
+            choice: FailedBatchGoChoice | None = None
+            if silent and self._session_failed_batch_go_choice is not None:
+                choice = self._session_failed_batch_go_choice
+            else:
+                # Manual GO, or automatic with no remembered choice — always ask.
+                silent = False
+                step_label = self._timeout_task_step_label(task_kind)
+                log_name = f"{BATCH_TIMEOUT_LOG_PREFIX}{task_kind}.txt"
+                remember = ""
+                if self._session_failed_batch_go_choice is not None:
+                    remember = (
+                        "\n\nYour last retry choice this session is remembered for "
+                        "Automatic mode on later steps until you pick again here."
+                    )
+                message = (
+                    f"The last {step_label} run recorded {len(failed_candidates)} failed "
+                    f"model(s) still missing output ({len(pending)} total still need output).\n\n"
+                    f"See {log_name} in the working folder for the full list.\n\n"
+                    "Retry failed only (one model per batch) — one `.dxc` per failed model.\n"
+                    "Retry failed only (normal chunking) — failed models only, using batch "
+                    "chunk size from Settings.\n"
+                    "Batch all still missing — every model without output, using batch chunk "
+                    "size from Settings.\n\n"
+                    "Cancel — do not start the batch."
+                    f"{remember}"
+                )
+                choice = self._ask_failed_batch_go_choice(message)
             if choice is None:
                 return pending, False, None, False
+            self._session_failed_batch_go_choice = choice
             if choice == FailedBatchGoChoice.BATCH_ALL_PENDING:
                 return pending, True, None, False
             retry_paths = _paths_for_timed_out_candidates(latest_files, failed_candidates)
@@ -5600,6 +5615,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._pending_template_sources.clear()
         self._wizard_report_auto_create_done = False
         self._automatic_wizard_paused = False
+        self._session_failed_batch_go_choice = None
         self._set_wizard_step(WIZARD_STEP_SETUP)
         if errors:
             messagebox.showwarning(
@@ -7724,6 +7740,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         debug_log_path: Path | None = None,
         cooperative_stop: bool = False,
         chunk_base: str = CREO_BATCH_BASE,
+        chunk_size: int = CREO_BATCH_CHUNK_SIZE_DEFAULT,
     ) -> str:
         """PowerShell: per chunk, skip if outputs already exist; else launch ptcdbatch, poll for expected output files, settle, then run kill.bat.
 
@@ -7734,6 +7751,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         wd = cls._ps_single_quoted_literal(working_dir)
         kb = cls._ps_single_quoted_literal(kill_bat)
         n = int(num_chunks)
+        chunk_sz = int(chunk_size)
         base = chunk_base.replace("'", "''")
         task_kind_ps = cls._ps_single_quoted_str(task_kind)
 
@@ -7783,7 +7801,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "$SuccessFileCount = 0",
             "$TimedOutFileCount = 0",
             "",
-            r'Write-ChLog "Runner starting. $NumChunks chunk(s). Skips chunks whose outputs already exist; otherwise polls for expected output files."',
+            f'Write-ChLog ("Runner starting. $NumChunks chunk(s); chunk size {chunk_sz}. Skips chunks whose outputs already exist; otherwise polls for expected output files.")',
             r'Write-ChLog "ptcdbatch: $PtcDbatch"',
             r'Write-ChLog "Working directory: $WorkDir"',
             r'Write-ChLog "kill.bat: $KillBat"',
@@ -8246,6 +8264,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     debug_log_path,
                     cooperative_stop=True,
                     chunk_base=chunk_base,
+                    chunk_size=effective_chunk,
                 )
             runner_ps1_path.write_text(runner_text, encoding="utf-8-sig")
         except OSError as exc:
