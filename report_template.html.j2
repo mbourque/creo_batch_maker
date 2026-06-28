@@ -420,10 +420,11 @@
             var sel = document.getElementById('sidebar-view-filter');
             if (!sel) { return; }
             var present = mqFlaggedFiltersPresentInDom();
+            var showUnflagged = present.flagged && present.unflagged;
             mqSetFilterOptionVisible(sel.querySelector('option[value="flagged"]'), present.flagged);
-            mqSetFilterOptionVisible(sel.querySelector('option[value="unflagged"]'), present.unflagged);
+            mqSetFilterOptionVisible(sel.querySelector('option[value="unflagged"]'), showUnflagged);
             if ((sel.value === 'flagged' && !present.flagged) ||
-                (sel.value === 'unflagged' && !present.unflagged)) {
+                (sel.value === 'unflagged' && !showUnflagged)) {
                 sel.value = 'all';
                 document.body.removeAttribute('data-mq-view-filter');
                 mqSyncSidebarNav();
