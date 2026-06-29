@@ -138,6 +138,15 @@ def _file_in_report_scan(file_element: ET.Element) -> bool:
     return bool(_file_report_check_stats(file_element))
 
 
+def _report_scanned_file_elements(master_root: ET.Element) -> list[ET.Element]:
+    """``File`` entries included in the report (same set as Family table detail)."""
+    return [
+        file_element
+        for file_element in master_root.findall("File")
+        if _file_in_report_scan(file_element)
+    ]
+
+
 
 
 
@@ -423,19 +432,35 @@ def _unq_asm_children(file_element: ET.Element) -> list[str]:
 
 
 
+def _asm_subtree_assembly_count(graph: dict[str, list[str]], start_key: str) -> int:
+    """Unique .ASM models in the UNQ_COMPONENTS tree below ``start_key`` (includes root)."""
+    seen: set[str] = set()
+
+    def dfs(key: str) -> None:
+        k = key.upper()
+        if k in seen or not k.endswith(".ASM"):
+            return
+        seen.add(k)
+        for child in graph.get(k, []):
+            dfs(child)
+
+    dfs(start_key)
+    return len(seen)
+
+
 def find_top_level_assembly(master_root: ET.Element) -> str | None:
 
     """
 
     Assembly with no other batch assembly referencing it as a sub-assembly (UNQ_COMPONENTS).
 
-    Tie-break multiple roots by most direct .ASM children in UNQ_COMPONENTS.
+    Tie-break multiple roots by the highest count of .ASM models in that assembly's subtree.
 
     """
 
     assemblies: dict[str, str] = {}
 
-    child_counts: dict[str, int] = {}
+    asm_graph: dict[str, list[str]] = {}
 
     referenced: set[str] = set()
 
@@ -459,7 +484,7 @@ def find_top_level_assembly(master_root: ET.Element) -> str | None:
 
         asm_children = _unq_asm_children(file_element)
 
-        child_counts[key] = len(asm_children)
+        asm_graph[key] = [child.upper() for child in asm_children]
 
         for child in asm_children:
 
@@ -481,9 +506,382 @@ def find_top_level_assembly(master_root: ET.Element) -> str | None:
 
     if len(roots) > 1:
 
-        return max(roots, key=lambda m: child_counts.get(m.upper(), 0))
+        return max(roots, key=lambda m: _asm_subtree_assembly_count(asm_graph, m))
 
     return None
+
+
+# --- Performance report table (Creo Performance Report–style batch metrics) ---
+
+PERFORMANCE_REPORT_ISSUE_ROW_CHECKS: dict[str, str] = {
+    "_FLEXIBLE_COMPONENTS": "FLEX_COMPONENTS",
+    "_PACKAGED_COMPONENTS": "PACK_COMPONENTS",
+    "_MECH_COMPONENTS": "MECH_COMPONENTS",
+}
+
+PERFORMANCE_TABLE_ROWS: list[tuple[str, str | None]] = [
+    ("Total components in all assemblies", "NUM_COMPONENTS"),
+    ("Number of unique models", "UNQ_COMPONENTS"),
+    ("Duplicate models", "_DUPLICATE_MODELS"),
+    ("Maximum assembly depth", "_MAX_ASSEMBLY_DEPTH"),
+    ("Number of created simplified representations", "_SIMPREP_REPRESENTATIONS"),
+    ("Number of components in master representation", "_MASTER_REP_COUNT"),
+    ("Number of flexible components", "_FLEXIBLE_COMPONENTS"),
+    ("Total number of suppressed components", "_SUPPRESSED_COMPONENTS"),
+    ("Number of packaged components", "_PACKAGED_COMPONENTS"),
+    ("Total number of fixed components", "_FIXED_COMPONENTS"),
+    ("Number of mechanism components", "_MECH_COMPONENTS"),
+    ("Number of family table generics", "_FAMILY_GENERIC_PART_COUNT"),
+    ("Number of family table instances", "_FAMILY_INSTANCE_COUNT"),
+    ("Sheetmetal parts", "_SHEETMETAL_PARTS"),
+    ("Multibody parts", "_MULTIBODY_PARTS"),
+    ("Number of skeleton models", "_SKELETON_MODELS"),
+]
+
+
+@dataclass
+class PerformanceMetrics:
+    family_generic_part_count: int = 0
+    family_instance_count: int = 0
+    total_num_components: int = 0
+    unique_model_count: int = 0
+    max_assembly_depth: int = 0
+    master_rep_component_count: int = 0
+    report_issue_counts: dict[str, int] = field(
+        default_factory=lambda: {k: 0 for k in PERFORMANCE_REPORT_ISSUE_ROW_CHECKS}
+    )
+    simprep_unique_count: int = 0
+    sheetmetal_parts: int = 0
+    multibody_parts: int = 0
+    skeleton_models: int = 0
+    duplicate_models: int = 0
+    fixed_components: int = 0
+    suppressed_components: int = 0
+    files_seen: int = 0
+    assembly_count: int = 0
+
+
+def _parse_int_metric(text: str | None) -> int | None:
+    if not text:
+        return None
+    try:
+        return int(float(text))
+    except ValueError:
+        return None
+
+
+def _check_ans_text(file_element: ET.Element, check_name: str) -> str | None:
+    check = _find_check(file_element, check_name)
+    if check is None:
+        return None
+    text = (check.findtext("ans") or "").strip()
+    if text:
+        return text
+    items = check.findall("item")
+    if items:
+        return str(len(items))
+    return None
+
+
+def _check_stat_text(check: ET.Element) -> str:
+    stat_el = check.find("stat")
+    return (stat_el.text if stat_el is not None else "").strip().upper()
+
+
+def _counts_as_report_issue(file_element: ET.Element, check_name: str) -> int:
+    """1 when this model has the check as ERROR/WARNING (errors/warnings report sections)."""
+    check = _find_check(file_element, check_name)
+    if check is None or _check_hidden_from_report(check):
+        return 0
+    if _check_stat_text(check) in ("ERROR", "WARNING"):
+        return 1
+    return 0
+
+
+def _unq_model_names_from(file_element: ET.Element) -> list[str]:
+    check = _find_check(file_element, "UNQ_COMPONENTS")
+    if check is None:
+        return []
+    return [
+        (item.findtext("info1") or "").strip()
+        for item in check.findall("item")
+        if (item.findtext("info1") or "").strip()
+    ]
+
+
+def _assembly_name_key(model: str, path: str) -> str:
+    if path:
+        return os.path.basename(path).casefold()
+    name = (model or "").strip()
+    if name and not os.path.splitext(name)[1]:
+        return f"{name}.asm".casefold()
+    return name.casefold()
+
+
+def _max_subasm_depth(graph: dict[str, list[str]], start_key: str) -> int:
+    cache: dict[str, int] = {}
+
+    def dfs(key: str, visiting: set[str]) -> int:
+        if key in cache:
+            return cache[key]
+        asm_children = [c for c in graph.get(key, []) if c.endswith(".asm")]
+        if not asm_children:
+            cache[key] = 0
+            return 0
+        best = 0
+        for child in asm_children:
+            if child in visiting:
+                continue
+            visiting.add(child)
+            best = max(best, 1 + dfs(child, visiting))
+            visiting.remove(child)
+        cache[key] = best
+        return best
+
+    return dfs(start_key.casefold(), set())
+
+
+def _batch_max_assembly_depth(asm_subassemblies: dict[str, list[str]]) -> int:
+    if not asm_subassemblies:
+        return 0
+    return max(_max_subasm_depth(asm_subassemblies, key) for key in asm_subassemblies)
+
+
+def _master_rep_count_from_element(file_element: ET.Element) -> int:
+    simp = (_check_ans_text(file_element, "SIMPREP_MASTER") or "").upper()
+    num = _parse_int_metric(_check_ans_text(file_element, "NUM_COMPONENTS"))
+    if simp in ("YES", "Y", "TRUE", "1") and num is not None:
+        return num
+    return 0
+
+
+def _simprep_names_from(file_element: ET.Element) -> list[str]:
+    check = _find_check(file_element, "SIMPREP_INFO")
+    if check is None:
+        return []
+    return [
+        (item.findtext("info1") or "").strip()
+        for item in check.findall("item")
+        if (item.findtext("info1") or "").strip()
+    ]
+
+
+def _is_multibody_part(file_element: ET.Element) -> bool:
+    mb = _find_check(file_element, "MULTIBODY_MODEL")
+    if mb is None:
+        return False
+    ans = (mb.findtext("ans") or "").strip().upper()
+    return ans in ("YES", "Y", "TRUE", "1") or _parse_positive_ans(mb)
+
+
+def _is_sheetmetal_part(file_element: ET.Element) -> bool:
+    return _find_check(file_element, "SHTMTL_THICK") is not None
+
+
+def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
+    """Batch-wide performance table metrics from every ``File`` entry in master.xml."""
+    metrics = PerformanceMetrics()
+    unique_models: set[str] = set()
+    simprep_names: set[str] = set()
+    skeleton_keys: set[str] = set()
+    asm_subassemblies: dict[str, list[str]] = {}
+
+    for file_element in master_root.findall("File"):
+        metrics.files_seen += 1
+        model = (file_element.findtext("Model") or "").strip()
+        path = (file_element.findtext("Path") or "").strip()
+        pro_type = (file_element.findtext("ProType") or "").strip().upper()
+
+        metrics.duplicate_models += _counts_as_report_issue(file_element, "DUPLICATE_MODELS")
+        metrics.fixed_components += _parse_int_metric(_check_ans_text(file_element, "FIXED_COMPONENTS")) or 0
+        metrics.suppressed_components += _parse_int_metric(_check_ans_text(file_element, "SUP_COMPONENTS")) or 0
+
+        for unq_name in _unq_model_names_from(file_element):
+            unique_models.add(unq_name.casefold())
+
+        for simp_name in _simprep_names_from(file_element):
+            simprep_names.add(simp_name.casefold())
+
+        skel_instances = _family_skel_instance_names(file_element)
+        for skel_name in skel_instances:
+            skeleton_keys.add(_skeleton_identity_key(skel_name))
+        if _is_skeleton_name(model) and not skel_instances:
+            skeleton_keys.add(_skeleton_identity_key(model))
+
+        if pro_type == "PRT":
+            if _is_sheetmetal_part(file_element):
+                metrics.sheetmetal_parts += 1
+            if _is_multibody_part(file_element):
+                metrics.multibody_parts += 1
+
+        if pro_type == "ASM":
+            metrics.assembly_count += 1
+            metrics.total_num_components += _parse_int_metric(_check_ans_text(file_element, "NUM_COMPONENTS")) or 0
+            metrics.master_rep_component_count += _master_rep_count_from_element(file_element)
+            for row_key, check_name in PERFORMANCE_REPORT_ISSUE_ROW_CHECKS.items():
+                metrics.report_issue_counts[row_key] += _counts_as_report_issue(file_element, check_name)
+            asm_children = _unq_asm_children(file_element)
+            asm_subassemblies[_assembly_name_key(model, path)] = [
+                child.casefold() for child in asm_children
+            ]
+
+    metrics.unique_model_count = len(unique_models)
+    metrics.max_assembly_depth = _batch_max_assembly_depth(asm_subassemblies)
+    metrics.simprep_unique_count = len(simprep_names)
+    metrics.skeleton_models = len(skeleton_keys)
+    family_generics = collect_family_generics_detail(
+        master_root,
+        file_elements=_report_scanned_file_elements(master_root),
+    )
+    metrics.family_generic_part_count = len(family_generics)
+    metrics.family_instance_count = sum(len(row.instance_names) for row in family_generics)
+    return metrics
+
+
+def performance_metrics_answers(metrics: PerformanceMetrics) -> dict[str, str]:
+    answers: dict[str, str] = {
+        "NUM_COMPONENTS": str(metrics.total_num_components),
+        "UNQ_COMPONENTS": str(metrics.unique_model_count),
+        "_MAX_ASSEMBLY_DEPTH": str(metrics.max_assembly_depth),
+        "_FAMILY_GENERIC_PART_COUNT": str(metrics.family_generic_part_count),
+        "_FAMILY_INSTANCE_COUNT": str(metrics.family_instance_count),
+        "_MASTER_REP_COUNT": str(metrics.master_rep_component_count),
+        "_SIMPREP_REPRESENTATIONS": str(metrics.simprep_unique_count),
+        "_SHEETMETAL_PARTS": str(metrics.sheetmetal_parts),
+        "_MULTIBODY_PARTS": str(metrics.multibody_parts),
+        "_SKELETON_MODELS": str(metrics.skeleton_models),
+        "_DUPLICATE_MODELS": str(metrics.duplicate_models),
+        "_FIXED_COMPONENTS": str(metrics.fixed_components),
+        "_SUPPRESSED_COMPONENTS": str(metrics.suppressed_components),
+    }
+    for row_key in PERFORMANCE_REPORT_ISSUE_ROW_CHECKS:
+        answers[row_key] = str(metrics.report_issue_counts.get(row_key, 0))
+    return answers
+
+
+def _resolve_performance_value(answers: dict[str, str], key: str | None) -> tuple[str, str | None]:
+    if key is None:
+        return ("—", None)
+    if key == "_MASTER_REP_COUNT":
+        val = answers.get(key)
+        return (val if val is not None else "—", "SIMPREP_MASTER")
+    if key == "_FAMILY_GENERIC_PART_COUNT":
+        val = answers.get(key)
+        return (val if val is not None else "—", "FAMILY_INFO")
+    if key == "_FAMILY_INSTANCE_COUNT":
+        val = answers.get(key)
+        return (val if val is not None else "—", "FAMILY_INFO")
+    if key == "_SHEETMETAL_PARTS":
+        val = answers.get(key)
+        return (val if val is not None else "—", "SHTMTL_THICK")
+    if key == "_MULTIBODY_PARTS":
+        val = answers.get(key)
+        return (val if val is not None else "—", "MULTIBODY_MODEL")
+    if key == "_SKELETON_MODELS":
+        val = answers.get(key)
+        return (val if val is not None else "—", None)
+    if key == "_MAX_ASSEMBLY_DEPTH":
+        val = answers.get(key)
+        return (val if val is not None else "—", "UNQ_COMPONENTS")
+    if key == "_SIMPREP_REPRESENTATIONS":
+        val = answers.get(key)
+        return (val if val is not None else "—", "SIMPREP_INFO")
+    if key == "_FLEXIBLE_COMPONENTS":
+        val = answers.get(key)
+        return (val if val is not None else "—", "FLEX_COMPONENTS")
+    if key == "_SUPPRESSED_COMPONENTS":
+        val = answers.get(key)
+        return (val if val is not None else "—", "SUP_COMPONENTS")
+    if key == "_PACKAGED_COMPONENTS":
+        val = answers.get(key)
+        return (val if val is not None else "—", "PACK_COMPONENTS")
+    if key == "_FIXED_COMPONENTS":
+        val = answers.get(key)
+        return (val if val is not None else "—", "FIXED_COMPONENTS")
+    if key == "_MECH_COMPONENTS":
+        val = answers.get(key)
+        return (val if val is not None else "—", "MECH_COMPONENTS")
+    if key == "_DUPLICATE_MODELS":
+        val = answers.get(key)
+        return (val if val is not None else "—", "DUPLICATE_MODELS")
+    val = answers.get(key)
+    if val is None:
+        return ("—", key)
+    return (val, key)
+
+
+def build_performance_table_rows(metrics: PerformanceMetrics) -> list[tuple[str, str, str | None]]:
+    answers = performance_metrics_answers(metrics)
+    rows: list[tuple[str, str, str | None]] = []
+    for label, key in PERFORMANCE_TABLE_ROWS:
+        value, check = _resolve_performance_value(answers, key)
+        rows.append((label, value, check if key and not key.startswith("_") else key))
+    return rows
+
+
+def generate_performance_table_html(
+    metrics: PerformanceMetrics,
+    *,
+    extra_summary_html: str = "",
+) -> str:
+    """Performance metrics table for Scan Information (embedded mq-stats styles)."""
+    body_rows: list[str] = []
+    for label, value, check_key in build_performance_table_rows(metrics):
+        label_esc = _esc(label)
+        if value == "—":
+            val_html = '<span class="mq-perf-missing">—</span>'
+            title_attr = ' title="Not in ModelCHECK master.xml"' if check_key is None else ""
+        else:
+            val_html = _esc(value)
+            title_attr = ""
+        body_rows.append(
+            f"<tr><td class=\"mq-perf-label\">{label_esc}</td>"
+            f"<td class=\"mq-perf-val\"{title_attr}>{val_html}</td></tr>"
+        )
+    table_body = "\n".join(body_rows)
+    extras = extra_summary_html or ""
+    return f"""
+  <div class="mq-stats-grid">
+    <div class="mq-stat-card mq-perf-card">
+      <h2>Statistics</h2>
+      <table class="mq-perf-table" role="table">
+        <tbody>
+{table_body}
+        </tbody>
+      </table>
+      {extras}
+    </div>
+  </div>"""
+
+
+def generate_performance_report_page(metrics: PerformanceMetrics) -> str:
+    """Standalone ``performance_report.html`` page."""
+    section = generate_performance_table_html(metrics)
+    return (
+        "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n"
+        "  <meta charset=\"UTF-8\">\n"
+        "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
+        "  <title>performance_report</title>\n"
+        f"{_MQ_STATS_CSS}\n"
+        "</head>\n<body style=\"margin:0;background:#e8eaed;\">\n"
+        f'<div class="mq-stats-page">{section}\n</div>\n</body>\n</html>\n'
+    )
+
+
+def write_performance_report_file(master_xml_path: str, output_path: str | None = None) -> str:
+    """Write ``performance_report.html`` beside ``master.xml`` from batch performance metrics."""
+    master_xml_path = os.path.abspath(master_xml_path)
+    root = ET.parse(master_xml_path).getroot()
+    metrics = scan_performance_metrics(root)
+    if metrics.files_seen == 0:
+        raise ValueError("No model entries found in master.xml")
+    out_path = output_path or os.path.join(os.path.dirname(master_xml_path), "performance_report.html")
+    out_dir = os.path.dirname(os.path.abspath(out_path))
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+    with open(out_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(generate_performance_report_page(metrics))
+    return out_path
 
 
 
@@ -656,6 +1054,39 @@ class FamilyGenericRow:
     instance_names: list[str] = field(default_factory=list)
 
 
+def _family_generic_row_from_file(file_element: ET.Element) -> FamilyGenericRow | None:
+    """One family-table generic row (same rules as Family table detail)."""
+    model = (file_element.findtext("Model") or "").strip()
+    if not model:
+        return None
+    family = _find_check(file_element, "FAMILY_INFO")
+    if family is None:
+        return None
+    ans = (family.findtext("ans") or "").strip().upper()
+    if "GENERIC" not in ans:
+        return None
+    names: list[str] = []
+    for item in family.findall("item"):
+        name = (item.findtext("info1") or "").strip()
+        if name:
+            names.append(name)
+    return FamilyGenericRow(model=model, instance_names=names)
+
+
+def collect_family_generics_detail(
+    master_root: ET.Element,
+    *,
+    file_elements: list[ET.Element] | None = None,
+) -> list[FamilyGenericRow]:
+    """Generic models with ``FAMILY_INFO`` (same rows as Family table detail section)."""
+    elements = file_elements if file_elements is not None else _report_scanned_file_elements(master_root)
+    rows: list[FamilyGenericRow] = []
+    for file_element in elements:
+        row = _family_generic_row_from_file(file_element)
+        if row is not None:
+            rows.append(row)
+    return rows
+
 
 
 
@@ -687,6 +1118,8 @@ class BatchStatistics:
 
     top_size_parts: list[tuple[str, float]] = field(default_factory=list)
 
+    performance_metrics: PerformanceMetrics | None = None
+
 
 
 
@@ -695,17 +1128,7 @@ def scan_batch_statistics(master_root: ET.Element, *, master_path: str = "") -> 
 
     stats = BatchStatistics(master_path=master_path)
 
-    scanned_files: list[ET.Element] = []
-
-    for file_element in master_root.findall("File"):
-
-        if not _file_in_report_scan(file_element):
-
-            continue
-
-        scanned_files.append(file_element)
-
-
+    scanned_files = _report_scanned_file_elements(master_root)
 
     health_counts = {label: 0 for _, label in HEALTH_CHECKS}
 
@@ -773,30 +1196,9 @@ def scan_batch_statistics(master_root: ET.Element, *, master_path: str = "") -> 
 
                 part_sizes.append((model, mb_val))
 
-
-
-        family = _find_check(file_element, "FAMILY_INFO")
-
-        if family is None:
-
-            continue
-
-        ans = (family.findtext("ans") or "").strip().upper()
-
-        if "GENERIC" in ans:
-
-            names: list[str] = []
-
-            for item in family.findall("item"):
-
-                name = (item.findtext("info1") or "").strip()
-
-                if name:
-
-                    names.append(name)
-
-            stats.family_generics_detail.append(FamilyGenericRow(model=model, instance_names=names))
-
+    stats.family_generics_detail = collect_family_generics_detail(
+        master_root, file_elements=scanned_files
+    )
     stats.health_counts = health_counts
 
     stats.skeleton_models = scan_skeleton_model_count(master_root)
@@ -848,6 +1250,20 @@ _MQ_STATS_CSS = """
 .mq-stat-card p { margin: 5px 0; font-size: 0.92rem; line-height: 1.4; }
 
 .mq-stat-card strong { color: #0f172a; }
+
+.mq-perf-card { grid-column: 1 / -1; }
+
+.mq-perf-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+
+.mq-perf-table td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+
+.mq-perf-table tr:last-child td { border-bottom: none; }
+
+.mq-perf-label { text-align: left; color: #1a1a1a; }
+
+.mq-perf-val { text-align: right; font-weight: 600; color: #0f172a; white-space: nowrap; }
+
+.mq-perf-missing { color: #94a3b8; font-weight: 400; }
 
 .mq-stat-num { font-size: 1.65rem; font-weight: 800; color: #0369a1; line-height: 1.2; }
 
@@ -926,6 +1342,8 @@ _MQ_STATS_CSS = """
 
 .mq-skipped-names { color: #334155; }
 
+.mq-skipped-section-list { margin: 0; font-size: 0.92rem; line-height: 1.45; color: #334155; }
+
 .mq-skipped-rest[hidden] { display: none !important; }
 
 .mq-skipped-more-btn {
@@ -976,6 +1394,17 @@ _MQ_STATS_CSS = """
 .mq-bom-table-rest[hidden] { display: none !important; }
 .mq-bom-more-wrap { margin: 12px 0 0 0; font-size: 0.88rem; }
 .mq-bom-expand-btn[hidden], .mq-bom-collapse-btn[hidden] { display: none !important; }
+
+.mq-stats-embedded button.mq-bom-jump.mq-inline-model-jump {
+  display: inline; width: auto; padding: 0; margin: 0;
+  font: inherit; color: #007bff; font-weight: 600; vertical-align: baseline;
+}
+.mq-stats-embedded button.mq-bom-jump.mq-inline-model-jump:hover {
+  background: transparent; text-decoration: underline;
+}
+.mq-stats-embedded button.mq-bom-jump.mq-inline-model-jump:focus-visible {
+  outline: 2px solid #2563eb; outline-offset: 2px;
+}
 
 </style>"""
 
@@ -1076,8 +1505,28 @@ def _family_table_section(generics: list[FamilyGenericRow]) -> str:
   </div>"""
 
 
-def _bom_row(row: BomComponentRow, *, embedded: bool, collapsed: bool = False) -> str:
-    display = _esc(_model_display_lower(row.name))
+def _top_level_asm_name_html(assembly_name: str, *, embedded: bool) -> str:
+    """Assembly name in the BOM note; jump link in embedded report."""
+    asm_display = _esc(_model_display_lower(assembly_name))
+    if embedded:
+        return (
+            f'<button type="button" class="mq-bom-jump mq-inline-model-jump" '
+            f'data-mq-model-jump="{_esc(assembly_name)}">{asm_display}</button>'
+        )
+    return asm_display
+
+
+def _bom_row(
+    row: BomComponentRow,
+    *,
+    embedded: bool,
+    collapsed: bool = False,
+    top_level_assembly: str | None = None,
+) -> str:
+    display = _model_display_lower(row.name)
+    if top_level_assembly and row.name.casefold() == top_level_assembly.casefold():
+        display = f"{display} (Top Level)"
+    display = _esc(display)
     hidden_attr = " hidden" if collapsed else ""
     rest_cls = " mq-bom-table-rest" if collapsed else ""
     inner = (
@@ -1141,10 +1590,10 @@ def _top_level_bom_section(
     total = len(bom_rows)
     if total > _BOM_LIST_PREVIEW_LIMIT:
         rows_html = "".join(
-            _bom_row(row, embedded=embedded)
+            _bom_row(row, embedded=embedded, top_level_assembly=assembly_name)
             for row in bom_rows[:_BOM_LIST_PREVIEW_LIMIT]
         ) + "".join(
-            _bom_row(row, embedded=embedded, collapsed=True)
+            _bom_row(row, embedded=embedded, collapsed=True, top_level_assembly=assembly_name)
             for row in bom_rows[_BOM_LIST_PREVIEW_LIMIT:]
         )
         more_html = (
@@ -1165,11 +1614,14 @@ def _top_level_bom_section(
             "Collapse</button></p>"
         )
     else:
-        rows_html = "".join(_bom_row(row, embedded=embedded) for row in bom_rows)
+        rows_html = "".join(
+            _bom_row(row, embedded=embedded, top_level_assembly=assembly_name)
+            for row in bom_rows
+        )
         more_html = ""
 
-    asm_display = _esc(_model_display_lower(assembly_name))
-    note = f"BOM from {asm_display} ({total} components)."
+    asm_html = _top_level_asm_name_html(assembly_name, embedded=embedded)
+    note = f"BOM from {asm_html} (Top Level) ({total} components)."
     if embedded:
         note += " Click a row to scroll to that model in the report."
 
@@ -1193,15 +1645,21 @@ def _top_level_bom_section(
   </div>"""
 
 
-def _skipped_models_summary_line(skipped_models: list[str]) -> str:
-    """One summary-card line for models skipped in the batch scan."""
+def _skipped_models_section(skipped_models: list[str]) -> str:
+    """Own section at top of Scan Information for models not in master.xml."""
     if not skipped_models:
         return ""
     total = len(skipped_models)
-    return (
-        f"<p><strong>Models skipped ({total}):</strong> "
-        f'{_comma_separated_list_html(skipped_models, span_class="mq-skipped-names")}</p>'
-    )
+    list_html = _comma_separated_list_html(skipped_models, span_class="mq-skipped-names")
+    return f"""
+
+  <div class="mq-section">
+
+    <h2>Models skipped ({total})</h2>
+
+    <p class="mq-skipped-section-list">{list_html}</p>
+
+  </div>"""
 
 
 TEMPLATE_SCAN_SESSION_BASENAME = "creo-batch-template-scan.json"
@@ -1291,47 +1749,27 @@ def _templates_scanned_summary_line(kinds: list[str]) -> str:
 
 def generate_statistics_html(stats: BatchStatistics, *, embedded: bool = False) -> str:
 
-    summary_bits: list[str] = []
-
+    extra_summary: list[str] = []
     templates_line = _templates_scanned_summary_line(stats.templates_scanned)
     if templates_line:
-        summary_bits.append(templates_line)
+        extra_summary.append(templates_line)
 
-    if stats.top_level_assembly:
-
-        top_asm = _esc(_model_display_lower(stats.top_level_assembly))
-
-        summary_bits.append(f"<p><strong>Top level assembly:</strong> {top_asm}</p>")
-
-    if stats.sheetmetal_parts > 0:
-
-        summary_bits.append(f"<p><strong>Sheetmetal parts:</strong> {stats.sheetmetal_parts}</p>")
-
-    if stats.multibody_parts > 0:
-
-        summary_bits.append(f"<p><strong>Multibody parts:</strong> {stats.multibody_parts}</p>")
-
-    if stats.skeleton_models > 0:
-
-        summary_bits.append(f"<p><strong>Skeleton models:</strong> {stats.skeleton_models}</p>")
-
-    skipped_line = _skipped_models_summary_line(stats.skipped_models)
-
-    if skipped_line:
-
-        summary_bits.append(skipped_line)
+    skipped_section = _skipped_models_section(stats.skipped_models)
 
     summary_grid = ""
-
-    if summary_bits:
-
+    if stats.performance_metrics and stats.performance_metrics.files_seen > 0:
+        summary_grid = generate_performance_table_html(
+            stats.performance_metrics,
+            extra_summary_html="".join(extra_summary),
+        )
+    elif extra_summary:
         summary_grid = f"""
 
   <div class="mq-stats-grid">
 
     <div class="mq-stat-card">
 
-      {''.join(summary_bits)}
+      {''.join(extra_summary)}
 
     </div>
 
@@ -1456,7 +1894,7 @@ def generate_statistics_html(stats: BatchStatistics, *, embedded: bool = False) 
 
 
 
-    body_sections = summary_grid + bom_section + health_section + complexity_snapshot_section + family_section
+    body_sections = skipped_section + summary_grid + bom_section + health_section + complexity_snapshot_section + family_section
 
     if not body_sections.strip():
 
@@ -1492,6 +1930,7 @@ def generate_statistics_fragment(
 ) -> str:
     """Build statistics HTML from an already-parsed ``master.xml`` root."""
     stats = scan_batch_statistics(master_root, master_path=master_path)
+    stats.performance_metrics = scan_performance_metrics(master_root)
     stats.skipped_models = scan_skipped_models(working_dir, master_root)
     stats.templates_scanned = scan_templates_scanned(working_dir)
     if stats.top_level_assembly:
@@ -1516,7 +1955,7 @@ def write_statistics_html_file(master_xml_path: str, output_path: str) -> str:
     working_dir = os.path.dirname(master_xml_path) or os.getcwd()
 
     stats = scan_batch_statistics(root, master_path=master_xml_path)
-
+    stats.performance_metrics = scan_performance_metrics(root)
     stats.skipped_models = scan_skipped_models(working_dir, root)
     stats.templates_scanned = scan_templates_scanned(working_dir)
     if stats.top_level_assembly:

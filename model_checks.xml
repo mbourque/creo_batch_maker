@@ -1657,7 +1657,7 @@ Suppressed features are appropriate if they are only used by particular instance
     <Check>
         <Name>Possible Global Interferences</Name>
         <Category>Model Integrity</Category>
-        <Description>Checks whether global interferences definitions in the assembly are properly created, maintained, and used according to company modeling standards. Global interfaces are commonly used to define controlled relationships between components, such as mating logic, connection definitions, interchangeability rules, and standardized interaction points across an assembly. Improper or missing global interface definitions can lead to inconsistent assembly behavior, incorrect mating conditions, poor interchangeability control, and downstream errors in design validation, manufacturing, or reuse scenarios. This check helps ensure that global interfaces are correctly defined and consistently applied to support robust and maintainable assembly design intent. Global interface definitions and usage rules are typically configured through Creo assembly interface settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the GLOBAL_INTF settings in the check.mch configuration file.</Description>
+        <Description>Checks whether an assembly has had a Global Interference analysis performed within the company-defined time period. When a Global Interference analysis is run in Creo, ModelCHECK records the date by creating or updating a parameter in the assembly. During subsequent ModelCHECK runs, the GLOBAL_INTF check compares the age of this parameter against the configured maximum number of days (GLOBAL_INTF_DAYS). If the analysis is older than the allowed period or has never been performed, the check reports the assembly according to the severity defined in the GLOBAL_INTF setting of the check.mch configuration file. This check does not perform a Global Interference analysis itself; it only verifies that one has been completed recently enough to meet company standards, helping ensure that component interferences are periodically reviewed throughout the design process.</Description>
         <ModelCheckName>GLOBAL_INTF</ModelCheckName>
         <ModelCheckOptions>YNEW E E N N Y</ModelCheckOptions>
         <display>Y</display>
@@ -1754,7 +1754,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Incomplete Features Defined</Name>
-        <Category>Model Integrity</Category>
+        <Category>MBD Readiness</Category>
         <Description>Checks for features in the model that are incomplete or not fully defined according to Creo feature definition requirements. Incomplete features may result from interrupted feature creation, missing inputs, failed references, unresolved geometry, or partially defined parameters. These features can cause regeneration failures, unstable model behavior, incorrect geometry output, and downstream issues in drawings, manufacturing, simulation, and data exchange. This check helps identify incomplete features so they can be repaired or completed to ensure a fully defined and stable model. Feature completion and model integrity rules are typically governed by Creo modeling standards and ModelCHECK configuration files, while check behavior and reporting are controlled by the AF_INCOMPLETE settings in the check.mch configuration file.</Description>
         <ModelCheckName>AF_INCOMPLETE</ModelCheckName>
         <ModelCheckOptions>YNEW W W E N Y</ModelCheckOptions>
@@ -1763,7 +1763,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
     <Check>
         <Name>Assembly Missing References</Name>
-        <Category>Model Integrity</Category>
+        <Category>MBD Readiness</Category>
         <Description>Checks for missing or unresolved references within an assembly that are required for proper model regeneration and correct assembly behavior. Missing references can occur when parent components, geometry, datums, constraints, or external dependencies are deleted, renamed, suppressed, or fail to load correctly. These issues can break assembly constraints, cause regeneration failures, result in misplaced components, and lead to incorrect geometry, BOM data, and downstream manufacturing or documentation errors. This check helps identify broken or incomplete reference chains so they can be repaired or redefined to restore full assembly stability and design intent. Assembly reference integrity rules are typically governed by Creo assembly constraint and dependency management settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the AE_MISSINGREFS settings in the check.mch configuration file.</Description>
         <ModelCheckName>AE_MISSINGREFS</ModelCheckName>
         <ModelCheckOptions>YNEW W W E N Y</ModelCheckOptions>
