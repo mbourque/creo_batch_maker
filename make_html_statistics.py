@@ -1245,7 +1245,7 @@ _MQ_STATS_CSS = """
 
   box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 
-.mq-stat-card h2 { margin: 0 0 12px 0; font-size: 1.05rem; font-weight: 700; color: #0f172a; }
+.mq-stats-page h2 { margin: 0 0 12px 0; font-size: 1.15rem; font-weight: 700; color: #0f172a; }
 
 .mq-stat-card p { margin: 5px 0; font-size: 0.92rem; line-height: 1.4; }
 
@@ -1272,8 +1272,6 @@ _MQ_STATS_CSS = """
 .mq-section { background: #fff; border-radius: 12px; padding: 18px 20px;
 
   box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 16px; }
-
-.mq-section h2 { margin: 0 0 12px 0; font-size: 1.15rem; font-weight: 700; color: #0f172a; }
 
 .mq-section-note { font-size: 0.85rem; color: #475569; margin: 0 0 14px 0; line-height: 1.45; }
 

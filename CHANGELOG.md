@@ -2,6 +2,11 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-06-30 — v1.11.9
+
+- **Thumbnails** / **ModelCHECK**: batch progress bars update smoothly while the runner is active (one chunk-file check per tick instead of rescanning the whole folder); the UI stays responsive on large folders. **Failed (N)** may lag during an active batch and refreshes when the pass finishes.
+- **Report** (Statistics): family generic/instance counts in the progress table match the Family table detail (same scanned-file filter). Performance table row labels use sentence case. **Models skipped** uses the same subsection heading size as other Scan Information blocks.
+
 ## 2026-06-28 — v1.11.8
 
 - **ModelCHECK** / **Thumbnails**: when a failure log still applies, **Automatic mode** reuses your last retry choice from this session (e.g. **one model per batch** picked on ModelCHECK also applies when thumbnails auto-start with failures). Manual **GO** still shows the retry dialog each time. The batch runner log records chunk size at start (fixed bad quoting in generated `.ps1` that could print a harmless PowerShell error on runner start).

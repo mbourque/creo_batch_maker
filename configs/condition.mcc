@@ -1,9 +1,4 @@
 # SET CONFIG FILE
-IF (MODEL_TYPE EQ PRT_SKELETON) NOCHECK
-IF (MODEL_TYPE EQ PRT_PIPE) NOCHECK
-IF (MODEL_TYPE EQ PRT_HARNESS) NOCHECK
-IF (MODEL_TYPE EQ ASM_INTERCHANGE) NOCHECK
-IF (MODEL_TYPE EQ ASM_MOLD_LAYOUT) NOCHECK
 
 IF (UNITS_LENGTH EQ MM) config=(default_checks.mch)(sample_start.mcs)(mm.mcn)(sample_status.mcq)
 IF (UNITS_LENGTH EQ INCH) config=(default_checks.mch)(sample_start.mcs)(inch.mcn)(sample_status.mcq)

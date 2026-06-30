@@ -1591,6 +1591,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             if self._modal_dialog_depth > 0:
                 self._post_batch_task_refresh_job = self.after(1000, tick)
                 return
+            if self._batch_run_active_for_heavy_ui_polls():
+                self._post_batch_task_refresh_job = self.after(3000, tick)
+                return
             self._update_create_report_task_list(advance_from_jpeg=False)
             poll_remaining["count"] -= 1
             if poll_remaining["count"] <= 0 or self._create_report_task_available():
@@ -2749,6 +2752,85 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         except OSError:
             pass
 
+    def _batch_run_active_for_heavy_ui_polls(self) -> bool:
+        """True while a ModelCHECK or thumbnails batch is in progress (skip full-folder scans)."""
+        return self._wizard_batch_waiting_on_step(WIZARD_STEP_MODELCHECK) or (
+            self._wizard_batch_waiting_on_step(WIZARD_STEP_JPEG_3D)
+        )
+
+    @staticmethod
+    def _wizard_batch_cache_thumbnail_phase_flags(
+        watch: dict[str, object], *, working_dir_str: str, drawing_task_ok: bool
+    ) -> None:
+        """Store which thumbnail progress rows apply (fixed for this GO; no per-tick iterdir)."""
+        watch["thumbnails_show_part"] = bool(
+            working_dir_str
+            and CreoDistributedBatchMakerApp._static_thumbnails_needs_part_phase(working_dir_str)
+        )
+        watch["thumbnails_show_asm"] = bool(
+            working_dir_str
+            and CreoDistributedBatchMakerApp._static_thumbnails_needs_assembly_phase(working_dir_str)
+        )
+        watch["thumbnails_show_drawing"] = bool(
+            working_dir_str
+            and drawing_task_ok
+            and CreoDistributedBatchMakerApp._static_thumbnails_needs_drawing_phase(working_dir_str)
+        )
+
+    @staticmethod
+    def _static_thumbnails_needs_part_phase(working_dir_str: str) -> bool:
+        return CreoDistributedBatchMakerApp._static_working_directory_has_creo_models(
+            working_dir_str, extensions=("prt",)
+        )
+
+    @staticmethod
+    def _static_thumbnails_needs_assembly_phase(working_dir_str: str) -> bool:
+        return CreoDistributedBatchMakerApp._static_working_directory_has_creo_models(
+            working_dir_str, extensions=("asm",)
+        )
+
+    @staticmethod
+    def _static_thumbnails_needs_drawing_phase(working_dir_str: str) -> bool:
+        return CreoDistributedBatchMakerApp._static_working_directory_has_creo_models(
+            working_dir_str, extensions=("drw",)
+        )
+
+    @staticmethod
+    def _static_working_directory_has_creo_models(
+        working_dir_str: str, *, extensions: tuple[str, ...]
+    ) -> bool:
+        s = (working_dir_str or "").strip()
+        if not s:
+            return False
+        pattern = _creo_model_name_pattern(extensions)
+        try:
+            d = Path(s).expanduser()
+            if not d.is_dir():
+                return False
+            for entry in d.iterdir():
+                if entry.is_file() and pattern.match(entry.name):
+                    return True
+            return False
+        except OSError:
+            return False
+
+    def _wizard_batch_sync_progress_snapshot(self, watch: dict[str, object]) -> None:
+        """One chunk .dxc glob and pass-complete check per UI tick (shared by progress UI)."""
+        batch_dir = watch.get("batch_dir")
+        if not isinstance(batch_dir, Path):
+            return
+        scan_templates = bool(watch.get("scan_templates"))
+        batch_dxc_base = self._watch_batch_dxc_base(watch)
+        pass_complete = bool(watch.get("batch_chunks_complete")) or self._wizard_batch_pass_complete(
+            watch
+        )
+        if pass_complete:
+            remaining = 0
+        else:
+            remaining = self._batch_dxc_count(batch_dir, scan_templates, batch_dxc_base)
+        watch["_progress_pass_complete"] = pass_complete
+        watch["_progress_remaining_dxc"] = remaining
+
     def _wizard_batch_runner_idle(self, watch: dict[str, object]) -> bool:
         """True when the batch runner script finished (process exited or run-complete flag)."""
         batch_dir = watch.get("batch_dir")
@@ -2861,12 +2943,16 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         initial = watch.get("initial_dxc_count")
         if not isinstance(initial, int) or initial <= 0:
             return None
-        remaining = self._batch_dxc_count(batch_dir, scan_templates, batch_dxc_base)
-        if (
-            watch.get("batch_chunks_complete")
-            or self._wizard_batch_pass_complete(watch)
-        ):
-            remaining = 0
+        cached_remaining = watch.get("_progress_remaining_dxc")
+        if isinstance(cached_remaining, int):
+            remaining = cached_remaining
+        else:
+            remaining = self._batch_dxc_count(batch_dir, scan_templates, batch_dxc_base)
+            if (
+                watch.get("batch_chunks_complete")
+                or self._wizard_batch_pass_complete(watch)
+            ):
+                remaining = 0
         done = max(0, initial - remaining)
         phase = watch.get("thumbnails_phase")
         if phase == _WIZARD_THUMBNAILS_PHASE_PART:
@@ -2933,9 +3019,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             if self._wizard_batch_runner_finished_for_step(step):
                 return True
         if step in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
-            batch_dir, _ = self._wizard_batch_dir_for_step(step)
-            if batch_dir is not None and self._wizard_failed_models_for_step(step, batch_dir):
-                return True
+            if not self._wizard_batch_waiting_on_step(step):
+                batch_dir, _ = self._wizard_batch_dir_for_step(step)
+                if batch_dir is not None and self._wizard_failed_models_for_step(step, batch_dir):
+                    return True
         return False
 
     def _wizard_batch_progress_info_for_step(self, step: int) -> tuple[float, str] | None:
@@ -2943,7 +3030,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if watch is None or watch.get("step") != step:
             watch = self._ensure_wizard_batch_watch(step)
         if watch is not None and watch.get("step") == step:
-            if self._wizard_batch_outputs_ready(watch):
+            if self._wizard_batch_waiting_on_step(step):
+                info = self._wizard_batch_progress_info(watch)
+                if info is not None:
+                    return info
+            elif self._wizard_batch_outputs_ready(watch):
                 info = self._wizard_batch_progress_info(watch)
                 if info is not None:
                     return info
@@ -2975,6 +3066,15 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
     def _refresh_wizard_step_batch_progress(self, step: int) -> None:
         if self._wizard_batch_in_progress_for_step(step):
             self._ensure_wizard_batch_watch(step)
+        watch = self._wizard_batch_watch
+        if (
+            watch is not None
+            and watch.get("step") == step
+            and watch.get("had_dxc")
+            and self._wizard_batch_waiting_on_step(step)
+            and "_progress_remaining_dxc" not in watch
+        ):
+            self._wizard_batch_sync_progress_snapshot(watch)
         for frame_attr in (
             "wizard_scan_progress_frame",
             "wizard_batch_progress_frame",
@@ -3067,7 +3167,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if step == WIZARD_STEP_MODELCHECK:
             batch_dir, _ = self._wizard_batch_dxc_context_for_step(step)
             self._refresh_wizard_batch_automatic_label(step)
-            self._refresh_wizard_batch_failed_label(step, batch_dir)
+            if not self._wizard_batch_waiting_on_step(step):
+                self._refresh_wizard_batch_failed_label(step, batch_dir)
 
     def _apply_wizard_progress_row(
         self,
@@ -3106,22 +3207,28 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         step = WIZARD_STEP_JPEG_3D
         if not self._wizard_step_shows_batch_progress(step):
             return
-        wd_str = (self.working_directory.get() or "").strip()
-        try:
-            wd = Path(wd_str).expanduser() if wd_str else None
-        except OSError:
-            wd = None
-        needs_part = self._wizard_thumbnails_needs_part_phase(wd_str)
-        needs_asm = self._wizard_thumbnails_needs_assembly_phase(wd_str)
-        drawing_task_ok = bool(self._task_display_for_ttd_filename(JPEG_2D_PLOT_TTD))
-        needs_drawing = (
-            self._wizard_thumbnails_needs_drawing_phase(wd_str) and drawing_task_ok
-        )
         watch = self._wizard_batch_watch
+        if watch is not None and "thumbnails_show_part" in watch:
+            needs_part = bool(watch.get("thumbnails_show_part"))
+            needs_asm = bool(watch.get("thumbnails_show_asm"))
+            needs_drawing = bool(watch.get("thumbnails_show_drawing"))
+        else:
+            wd_str = (self.working_directory.get() or "").strip()
+            needs_part = self._wizard_thumbnails_needs_part_phase(wd_str)
+            needs_asm = self._wizard_thumbnails_needs_assembly_phase(wd_str)
+            drawing_task_ok = bool(self._task_display_for_ttd_filename(JPEG_2D_PLOT_TTD))
+            needs_drawing = (
+                self._wizard_thumbnails_needs_drawing_phase(wd_str) and drawing_task_ok
+            )
         phase = watch.get("thumbnails_phase") if watch is not None else None
         part_done = self._wizard_thumbnails_part_phase_done
         asm_done = self._wizard_thumbnails_assembly_phase_done
         drawing_done = self._wizard_thumbnails_drawing_phase_done
+        progress_info_once = (
+            self._wizard_batch_progress_info(watch)
+            if watch is not None and watch.get("had_dxc")
+            else None
+        )
 
         def _phase_row(
             *,
@@ -3148,6 +3255,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 and phase == phase_key
             )
             waiting = active_this_phase and self._wizard_batch_waiting_on_step(step)
+            pass_complete = bool(watch.get("_progress_pass_complete")) if watch else False
             active_order = (
                 _WIZARD_THUMBNAILS_PHASE_ORDER.get(str(phase), -1)
                 if phase is not None
@@ -3164,27 +3272,22 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 active_this_phase
                 and (
                     watch.get("batch_chunks_complete")
-                    or self._wizard_batch_pass_complete(watch)
-                    or self._wizard_batch_outputs_ready(watch)
+                    or pass_complete
                 )
                 and not waiting
             )
             short = self._wizard_thumbnails_phase_short_title(title)
             if waiting:
-                info = self._wizard_batch_progress_info(watch)
+                info = progress_info_once
             elif run_complete and not done:
-                info = self._wizard_batch_progress_info(watch) or (
+                info = progress_info_once or (
                     1.0,
                     f"{short} finished.",
                 )
             elif done or run_complete or earlier_pass_running:
                 info = (1.0, f"{short} finished.")
             elif phase_live:
-                info = (
-                    self._wizard_batch_progress_info(watch)
-                    if active_this_phase
-                    else None
-                )
+                info = progress_info_once if active_this_phase else None
                 if info is None:
                     snap = self._wizard_batch_go_snapshot_for_step(step)
                     initial = (
@@ -3244,7 +3347,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
         batch_dir, _ = self._wizard_batch_dxc_context_for_step(step)
         self._refresh_wizard_batch_automatic_label(step)
-        self._refresh_wizard_batch_failed_label(step, batch_dir)
+        if not self._wizard_batch_waiting_on_step(step):
+            self._refresh_wizard_batch_failed_label(step, batch_dir)
 
     def _wizard_automatic_mode_progress_note(self, step: int) -> str:
         if not self._automatic_mode:
@@ -3559,6 +3663,14 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "started_at": time.time(),
             "thumbnails_phase": thumbnails_phase,
         }
+        if step == WIZARD_STEP_JPEG_3D:
+            wd_str = (self.working_directory.get() or "").strip()
+            drawing_task_ok = bool(self._task_display_for_ttd_filename(JPEG_2D_PLOT_TTD))
+            self._wizard_batch_cache_thumbnail_phase_flags(
+                self._wizard_batch_watch,
+                working_dir_str=wd_str,
+                drawing_task_ok=drawing_task_ok,
+            )
         self._wizard_batch_go_snapshot = {
             "step": step,
             "batch_dir": batch_dir,
@@ -3691,7 +3803,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 WIZARD_BATCH_DXC_POLL_MS, self._tick_wizard_batch_output_watch
             )
             return
-        ready = self._wizard_batch_pass_complete(watch)
+        if watch.get("had_dxc"):
+            self._wizard_batch_sync_progress_snapshot(watch)
+        ready = bool(watch.get("_progress_pass_complete"))
         if ready:
             if not watch.get("batch_finish_painted"):
                 self._wizard_batch_paint_pass_complete(watch)
@@ -6214,7 +6328,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if self._modal_dialog_depth > 0:
             self._activate_refresh_job = self.after(500, self._on_app_activate_run)
             return
-        self._update_create_report_task_list(advance_from_jpeg=False)
+        if not self._batch_run_active_for_heavy_ui_polls():
+            self._update_create_report_task_list(advance_from_jpeg=False)
         self._refresh_action_buttons()
 
     def _install_dialog_parent(self) -> None:

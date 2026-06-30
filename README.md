@@ -84,7 +84,7 @@ Click **Run ModelCHECK >** to batch your models. The app only processes models t
 
 ### Thumbnails
 
-Click **Thumbnails >**. The app runs part, assembly, and drawing passes when those model types exist. Each pass uses its own chunk files; progress bars reflect **this session’s** passes (not leftover files from an earlier run). When a pass finishes, its bar shows **100%** before the next pass starts.
+Click **Thumbnails >**. The app runs part, assembly, and drawing passes when those model types exist. Each pass uses its own chunk files; progress bars reflect **this session’s** passes (not leftover files from an earlier run). When a pass finishes, its bar shows **100%** before the next pass starts. While a batch is running, progress updates from chunk files only (the app does not rescan the whole folder each tick).
 
 Same ideas as ModelCHECK: **Waiting…**, **Failed (N)**, **Next >** when complete, or **Skip**.
 
