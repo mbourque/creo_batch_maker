@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import glob
 import hashlib
+import html
 import os
 import re
 import sys
@@ -239,6 +240,65 @@ def model_tag_to_display_name(model_tag: str) -> str:
     return (model_tag or "").strip().lower()
 
 
+def _parse_duplicate_models_check(check: ET.Element) -> dict | None:
+    """Extract preview lines from DUPLICATE_MODELS (func_str + item info1 names)."""
+    if (check.get("name") or "") != "DUPLICATE_MODELS":
+        return None
+    func_str_el = check.find("func_str")
+    func_str = (func_str_el.text or "").strip() if func_str_el is not None else ""
+    if not func_str:
+        func_str = "Preview the model :"
+    models: list[str] = []
+    for item in check.findall("item"):
+        info1 = (item.findtext("info1") or "").strip()
+        if info1:
+            models.append(info1)
+    if not models:
+        return None
+    return {"func_str": func_str, "models": models}
+
+
+def build_duplicate_models_detail_html(
+    duplicate_models: dict,
+    *,
+    jump_display_names: set[str],
+) -> str:
+    """HTML lines: ``func_str`` + linked model name (in-report jump when the model is listed)."""
+    func_str = (duplicate_models.get("func_str") or "Preview the model :").strip()
+    prefix = html.escape(func_str)
+    if not prefix.endswith(" "):
+        prefix += " "
+    lines: list[str] = []
+    for raw_name in duplicate_models.get("models") or []:
+        jump_name = model_tag_to_display_name(raw_name)
+        visible = html.escape(raw_name)
+        if jump_name.casefold() in jump_display_names:
+            link = (
+                f'<button type="button" class="mq-bom-jump mq-duplicate-model-jump" '
+                f'data-mq-model-jump="{html.escape(jump_name, quote=True)}">{visible}</button>'
+            )
+        else:
+            link = f'<span class="model-name-plain">{visible}</span>'
+        lines.append(f'<p class="mq-duplicate-preview-line">{prefix}{link}</p>')
+    return "\n".join(lines)
+
+
+def collect_report_model_jump_names(files_info: dict) -> set[str]:
+    """Casefolded display names for models that appear as issue rows (jump targets)."""
+    names: set[str] = set()
+    for file_path, file_info in files_info.items():
+        display = get_display_name(file_path)
+        if display:
+            names.add(display.casefold())
+        report_display = file_info.get("report_display_name")
+        if report_display:
+            names.add(report_display.casefold())
+        model_tag = (file_info.get("model") or "").strip()
+        if model_tag:
+            names.add(model_tag_to_display_name(model_tag).casefold())
+    return names
+
+
 def resolve_report_display_name(
     *,
     working_dir: str,
@@ -317,14 +377,16 @@ def _parse_master_root(root: ET.Element) -> dict:
                 ans = ans_el.text if ans_el is not None else ""
                 condensed_msg = f"{msg.strip()} {ans.strip()}" if msg and ans else msg.strip()
 
-                file_info["checks"].append(
-                    {
-                        "stat": stat,
-                        "name": name,
-                        "desc": desc,
-                        "condensed_msg": condensed_msg,
-                    }
-                )
+                check_entry: dict = {
+                    "stat": stat,
+                    "name": name,
+                    "desc": desc,
+                    "condensed_msg": condensed_msg,
+                }
+                duplicate_models = _parse_duplicate_models_check(check)
+                if duplicate_models is not None:
+                    check_entry["duplicate_models"] = duplicate_models
+                file_info["checks"].append(check_entry)
 
             if _file_size_header_is_zero(file_info["file_size"]):
                 for chk in file_element.findall(".//check"):
@@ -724,6 +786,7 @@ def create_html_report(
     more_info_index = build_more_info_name_index(working_dir)
     ensure_shared_placeholder_jpeg(report_assets_dir)
     thumbnail_cache: dict[str, str] = {}
+    jump_display_names = collect_report_model_jump_names(files_info)
     for file_path, file_info in files_info.items():
         original_display_name = get_display_name(file_path)
         drag_image_display_name = file_info.get("report_display_name") or original_display_name
@@ -746,11 +809,20 @@ def create_html_report(
                     )
                 image_url = thumbnail_cache[thumb_key]
 
+                duplicate_detail = ""
+                duplicate_models = check.get("duplicate_models")
+                if duplicate_models:
+                    duplicate_detail = build_duplicate_models_detail_html(
+                        duplicate_models,
+                        jump_display_names=jump_display_names,
+                    )
+
                 check_dict[f"{check['stat']}: {check['name']}"].append(
                     {
                         "file_path": file_path,
                         "desc": check["desc"],
                         "condensed_msg": check["condensed_msg"],
+                        "duplicate_models_detail_html": duplicate_detail,
                         "stat": check["stat"],
                         "last_saved": file_info["last_saved"],
                         "created": file_info["created"],

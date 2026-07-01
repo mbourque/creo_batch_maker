@@ -94,6 +94,8 @@ Click **Create Report**. When finished, choose whether to open `index.html` in y
 
 If the report already exists, **Open Report** opens it without rebuilding.
 
+On **Duplicate Models** warnings, the report lists each duplicate under the count (`Preview the model : …`); click a model name to jump to that model’s row when it appears elsewhere in the report.
+
 ## Settings (Setup step only)
 
 Open **Settings** from the menu:

@@ -165,6 +165,23 @@
             pointer-events: none;
         }
         .model-name-plain { color: #1a1a1a; font-weight: normal; }
+        .mq-duplicate-preview-line { margin: 4px 0 0 0; }
+        button.mq-duplicate-model-jump {
+            display: inline;
+            padding: 0;
+            margin: 0;
+            border: none;
+            background: transparent;
+            font: inherit;
+            color: #007BFF;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        button.mq-duplicate-model-jump:hover { text-decoration: underline; }
+        button.mq-duplicate-model-jump:focus-visible {
+            outline: 2px solid #007BFF;
+            outline-offset: 2px;
+        }
         .save-help-overlay {
             display: none;
             position: fixed;
@@ -551,7 +568,7 @@
 
         function initModelJumps() {
             var btns = document.querySelectorAll(
-                '.mq-bom-jump[data-mq-model-jump], .mq-complexity-jump[data-mq-model-jump]'
+                '.mq-bom-jump[data-mq-model-jump], .mq-complexity-jump[data-mq-model-jump], .mq-duplicate-model-jump[data-mq-model-jump]'
             );
             for (var i = 0; i < btns.length; i++) {
                 btns[i].addEventListener('click', function () {
@@ -1237,6 +1254,9 @@
                 </p>
                 <p class="mq-issue-desc">{% if file.stat == 'ERROR' %}<img class="mq-stat-icon" src="msgs_error.png" alt="ERROR" width="16" height="16">{% else %}<img class="mq-stat-icon" src="msgs_warning.png" alt="WARNING" width="16" height="16">{% endif %}<span>{{ file.desc | e }}</span></p>
                 <p>{{ file.condensed_msg | e }}</p>
+                {% if file.duplicate_models_detail_html %}
+                {{ file.duplicate_models_detail_html | safe }}
+                {% endif %}
                 <p><strong>Created by:</strong> {{ file.last_saved }} on {{ file.created }}</p>
                 <p><strong>File Size:</strong> {{ file.file_size }}</p>
                 <p><strong>Number of Features:</strong> {{ file.num_features }}</p>

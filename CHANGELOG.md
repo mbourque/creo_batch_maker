@@ -6,6 +6,7 @@ Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. 
 
 - **Thumbnails** / **ModelCHECK**: batch progress bars update smoothly while the runner is active (one chunk-file check per tick instead of rescanning the whole folder); the UI stays responsive on large folders. **Failed (N)** may lag during an active batch and refreshes when the pass finishes.
 - **Report** (Statistics): family generic/instance counts in the progress table match the Family table detail (same scanned-file filter). Performance table row labels use sentence case. **Models skipped** uses the same subsection heading size as other Scan Information blocks.
+- **Report** (**Duplicate Models**): lists each duplicate found under the count (`Preview the model : MODEL.PRT`); model names link to that model elsewhere in the report when it appears as an issue row.
 
 ## 2026-06-28 — v1.11.8
 
