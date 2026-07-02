@@ -189,6 +189,7 @@ WIZARD_AUTOMATIC_MODE_MESSAGE = (
 )
 AUTOMATIC_MODE_DEFAULT = True
 DEBUG_MODE_DEFAULT = False
+_RECENT_SCANS_MAX = 10
 # When no Creo loadpoint / no .ttd list yet, File → New uses this default task (filename + UI label).
 DEFAULT_MODELCHECK_TTD = "modelcheck.ttd"
 DEFAULT_MODELCHECK_DISPLAY = "ModelCHECK"
@@ -819,10 +820,42 @@ def _normalize_automatic_mode(value: object) -> bool:
     return False
 
 
+def _normalize_recent_scans(value: object) -> list[str]:
+    """Up to ``_RECENT_SCANS_MAX`` full working-directory paths (most recent first)."""
+    if not isinstance(value, list):
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in value:
+        if not isinstance(item, str):
+            continue
+        path = item.strip()
+        if not path:
+            continue
+        key = path.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(path)
+        if len(out) >= _RECENT_SCANS_MAX:
+            break
+    return out
+
+
+def _prepend_recent_scan(recent: list[str], working_dir: str) -> list[str]:
+    path = working_dir.strip()
+    if not path:
+        return list(recent)
+    key = path.casefold()
+    rest = [p for p in recent if p.strip().casefold() != key]
+    return [path, *rest[: _RECENT_SCANS_MAX - 1]]
+
+
 def _canonical_app_settings(data: dict[str, object]) -> dict[str, object]:
     """Keys persisted in app_settings.json (task selection is not stored)."""
     return {
         "working_directory": str(data.get("working_directory") or ""),
+        "recent_scans": _normalize_recent_scans(data.get("recent_scans")),
         "creo_loadpoint": str(data.get("creo_loadpoint") or ""),
         "chunk_size": _normalize_chunk_size(
             data.get("chunk_size", CREO_BATCH_CHUNK_SIZE_DEFAULT)
@@ -1025,6 +1058,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._skip_timed_out_prompt_on_go = False
         self._session_failed_batch_go_choice: FailedBatchGoChoice | None = None
         self._go_in_progress = False
+        self._recent_scans: list[str] = []
+        self._file_menu_recent_scans_index: int | None = None
         self._configuration_menu: tk.Menu | None = None
         self._menubar: tk.Menu | None = None
         self._settings_options = [
@@ -5189,6 +5224,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._file_menu = file_menu
         file_menu.add_command(label="New", command=self._on_file_menu_new)
         file_menu.add_command(label="Open...", command=self._on_file_menu_open)
+        self._recent_scans_menu = tk.Menu(file_menu, tearoff=0)
         file_menu.add_command(label="Save", command=self._on_file_menu_save)
         file_menu.add_command(label="Save as...", command=self._on_file_menu_save_as)
         file_menu.add_separator()
@@ -5321,6 +5357,65 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             pass
         if fully_enabled:
             self._refresh_file_menu_save_state()
+        self._refresh_recent_scans_menu()
+
+    def _refresh_recent_scans_menu(self) -> None:
+        """Rebuild File → Recent scans (hidden when the list is empty)."""
+        fm = getattr(self, "_file_menu", None)
+        rs_menu = getattr(self, "_recent_scans_menu", None)
+        if fm is None or rs_menu is None:
+            return
+        rs_menu.delete(0, "end")
+        idx = self._file_menu_recent_scans_index
+        if not self._recent_scans:
+            if idx is not None:
+                try:
+                    fm.delete(idx)
+                except tk.TclError:
+                    pass
+                self._file_menu_recent_scans_index = None
+            return
+        for path in self._recent_scans:
+            try:
+                label = Path(path).name or path
+            except OSError:
+                label = path
+            rs_menu.add_command(
+                label=label,
+                command=lambda p=path: self._on_file_menu_recent_scan(p),
+            )
+        if idx is None:
+            try:
+                fm.insert_cascade(2, label="Recent scans", menu=rs_menu)
+                self._file_menu_recent_scans_index = 2
+            except tk.TclError:
+                pass
+
+    def _record_recent_scan(self, working_dir: Path) -> None:
+        try:
+            path = str(working_dir.expanduser().resolve())
+        except OSError:
+            path = str(working_dir).strip()
+        if not path:
+            return
+        self._recent_scans = _prepend_recent_scan(self._recent_scans, path)
+        self._refresh_recent_scans_menu()
+
+    def _on_file_menu_recent_scan(self, path: str) -> None:
+        if not self._app_menus_fully_enabled():
+            return
+        try:
+            resolved = str(Path(path).expanduser().resolve())
+        except OSError:
+            resolved = path.strip()
+        if not resolved:
+            return
+        self._set_working_directory_value(resolved)
+        self._persist_working_directory_and_loadpoint()
+        self._warn_if_working_directory_invalid()
+        self._warn_if_working_directory_has_spaces()
+        self._warn_if_working_directory_has_no_creo_models()
+        self._refresh_wizard_ui()
 
     def _refresh_file_menu_save_state(self) -> None:
         """Disable File → Save / Save as when settings are not in a savable state."""
@@ -5330,8 +5425,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         ok, _ = self._settings_fields_ready()
         st = tk.NORMAL if ok else tk.DISABLED
         try:
-            fm.entryconfigure(2, state=st)
-            fm.entryconfigure(3, state=st)
+            fm.entryconfigure("Save", state=st)
+            fm.entryconfigure("Save as...", state=st)
         except tk.TclError:
             pass
 
@@ -5430,6 +5525,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     "xtop_timeout_sec": self._xtop_gone_timeout_sec,
                     "automatic_mode": self._automatic_mode,
                     "debug_mode": self._debug_mode,
+                    "recent_scans": self._recent_scans,
                 }
             ),
             "",
@@ -5884,6 +5980,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         data["chunk_size"] = self._chunk_size
         data["output_timeout_sec"] = self._output_timeout_sec
         data["xtop_timeout_sec"] = self._xtop_gone_timeout_sec
+        data["recent_scans"] = self._recent_scans
         return data
 
     def _read_app_settings_dict(self) -> dict[str, object]:
@@ -6239,6 +6336,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 self._warn_if_creo_loadpoint_missing_parametric()
                 self._refresh_task_options()
             elif target_variable is self.working_directory:
+                self._record_recent_scan(Path(selected_path))
                 self._set_working_directory_value(selected_path)
                 self._warn_if_working_directory_invalid()
                 self._warn_if_working_directory_has_spaces()
@@ -6706,6 +6804,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             data.get("debug_mode", DEBUG_MODE_DEFAULT)
         )
         self._debug_mode_var.set(self._debug_mode)
+        self._recent_scans = _normalize_recent_scans(data.get("recent_scans"))
         self._set_creo_loadpoint_value(str(data.get("creo_loadpoint") or ""))
         self._warn_if_creo_loadpoint_missing_parametric()
         self._set_working_directory_value(str(data.get("working_directory") or ""))
@@ -6716,6 +6815,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._refresh_task_options()
         self._refresh_configuration_menu()
         self._refresh_action_buttons()
+        self._refresh_recent_scans_menu()
 
     def _load_settings(self) -> None:
         """On startup, restore form from ``app_settings.json`` (create empty file if missing)."""
@@ -6739,6 +6839,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return
 
         self._apply_settings_data(data)
+        if "recent_scans" not in data:
+            merged = self._merge_session_into_app_settings_dict(dict(data))
+            self._write_app_settings_dict(merged)
 
     def _save_settings(self) -> None:
         """Persist paths and app options to ``app_settings.json`` (called after a successful GO)."""
@@ -8390,6 +8493,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return
 
         self._update_create_report_task_list()
+        self._record_recent_scan(working_dir)
         self._save_settings()
         thumbnails_phase = thumbnail_phase if self._wizard_step == WIZARD_STEP_JPEG_3D else None
         if not self._launch_batch_runner(working_dir, task_display_raw):

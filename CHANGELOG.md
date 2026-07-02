@@ -2,6 +2,18 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-02 — v1.11.15
+
+- **File → Recent scans**: browsing to a working directory on Setup adds that folder to the list (same as starting a batch).
+
+## 2026-07-02 — v1.11.14
+
+- **Settings** (`app_settings.json`): `recent_scans` is always written (below `working_directory`) so you can add test paths manually; older settings files are upgraded on startup.
+
+## 2026-07-02 — v1.11.13
+
+- **File → Recent scans**: lists up to 10 recently batched working folders (folder name in the menu, full path in `app_settings.json`). Pick one to restore that working directory. Hidden when the list is empty.
+
 ## 2026-07-02 — v1.11.12
 
 - **Report** (Scan Information → **Models skipped**): **More…** expands the full list; **Collapse** returns to the short preview (same as Family table detail).

@@ -27,7 +27,7 @@ python .\main.py
 - Choose a **working directory** with your `.prt`, `.asm`, and/or `.drw` files at the top level (not in subfolders).
 - The working directory path must **not contain spaces** for batch steps.
 
-Settings are saved in `app_settings.json` when you start a batch or use **File → Save**.
+Settings are saved in `app_settings.json` when you start a batch or use **File → Save**. The `recent_scans` array (full folder paths, newest first) drives **File → Recent scans** — populated when you **Browse…** the working directory or start a batch. Edit it while the app is closed, then restart to test.
 
 ## The wizard
 
@@ -121,6 +121,7 @@ Open **Settings** from the menu:
 | **Start over…**            | Clear batch outputs in the working folder and return to Setup. Keeps your Creo models.            |
 | **Zip report…**            | Package `index.html` and related files into a zip (when a report exists).                         |
 | **Save / Open…**           | Save or load `app_settings.json`.                                                                 |
+| **Recent scans**           | Switch to a recently batched working folder (up to 10; shown only when the list is not empty).   |
 
 
 **Configuration** opens ModelCHECK config files in Notepad (`configs\` folder).
