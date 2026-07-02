@@ -1068,7 +1068,7 @@
                 setActiveSidebarNavFromHash();
             }
             function initModelThumbDrag() {
-                var wraps = document.querySelectorAll('a.model-thumb-wrap[href]');
+                var wraps = document.querySelectorAll('a.model-thumb-wrap[href], a.mq-skipped-drag[href]');
                 for (var i = 0; i < wraps.length; i++) {
                     (function (wrap) {
                         var img = wrap.querySelector('img');

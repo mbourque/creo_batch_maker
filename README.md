@@ -95,7 +95,7 @@ Click **Create Report**. When finished, choose whether to open `index.html` in y
 If the report already exists, **Open Report** opens it without rebuilding.
 
 On **Duplicate Models** warnings, the report lists each duplicate under the count (`Preview the model : …`); click a model name to jump to that model’s row when it appears elsewhere in the report.
-In **Scan Information → Statistics**, the table includes a **Bulk parts** row from unique `BULK_ITEMS` model names (`item/info1`, not `ans`).
+In **Scan Information → Statistics**, the table includes a **Bulk parts** row from unique `BULK_ITEMS` model names (`item/info1`, not `ans`). Under **Models skipped**, drag a name into Creo to open it (click does not open the file). Long lists use **More...** / **Collapse** like Family table detail.
 
 ## Settings (Setup step only)
 

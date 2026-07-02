@@ -40,7 +40,8 @@ from dataclasses import dataclass, field
 
 from pathlib import Path
 
-from typing import Any
+from typing import Any, Callable
+from urllib.parse import quote
 
 from make_html_summary import _model_check_category_map
 
@@ -1371,6 +1372,10 @@ _MQ_STATS_CSS = """
 
 .mq-skipped-names { color: #334155; }
 
+.mq-skipped-drag { color: #0369a1; text-decoration: underline; cursor: grab; }
+.mq-skipped-drag:active { cursor: grabbing; }
+.mq-skipped-name-plain { color: #334155; }
+
 .mq-skipped-section-list { margin: 0; font-size: 0.92rem; line-height: 1.45; color: #334155; }
 
 .mq-skipped-rest[hidden] { display: none !important; }
@@ -1383,6 +1388,8 @@ _MQ_STATS_CSS = """
 .mq-skipped-more-btn:hover { text-decoration: underline; }
 
 .mq-list-more-wrap { display: inline; }
+
+.mq-list-expand-btn[hidden], .mq-list-collapse-btn[hidden] { display: none !important; }
 
 .mq-family-table-rest[hidden] { display: none !important; }
 
@@ -1438,6 +1445,38 @@ _MQ_STATS_CSS = """
 </style>"""
 
 
+_MQ_SKIPPED_DRAG_SCRIPT = """
+<script>
+(function () {
+    function initSkippedModelDrag() {
+        var links = document.querySelectorAll('a.mq-skipped-drag[href]');
+        for (var i = 0; i < links.length; i++) {
+            (function (link) {
+                link.addEventListener('dragstart', function (e) {
+                    var rel = link.getAttribute('href');
+                    if (!rel) { return; }
+                    var fileUrl;
+                    try {
+                        fileUrl = new URL(rel, window.location.href).href;
+                    } catch (err) {
+                        fileUrl = rel;
+                    }
+                    e.dataTransfer.setData('text/uri-list', fileUrl);
+                    e.dataTransfer.setData('text/plain', fileUrl);
+                    e.dataTransfer.effectAllowed = 'copy';
+                });
+            })(links[i]);
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSkippedModelDrag);
+    } else {
+        initSkippedModelDrag();
+    }
+})();
+</script>"""
+
+
 
 
 
@@ -1453,22 +1492,58 @@ _FAMILY_TABLE_PREVIEW_LIMIT = 5
 _BOM_LIST_PREVIEW_LIMIT = 10
 
 
-def _comma_separated_list_html(names: list[str], *, span_class: str) -> str:
-    """Comma-separated names; first 20 inline, then ``more...`` expands the rest on the same line."""
+def _name_has_creo_path_ref(display_name: str) -> bool:
+    if "<<" in display_name and ">>" in display_name:
+        return True
+    if "[[" in display_name and "]]" in display_name:
+        return True
+    return False
+
+
+def _skipped_model_name_html(name: str) -> str:
+    """Draggable link for Creo drop (click does nothing); plain span for session-style names."""
+    if _name_has_creo_path_ref(name):
+        return f'<span class="mq-skipped-name-plain">{_esc(name)}</span>'
+    href = "./" + quote(name)
+    return (
+        f'<a class="mq-skipped-drag" href="{_esc(href)}" '
+        f'onclick="void(0); return false;" title="Drag into Creo">{_esc(name)}</a>'
+    )
+
+
+def _comma_separated_list_html(
+    names: list[str],
+    *,
+    span_class: str,
+    item_html: Callable[[str], str] | None = None,
+) -> str:
+    """Comma-separated names; first 20 inline, then ``More...`` expands the rest on the same line."""
     if not names:
         return "—"
+
+    def one(name: str) -> str:
+        return item_html(name) if item_html else _esc(name)
+
     if len(names) <= _LIST_PREVIEW_LIMIT:
-        return f'<span class="{span_class}">{", ".join(_esc(name) for name in names)}</span>'
-    visible = ", ".join(_esc(name) for name in names[:_LIST_PREVIEW_LIMIT])
-    rest = ", ".join(_esc(name) for name in names[_LIST_PREVIEW_LIMIT:])
+        return f'<span class="{span_class}">{", ".join(one(name) for name in names)}</span>'
+    visible = ", ".join(one(name) for name in names[:_LIST_PREVIEW_LIMIT])
+    rest = ", ".join(one(name) for name in names[_LIST_PREVIEW_LIMIT:])
     return (
         f'<span class="{span_class}">{visible}'
         f'<span class="mq-skipped-rest" hidden>, {rest}</span></span>'
         f'<span class="mq-list-more-wrap">, '
-        f'<button type="button" class="mq-skipped-more-btn" '
-        f'onclick="var w=this.parentElement;var l=w.previousElementSibling;'
-        f"var r=l.querySelector(&quot;.mq-skipped-rest&quot;);"
-        f"r.removeAttribute(&quot;hidden&quot;);w.remove();\">more...</button></span>"
+        f'<button type="button" class="mq-skipped-more-btn mq-list-expand-btn" '
+        f'onclick="var w=this.closest(&quot;.mq-list-more-wrap&quot;);'
+        f"var l=w.previousElementSibling;var r=l.querySelector(&quot;.mq-skipped-rest&quot;);"
+        f"r.removeAttribute(&quot;hidden&quot;);"
+        f"w.querySelector('.mq-list-expand-btn').setAttribute('hidden','');"
+        f"w.querySelector('.mq-list-collapse-btn').removeAttribute('hidden');\">More...</button>"
+        f'<button type="button" class="mq-skipped-more-btn mq-list-collapse-btn" hidden '
+        f'onclick="var w=this.closest(&quot;.mq-list-more-wrap&quot;);'
+        f"var l=w.previousElementSibling;var r=l.querySelector(&quot;.mq-skipped-rest&quot;);"
+        f"r.setAttribute(&quot;hidden&quot;,&quot;&quot;);"
+        f"w.querySelector('.mq-list-collapse-btn').setAttribute('hidden','');"
+        f"w.querySelector('.mq-list-expand-btn').removeAttribute('hidden');\">Collapse</button></span>"
     )
 
 
@@ -1679,7 +1754,11 @@ def _skipped_models_section(skipped_models: list[str]) -> str:
     if not skipped_models:
         return ""
     total = len(skipped_models)
-    list_html = _comma_separated_list_html(skipped_models, span_class="mq-skipped-names")
+    list_html = _comma_separated_list_html(
+        skipped_models,
+        span_class="mq-skipped-names",
+        item_html=_skipped_model_name_html,
+    )
     return f"""
 
   <div class="mq-section">
@@ -2008,6 +2087,8 @@ def write_statistics_html_file(master_xml_path: str, output_path: str) -> str:
         '  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
 
         "  <title>Scan Information</title>\n"
+
+        f"{_MQ_SKIPPED_DRAG_SCRIPT}\n"
 
         "</head>\n<body style=\"margin:0;background:#e8eaed;\">\n"
 
