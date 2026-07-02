@@ -535,7 +535,8 @@ PERFORMANCE_TABLE_ROWS: list[tuple[str, str | None]] = [
     ("Number of family table instances", "_FAMILY_INSTANCE_COUNT"),
     ("Sheetmetal parts", "_SHEETMETAL_PARTS"),
     ("Multibody parts", "_MULTIBODY_PARTS"),
-    ("Number of skeleton models", "_SKELETON_MODELS"),
+    ("Skeleton parts", "_SKELETON_MODELS"),
+    ("Bulk parts", "_BULK_PARTS"),
 ]
 
 
@@ -555,6 +556,7 @@ class PerformanceMetrics:
     multibody_parts: int = 0
     skeleton_models: int = 0
     duplicate_models: int = 0
+    bulk_parts: int = 0
     fixed_components: int = 0
     suppressed_components: int = 0
     files_seen: int = 0
@@ -596,6 +598,27 @@ def _counts_as_report_issue(file_element: ET.Element, check_name: str) -> int:
     if _check_stat_text(check) in ("ERROR", "WARNING"):
         return 1
     return 0
+
+
+def _bulk_item_names(file_element: ET.Element) -> list[str]:
+    """Unique BULK_ITEMS ``info1`` model names from one report-visible check."""
+    check = _find_check(file_element, "BULK_ITEMS")
+    if check is None or _check_hidden_from_report(check):
+        return []
+    if _check_stat_text(check) not in ("ERROR", "WARNING"):
+        return []
+    names: list[str] = []
+    seen: set[str] = set()
+    for item in check.findall("item"):
+        name = (item.findtext("info1") or "").strip()
+        if not name:
+            continue
+        key = name.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        names.append(name)
+    return names
 
 
 def _unq_model_names_from(file_element: ET.Element) -> list[str]:
@@ -684,6 +707,7 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
     unique_models: set[str] = set()
     simprep_names: set[str] = set()
     skeleton_keys: set[str] = set()
+    bulk_part_keys: set[str] = set()
     asm_subassemblies: dict[str, list[str]] = {}
 
     for file_element in master_root.findall("File"):
@@ -693,6 +717,8 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
         pro_type = (file_element.findtext("ProType") or "").strip().upper()
 
         metrics.duplicate_models += _counts_as_report_issue(file_element, "DUPLICATE_MODELS")
+        for bulk_name in _bulk_item_names(file_element):
+            bulk_part_keys.add(bulk_name.casefold())
         metrics.fixed_components += _parse_int_metric(_check_ans_text(file_element, "FIXED_COMPONENTS")) or 0
         metrics.suppressed_components += _parse_int_metric(_check_ans_text(file_element, "SUP_COMPONENTS")) or 0
 
@@ -729,6 +755,7 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
     metrics.max_assembly_depth = _batch_max_assembly_depth(asm_subassemblies)
     metrics.simprep_unique_count = len(simprep_names)
     metrics.skeleton_models = len(skeleton_keys)
+    metrics.bulk_parts = len(bulk_part_keys)
     family_generics = collect_family_generics_detail(
         master_root,
         file_elements=_report_scanned_file_elements(master_root),
@@ -751,6 +778,7 @@ def performance_metrics_answers(metrics: PerformanceMetrics) -> dict[str, str]:
         "_MULTIBODY_PARTS": str(metrics.multibody_parts),
         "_SKELETON_MODELS": str(metrics.skeleton_models),
         "_DUPLICATE_MODELS": str(metrics.duplicate_models),
+        "_BULK_PARTS": str(metrics.bulk_parts),
         "_FIXED_COMPONENTS": str(metrics.fixed_components),
         "_SUPPRESSED_COMPONENTS": str(metrics.suppressed_components),
     }
@@ -804,6 +832,9 @@ def _resolve_performance_value(answers: dict[str, str], key: str | None) -> tupl
     if key == "_DUPLICATE_MODELS":
         val = answers.get(key)
         return (val if val is not None else "—", "DUPLICATE_MODELS")
+    if key == "_BULK_PARTS":
+        val = answers.get(key)
+        return (val if val is not None else "—", "BULK_ITEMS")
     val = answers.get(key)
     if val is None:
         return ("—", key)

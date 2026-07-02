@@ -2,15 +2,24 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-02 — v1.11.10
+
+- **Report** (Scan Information → Statistics): added a **Bulk parts** row that totals `BULK_ITEMS` values found in report-visible checks.
+- **Report** (Scan Information → Statistics): renamed **Number of skeleton models** to **Skeleton models**.
+
 ## 2026-06-30 — v1.11.9
 
 - **Thumbnails** / **ModelCHECK**: batch progress bars update smoothly while the runner is active (one chunk-file check per tick instead of rescanning the whole folder); the UI stays responsive on large folders. **Failed (N)** may lag during an active batch and refreshes when the pass finishes.
 - **Report** (Statistics): family generic/instance counts in the progress table match the Family table detail (same scanned-file filter). Performance table row labels use sentence case. **Models skipped** uses the same subsection heading size as other Scan Information blocks.
 - **Report** (**Duplicate Models**): lists each duplicate found under the count (`Preview the model : MODEL.PRT`); model names link to that model elsewhere in the report when it appears as an issue row.
 
+
+
 ## 2026-06-28 — v1.11.8
 
 - **ModelCHECK** / **Thumbnails**: when a failure log still applies, **Automatic mode** reuses your last retry choice from this session (e.g. **one model per batch** picked on ModelCHECK also applies when thumbnails auto-start with failures). Manual **GO** still shows the retry dialog each time. The batch runner log records chunk size at start (fixed bad quoting in generated `.ps1` that could print a harmless PowerShell error on runner start).
+
+
 
 ## 2026-06-27 — v1.11.7
 
@@ -26,6 +35,8 @@ Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. 
 - **Stop**: cooperative stop, `kill.bat`, and cleanup; confirmation stays on top (**Proceed** default); auto-advance pauses until you continue.
 - **Automatic mode** / **ModelCHECK** / **Thumbnails**: advance after a batch finishes (even with failures) without re-running the same step; thumbnails chain part → assembly → drawing before **Create Report**; fixed auto loops, per-pass progress bars, and batch-runner **xtop** / **kill.bat** timing between chunks.
 - **ModelCHECK** / **Thumbnails**: retry dialog when a failure log exists (batch all still missing, retry failed at normal chunk size, or one model per batch); **Stop** clears failure logs.
+
+
 
 ## 2026-06-24 — v1.11.0
 
