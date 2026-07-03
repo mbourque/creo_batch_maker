@@ -1314,6 +1314,7 @@ _MQ_STATS_CSS = """
 .mq-template-category:last-child { margin-bottom: 0; }
 .mq-template-cat-title { margin: 0 0 4px 0; font-size: 0.92rem; font-weight: 600; color: #0f172a; }
 .mq-template-cat-body { margin: 0; padding-left: 12px; font-size: 0.92rem; line-height: 1.45; color: #334155; }
+.mq-template-cat-pre { white-space: pre-line; }
 .mq-template-cat-body + .mq-template-cat-body { margin-top: 4px; }
 .mq-template-empty { color: #94a3b8; }
 
@@ -1869,6 +1870,8 @@ def _template_category_html(label: str, count: int | None, lines: list[str]) -> 
         title = f"{_esc(label)} ({count})"
     if not lines:
         body = '<p class="mq-template-cat-body mq-template-empty">—</p>'
+    elif len(lines) == 1 and "\n" in lines[0]:
+        body = f'<p class="mq-template-cat-body mq-template-cat-pre">{_esc(lines[0])}</p>'
     else:
         body = "".join(
             f'<p class="mq-template-cat-body">{_esc(line)}</p>' for line in lines

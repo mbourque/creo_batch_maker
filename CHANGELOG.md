@@ -2,6 +2,14 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-03 — v1.11.30
+
+- **Report → Template Information**: part and assembly **Start relations** heading drops the count; relations render in one block with line breaks (no extra gap between lines).
+
+## 2026-07-03 — v1.11.29
+
+- **Report → Template Information**: part and assembly **Start relations** list one relation per line and drop the `Model=` prefix.
+
 ## 2026-07-03 — v1.11.28
 
 - **Report > Template Information**: drawing adds sheet sizes, symbols, sheet count, and notes; part adds length units, designated attributes, and accuracy; assembly adds designated attributes (from template scan XML).

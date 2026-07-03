@@ -284,6 +284,12 @@ _DTM_REPORT_GROUPS: tuple[tuple[str, str], ...] = (
 )
 
 
+def _strip_model_relation_prefix(value: str) -> str:
+    if value.startswith("Model="):
+        return value[6:]
+    return value
+
+
 def _relation_display_items(check: ET.Element | None) -> list[str]:
     if check is None:
         return []
@@ -292,13 +298,13 @@ def _relation_display_items(check: ET.Element | None) -> list[str]:
         info1 = (item.findtext("info1") or "").strip()
         info2 = (item.findtext("info2") or "").strip()
         if info1 and "=" in info1:
-            values.append(info1)
+            values.append(_strip_model_relation_prefix(info1))
         elif info1 and info2:
-            values.append(f"{info1}={info2}")
+            values.append(_strip_model_relation_prefix(f"{info1}={info2}"))
         elif info1:
-            values.append(info1)
+            values.append(_strip_model_relation_prefix(info1))
         elif info2:
-            values.append(info2)
+            values.append(_strip_model_relation_prefix(info2))
     return _unique_preserve_order(values)
 
 
@@ -397,7 +403,7 @@ def _model_template_base_categories(
     categories.extend(
         [
             ("Start layers", len(layers), [", ".join(layers)] if layers else []),
-            ("Start relations", len(relations), [_join_report_values(relations)] if relations else []),
+            ("Start relations", None, ["\n".join(relations)] if relations else []),
         ]
     )
     return categories
