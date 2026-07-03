@@ -38,6 +38,8 @@ import xml.etree.ElementTree as ET
 
 from dataclasses import dataclass, field
 
+from datetime import datetime
+
 from pathlib import Path
 
 from typing import Any, Callable
@@ -523,6 +525,7 @@ PERFORMANCE_REPORT_ISSUE_ROW_CHECKS: dict[str, str] = {
 }
 
 PERFORMANCE_TABLE_ROWS: list[tuple[str, str | None]] = [
+    ("Scan date", "_SCAN_DATE"),
     ("Parts", "_PART_COUNT"),
     ("Assemblies", "_ASSEMBLY_COUNT"),
     ("Drawings", "_DRAWING_COUNT"),
@@ -569,6 +572,7 @@ class PerformanceMetrics:
     part_count: int = 0
     assembly_count: int = 0
     drawing_count: int = 0
+    scan_date: str = ""
 
 
 def _parse_int_metric(text: str | None) -> int | None:
@@ -775,8 +779,31 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
     return metrics
 
 
+def _format_scan_date(dt: datetime) -> str:
+    """e.g. Thursday July 3, 2026 8:15am"""
+    hour12 = dt.hour % 12 or 12
+    ampm = "am" if dt.hour < 12 else "pm"
+    return f"{dt.strftime('%A %B')} {dt.day}, {dt.year} {hour12}:{dt.minute:02d}{ampm}"
+
+
+def _scan_date_for_report(master_path: str = "") -> str:
+    """Prefer master.xml write time (scan merge); otherwise report build time."""
+    dt: datetime | None = None
+    if master_path:
+        try:
+            path = Path(master_path)
+            if path.is_file():
+                dt = datetime.fromtimestamp(path.stat().st_mtime)
+        except OSError:
+            pass
+    if dt is None:
+        dt = datetime.now()
+    return _format_scan_date(dt)
+
+
 def performance_metrics_answers(metrics: PerformanceMetrics) -> dict[str, str]:
     answers: dict[str, str] = {
+        "_SCAN_DATE": metrics.scan_date or "—",
         "_PART_COUNT": str(metrics.part_count),
         "_ASSEMBLY_COUNT": str(metrics.assembly_count),
         "_DRAWING_COUNT": str(metrics.drawing_count),
@@ -812,7 +839,7 @@ def _resolve_performance_value(answers: dict[str, str], key: str | None) -> tupl
     if key == "_FAMILY_INSTANCE_COUNT":
         val = answers.get(key)
         return (val if val is not None else "—", "FAMILY_INFO")
-    if key in ("_PART_COUNT", "_ASSEMBLY_COUNT", "_DRAWING_COUNT"):
+    if key in ("_SCAN_DATE", "_PART_COUNT", "_ASSEMBLY_COUNT", "_DRAWING_COUNT"):
         val = answers.get(key)
         return (val if val is not None else "—", None)
     if key == "_SHEETMETAL_PARTS":
@@ -920,6 +947,7 @@ def write_performance_report_file(master_xml_path: str, output_path: str | None 
     master_xml_path = os.path.abspath(master_xml_path)
     root = ET.parse(master_xml_path).getroot()
     metrics = scan_performance_metrics(root)
+    metrics.scan_date = _scan_date_for_report(master_xml_path)
     if metrics.files_seen == 0:
         raise ValueError("No model entries found in master.xml")
     out_path = output_path or os.path.join(os.path.dirname(master_xml_path), "performance_report.html")
@@ -2128,6 +2156,7 @@ def generate_statistics_fragment(
     """Build statistics HTML from an already-parsed ``master.xml`` root."""
     stats = scan_batch_statistics(master_root, master_path=master_path)
     stats.performance_metrics = scan_performance_metrics(master_root)
+    stats.performance_metrics.scan_date = _scan_date_for_report(master_path)
     stats.skipped_models = scan_skipped_models(working_dir, master_root)
     stats.templates_scanned = scan_templates_scanned(working_dir)
     if stats.top_level_assembly:
