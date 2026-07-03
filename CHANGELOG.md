@@ -2,6 +2,54 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-03 — v1.11.28
+
+- **Report → Template Information**: part and assembly **Simplified representations** moved directly under **Views**.
+
+## 2026-07-03 — v1.11.27
+
+- **Report → Template Information**: drawing **Number of sheets** moved above **Sheet sizes**.
+
+## 2026-07-03 — v1.11.26
+
+- **Report → Template Information**: part and assembly **Designated attributes** moved directly under **Start parameters**.
+
+## 2026-07-03 — v1.11.25
+
+- **Report → Template Information**: part and assembly **Length units** and **Accuracy** no longer show a `(1)` count in the heading (single-value fields).
+
+## 2026-07-03 — v1.11.24
+
+- **Report → Template Information**: removed **Designated attributes** from the drawing template section (not supported for drawings).
+
+## 2026-07-03 — v1.11.23
+
+- **Report → Template Information**: drawing template adds **Designated attributes** (`DESIGNATED_ATTR`).
+
+## 2026-07-03 — v1.11.22
+
+- **Report → Template Information**: drawing **Sheet sizes** shows the sheet size when ModelCHECK reports it in `<ans>` only (e.g. `B`) instead of `<item>` rows.
+
+## 2026-07-03 — v1.11.21
+
+- **Report → Template Information**: assembly template adds length units and accuracy (same as part).
+
+## 2026-07-03 — v1.11.20
+
+- **Report → Template Information**: drawing adds sheet sizes, symbols, sheet count, and notes; part adds length units, designated attributes, and accuracy; assembly adds designated attributes (from template scan XML).
+
+## 2026-07-03 — v1.11.19
+
+- **Scan Templates**: each template (part, assembly, drawing) runs in its own batch chunk — one model at a time — instead of all templates in a single run.
+
+## 2026-07-03 — v1.11.18
+
+- **Scan Templates**: after a failed template scan, **Back** and **Scan Templates >** work again so you can change templates or retry (manual and automatic mode).
+
+## 2026-07-03 — v1.11.17
+
+- **Report**: **Template Information** (sidebar, under Scan Information) lists part, assembly, and drawing template scan details from `templates\*.xml` when a template scan was run; omitted when no template XML exists.
+
 ## 2026-07-02 — v1.11.16
 
 - **File → Recent scans**: numbered entries (`1.`, `2.`, …) with a shortened path (`C:/PTC/XMA3/.../folder`) so similar folders are easier to tell apart.

@@ -23,6 +23,7 @@ import json
 import re
 import sys
 import xml.etree.ElementTree as ET
+from collections.abc import Callable
 from pathlib import Path
 
 _LAYER_SUFFIX_RE = re.compile(r"\s+\[(?:no items|\d+ items?)\]$", re.IGNORECASE)
@@ -263,6 +264,221 @@ def parse_drw_xml(xml_path: Path) -> tuple[list[str], list[str], list[str]]:
     )
     symbol_names = _unique_preserve_order(_check_items(_find_check(root, "SYMBOL_INFO")))
     return param_names, layer_names, symbol_names
+
+
+PART_TEMPLATE_MODEL = "part_template.prt"
+ASM_TEMPLATE_MODEL = "assembly_template.asm"
+DRW_TEMPLATE_MODEL = "drawing_template.drw"
+
+_TEMPLATE_XML_FILES = (
+    ("Part template", PART_TEMPLATE_MODEL, PART_TEMPLATE_XML, "model"),
+    ("Assembly template", ASM_TEMPLATE_MODEL, ASM_TEMPLATE_XML, "model"),
+    ("Drawing template", DRW_TEMPLATE_MODEL, DRW_TEMPLATE_XML, "drawing"),
+)
+
+_DTM_REPORT_GROUPS: tuple[tuple[str, str], ...] = (
+    ("DTM_PLANE_INFO", "Plane"),
+    ("DTM_CSYS_INFO", "Coordinate system"),
+    ("DTM_AXES_INFO", "Axis"),
+    ("DTM_POINT_INFO", "Point"),
+)
+
+
+def _relation_display_items(check: ET.Element | None) -> list[str]:
+    if check is None:
+        return []
+    values: list[str] = []
+    for item in check.findall("item"):
+        info1 = (item.findtext("info1") or "").strip()
+        info2 = (item.findtext("info2") or "").strip()
+        if info1 and "=" in info1:
+            values.append(info1)
+        elif info1 and info2:
+            values.append(f"{info1}={info2}")
+        elif info1:
+            values.append(info1)
+        elif info2:
+            values.append(info2)
+    return _unique_preserve_order(values)
+
+
+def _direct_ans(check: ET.Element | None) -> str | None:
+    """First direct child ``<ans>`` only (``find('ans')`` can match nested descendants)."""
+    if check is None:
+        return None
+    for child in check:
+        if child.tag == "ans":
+            text = (child.text or "").strip()
+            if text:
+                return text
+    return None
+
+
+def _normalize_units_length(raw: str) -> str:
+    text = raw.strip()
+    if not text:
+        return ""
+    key = text.upper()
+    return {"MM": "mm", "INCH": "in", "IN": "in"}.get(key, text)
+
+
+def _report_category_named_items(
+    root: ET.Element, check_name: str, label: str
+) -> tuple[str, int, list[str]]:
+    check = _find_check(root, check_name)
+    names = _unique_preserve_order(_check_items(check))
+    if names:
+        return (label, len(names), [", ".join(names)])
+    ans = _direct_ans(check)
+    if ans:
+        return (label, 1, [ans])
+    return (label, 0, [])
+
+
+def _report_category_scalar(
+    root: ET.Element,
+    check_name: str,
+    label: str,
+    *,
+    normalizer: Callable[[str], str] | None = None,
+) -> tuple[str, int | None, list[str]]:
+    check = _find_check(root, check_name)
+    ans = _direct_ans(check)
+    if ans:
+        text = normalizer(ans) if normalizer else ans
+        return (label, None, [text])
+    return (label, None, [])
+
+
+def _report_category_accuracy(root: ET.Element) -> tuple[str, int | None, list[str]]:
+    check = _find_check(root, "ACCURACY_INFO")
+    ans = _direct_ans(check)
+    if ans:
+        return ("Accuracy", None, [ans])
+    values = _relation_display_items(check)
+    return ("Accuracy", None, [_join_report_values(values)] if values else [])
+
+
+def _model_template_base_categories(
+    root: ET.Element, *, include_designated_attr: bool = False
+) -> list[tuple[str, int | None, list[str]]]:
+    """(label, count, body lines) for part or assembly template XML."""
+    datum_groups: list[tuple[str, list[str]]] = []
+    datum_count = 0
+    for check_name, group_label in _DTM_REPORT_GROUPS:
+        names = _check_items(_find_check(root, check_name))
+        if names:
+            datum_groups.append((group_label, names))
+            datum_count += len(names)
+    datum_lines = [f"{label}: {', '.join(names)}" for label, names in datum_groups]
+
+    views = _check_items(_find_check(root, "VIEW_INFO"))
+    parameters = _check_items(_find_check(root, "PARAM_INFO"))
+    layers = _unique_preserve_order(
+        [_normalize_layer_name(n) for n in _check_items(_find_check(root, "EXTRA_LAYERS"))]
+    )
+    relations = _relation_display_items(_find_check(root, "RELATION_INFO"))
+    simpreps = _check_items(_find_check(root, "SIMPREP_INFO"))
+
+    categories: list[tuple[str, int | None, list[str]]] = [
+        ("Start datums", datum_count, datum_lines),
+        ("Views", len(views), [", ".join(views)] if views else []),
+        (
+            "Simplified representations",
+            len(simpreps),
+            [", ".join(simpreps)] if simpreps else [],
+        ),
+        ("Start parameters", len(parameters), [", ".join(parameters)] if parameters else []),
+    ]
+    if include_designated_attr:
+        categories.append(
+            _report_category_named_items(root, "DESIGNATED_ATTR", "Designated attributes")
+        )
+    categories.extend(
+        [
+            ("Start layers", len(layers), [", ".join(layers)] if layers else []),
+            ("Start relations", len(relations), [_join_report_values(relations)] if relations else []),
+        ]
+    )
+    return categories
+
+
+def _part_template_report_categories(root: ET.Element) -> list[tuple[str, int | None, list[str]]]:
+    categories = _model_template_base_categories(root, include_designated_attr=True)
+    categories.extend(
+        [
+            _report_category_scalar(
+                root, "UNITS_LENGTH", "Length units", normalizer=_normalize_units_length
+            ),
+            _report_category_accuracy(root),
+        ]
+    )
+    return categories
+
+
+def _asm_template_report_categories(root: ET.Element) -> list[tuple[str, int | None, list[str]]]:
+    categories = _model_template_base_categories(root, include_designated_attr=True)
+    categories.extend(
+        [
+            _report_category_scalar(
+                root, "UNITS_LENGTH", "Length units", normalizer=_normalize_units_length
+            ),
+            _report_category_accuracy(root),
+        ]
+    )
+    return categories
+
+
+def _drawing_template_report_categories(root: ET.Element) -> list[tuple[str, int, list[str]]]:
+    parameters = _check_items(_find_check(root, "PARAM_INFO"))
+    layers = _unique_preserve_order(
+        [_normalize_layer_name(n) for n in _check_items(_find_check(root, "EXTRA_LAYERS"))]
+    )
+    return [
+        ("Start parameters", len(parameters), [", ".join(parameters)] if parameters else []),
+        ("Start layers", len(layers), [", ".join(layers)] if layers else []),
+        _report_category_scalar(root, "NUM_DRAW_SHEETS", "Number of sheets"),
+        _report_category_named_items(root, "SHEET_SIZE_INFO", "Sheet sizes"),
+        _report_category_named_items(root, "SYMBOL_INFO", "Drawing symbols"),
+        _report_category_named_items(root, "NOTE_INFO", "Notes"),
+    ]
+
+
+def _join_report_values(values: list[str]) -> str:
+    return " · ".join(values)
+
+
+def collect_template_scan_report_blocks(templates_dir: Path) -> list[tuple[str, str, list[tuple[str, int, list[str]]]]]:
+    """
+    Return ``(title, model_filename, categories)`` for each template XML on disk.
+
+    ``categories`` is a list of ``(label, count, body_lines)``.
+    """
+    blocks: list[tuple[str, str, list[tuple[str, int, list[str]]]]] = []
+    if not templates_dir.is_dir():
+        return blocks
+    for title, model_file, xml_name, kind in _TEMPLATE_XML_FILES:
+        xml_path = templates_dir / xml_name
+        if not xml_path.is_file():
+            continue
+        try:
+            root = ET.parse(xml_path).getroot()
+        except (OSError, ET.ParseError):
+            continue
+        if kind == "drawing":
+            categories = _drawing_template_report_categories(root)
+        elif xml_name == PART_TEMPLATE_XML:
+            categories = _part_template_report_categories(root)
+        else:
+            categories = _asm_template_report_categories(root)
+        blocks.append((title, model_file, categories))
+    return blocks
+
+
+def templates_dir_has_scan_xml(templates_dir: Path) -> bool:
+    if not templates_dir.is_dir():
+        return False
+    return any((templates_dir / xml_name).is_file() for _t, _m, xml_name, _k in _TEMPLATE_XML_FILES)
 
 
 def _fallback_param_insert(part_lines: list[str]) -> int:

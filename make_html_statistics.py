@@ -45,6 +45,8 @@ from urllib.parse import quote
 
 from make_html_summary import _model_check_category_map
 
+from update_sample_start_from_xml import collect_template_scan_report_blocks
+
 
 
 
@@ -1307,6 +1309,14 @@ _MQ_STATS_CSS = """
 
 .mq-section-note { font-size: 0.85rem; color: #475569; margin: 0 0 14px 0; line-height: 1.45; }
 
+.mq-template-categories { margin: 0; }
+.mq-template-category { margin: 0 0 14px 0; }
+.mq-template-category:last-child { margin-bottom: 0; }
+.mq-template-cat-title { margin: 0 0 4px 0; font-size: 0.92rem; font-weight: 600; color: #0f172a; }
+.mq-template-cat-body { margin: 0; padding-left: 12px; font-size: 0.92rem; line-height: 1.45; color: #334155; }
+.mq-template-cat-body + .mq-template-cat-body { margin-top: 4px; }
+.mq-template-empty { color: #94a3b8; }
+
 .mq-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
 
 .mq-table th, .mq-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
@@ -1850,6 +1860,69 @@ def _templates_scanned_summary_line(kinds: list[str]) -> str:
     count_word = count_words.get(len(kinds), str(len(kinds)))
     types_label = ", ".join(kinds)
     return f"<p><strong>Templates scanned ({count_word}):</strong> {types_label}</p>"
+
+
+def _template_category_html(label: str, count: int | None, lines: list[str]) -> str:
+    if count is None:
+        title = _esc(label)
+    else:
+        title = f"{_esc(label)} ({count})"
+    if not lines:
+        body = '<p class="mq-template-cat-body mq-template-empty">—</p>'
+    else:
+        body = "".join(
+            f'<p class="mq-template-cat-body">{_esc(line)}</p>' for line in lines
+        )
+    return (
+        f'<div class="mq-template-category">'
+        f'<p class="mq-template-cat-title">{title}</p>{body}</div>'
+    )
+
+
+def _template_block_html(
+    title: str, model_file: str, categories: list[tuple[str, int | None, list[str]]]
+) -> str:
+    rows = "".join(_template_category_html(label, count, lines) for label, count, lines in categories)
+    return f"""
+
+  <div class="mq-section mq-template-block">
+
+    <h2>{_esc(title)} — {_esc(model_file)}</h2>
+
+    <div class="mq-template-categories">{rows}
+    </div>
+
+  </div>"""
+
+
+def generate_template_information_html(working_dir: str, *, embedded: bool = False) -> str:
+    """Template scan details from ``templates\\*.xml``; empty when no template XML exists."""
+    wd = os.path.normpath(os.path.abspath(working_dir))
+    templates_dir = Path(wd) / "templates"
+    blocks = collect_template_scan_report_blocks(templates_dir)
+    if not blocks:
+        return ""
+    body = "".join(
+        _template_block_html(title, model_file, categories)
+        for title, model_file, categories in blocks
+    )
+    page_class = "mq-stats-page mq-stats-embedded" if embedded else "mq-stats-page"
+    if embedded:
+        title_html = '  <h1 class="mq-page-title" id="template-information">Template Information</h1>'
+    else:
+        title_html = '  <h1 class="mq-stats-title">Template Information</h1>'
+    return f"""{_MQ_STATS_CSS}
+
+<div class="{page_class}">
+
+{title_html}
+{body}
+
+</div>"""
+
+
+def generate_template_information_fragment(working_dir: str, *, embedded: bool = True) -> str:
+    return generate_template_information_html(working_dir, embedded=embedded)
 
 
 

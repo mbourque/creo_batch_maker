@@ -65,6 +65,7 @@ If `index.html` already exists, **Open Report** opens it in your browser.
 ### Scan Templates (optional)
 
 Upload part / assembly / drawing templates if you use them, then **Scan Templates >**.
+- Each template is batched one at a time (part, then assembly, then drawing when present).
 
 - **Skip** if you don’t need templates.
 - If the scan fails, fix the issue and run **Scan Templates >** again. Automatic mode pauses until you continue.
@@ -95,7 +96,7 @@ Click **Create Report**. When finished, choose whether to open `index.html` in y
 If the report already exists, **Open Report** opens it without rebuilding.
 
 On **Duplicate Models** warnings, the report lists each duplicate under the count (`Preview the model : …`); click a model name to jump to that model’s row when it appears elsewhere in the report.
-In **Scan Information → Statistics**, the table includes a **Bulk parts** row from unique `BULK_ITEMS` model names (`item/info1`, not `ans`). Under **Models skipped**, drag a name into Creo to open it (click does not open the file). Long lists use **More...** / **Collapse** like Family table detail.
+In **Scan Information → Statistics**, the table includes a **Bulk parts** row from unique `BULK_ITEMS` model names (`item/info1`, not `ans`). Under **Models skipped**, drag a name into Creo to open it (click does not open the file). Long lists use **More...** / **Collapse** like Family table detail. After **Scan Templates**, **Template Information** in the sidebar summarizes datums, views, parameters, layers, relations, symbols, sheet sizes, notes, length units, designated attributes, accuracy, and related details read from `templates\*.xml`.
 
 ## Settings (Setup step only)
 

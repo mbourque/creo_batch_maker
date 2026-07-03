@@ -22,7 +22,7 @@ import markdown
 from jinja2 import Environment, FileSystemLoader
 from PIL import Image, ImageDraw
 
-from make_html_statistics import generate_statistics_fragment
+from make_html_statistics import generate_statistics_fragment, generate_template_information_fragment
 from make_html_summary import (
     generate_adjusted_summary_shell,
     get_category_descriptions,
@@ -773,6 +773,10 @@ def create_html_report(
         master_path=master_xml_path,
         embedded=True,
     )
+    template_information_div = generate_template_information_fragment(
+        working_dir,
+        embedded=True,
+    )
 
     env = Environment(loader=FileSystemLoader(bundle_dir))
     template = env.get_template("report_template.html.j2")
@@ -876,6 +880,7 @@ def create_html_report(
         summary=summary,
         summary_div=summary_div,
         statistics_div=statistics_div,
+        template_information_div=template_information_div,
     )
 
     out_dir = os.path.dirname(os.path.abspath(output_file))

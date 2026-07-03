@@ -72,6 +72,7 @@ BATCH_DXC_BASE_MODELCHECK = "modelcheck-batch"
 BATCH_DXC_BASE_PART_THUMBNAILS = "part-thumbnails-batch"
 BATCH_DXC_BASE_ASSEMBLY_THUMBNAILS = "assembly-thumbnails-batch"
 BATCH_DXC_BASE_DRAWING_THUMBNAILS = "drawing-thumbnails-batch"
+BATCH_DXC_BASE_SCAN_TEMPLATES = "scan-templates-batch"
 BATCH_DXC_CHUNK_BASES = (
     CREO_BATCH_BASE,
     BATCH_DXC_BASE_MODELCHECK,
@@ -197,6 +198,7 @@ JPEG_3D_DISPLAY = "Thumbnails"
 SCAN_TEMPLATES_DISPLAY = "Scan Templates"
 CREATE_REPORT_DISPLAY = "Create Report"
 SCAN_TEMPLATES_DXC_BASENAME = "templates.dxc"
+SCAN_TEMPLATES_CHUNK_SIZE = 1
 JPEG_2D_PLOT_TTD = "plot_jpeg_a-size.ttd"
 JPEG_2D_PLOT_DISPLAY = "JPEG 2D Export to file, A Paper Size"
 JPEG_3D_TTD = "solid-raster_write_jpg.ttd"
@@ -2451,6 +2453,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     self._wizard_thumbnails_phase_runner_task_kind(phase)
                 )
             return BATCH_DXC_BASE_PART_THUMBNAILS
+        if step == WIZARD_STEP_SCAN:
+            return BATCH_DXC_BASE_SCAN_TEMPLATES
         return CREO_BATCH_BASE
 
     @staticmethod
@@ -2642,6 +2646,12 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         return False
 
     @staticmethod
+    def _scan_templates_dxc_base(batch_dxc_base: str) -> str:
+        if batch_dxc_base == CREO_BATCH_BASE:
+            return BATCH_DXC_BASE_SCAN_TEMPLATES
+        return batch_dxc_base
+
+    @staticmethod
     def _batch_dxc_files_exist(
         batch_dir: Path,
         scan_templates: bool,
@@ -2649,7 +2659,12 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
     ) -> bool:
         try:
             if scan_templates:
-                return (batch_dir / SCAN_TEMPLATES_DXC_BASENAME).is_file()
+                base = CreoDistributedBatchMakerApp._scan_templates_dxc_base(
+                    batch_dxc_base
+                )
+                if (batch_dir / SCAN_TEMPLATES_DXC_BASENAME).is_file():
+                    return True
+                return any(batch_dir.glob(f"{base}-*.dxc"))
             return any(batch_dir.glob(f"{batch_dxc_base}-*.dxc"))
         except OSError:
             return False
@@ -2662,7 +2677,13 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
     ) -> int:
         try:
             if scan_templates:
-                return 1 if (batch_dir / SCAN_TEMPLATES_DXC_BASENAME).is_file() else 0
+                base = CreoDistributedBatchMakerApp._scan_templates_dxc_base(
+                    batch_dxc_base
+                )
+                count = len(list(batch_dir.glob(f"{base}-*.dxc")))
+                if (batch_dir / SCAN_TEMPLATES_DXC_BASENAME).is_file():
+                    count += 1
+                return count
             return len(list(batch_dir.glob(f"{batch_dxc_base}-*.dxc")))
         except OSError:
             return 0
@@ -3190,13 +3211,17 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             and watch.get("step") == WIZARD_STEP_SCAN
             and watch.get("scan_failed")
         ):
-            label.configure(
-                text=(
+            if self._automatic_mode:
+                fail_text = (
                     "Template scan failed — automatic mode stopped. "
                     "Check the batch log, then use Scan Templates > to try again."
-                ),
-                text_color="#C62828",
-            )
+                )
+            else:
+                fail_text = (
+                    "Template scan failed. "
+                    "Check the batch log, then use Scan Templates > to try again."
+                )
+            label.configure(text=fail_text, text_color="#C62828")
             bar.set(0)
             frame.pack(anchor="w", fill="x", pady=(8, 0))
             return
@@ -3567,13 +3592,18 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             log_path = batch_dir / f"{log_stem}.log"
             if log_path.is_file():
                 log_hint = f"\n\nSee log:\n{log_path}"
-        messagebox.showerror(
-            "Scan Templates failed",
-            "Template scan did not complete. Auto-advance is paused until you continue manually.\n\n"
-            "The Automatic mode checkbox in Settings is not changed.\n\n"
-            "Fix the issue and use Scan Templates > to try again."
-            + log_hint,
-        )
+        if self._automatic_mode:
+            fail_body = (
+                "Template scan did not complete. Auto-advance is paused until you continue manually.\n\n"
+                "The Automatic mode checkbox in Settings is not changed.\n\n"
+                "Fix the issue and use Scan Templates > to try again."
+            )
+        else:
+            fail_body = (
+                "Template scan did not complete.\n\n"
+                "Fix the issue and use Scan Templates > to try again, or use Back to change templates."
+            )
+        messagebox.showerror("Scan Templates failed", fail_body + log_hint)
 
     def _wizard_scan_batch_failed(self, watch: dict[str, object]) -> bool:
         """True when the scan runner finished but template .xml outputs are still missing."""
@@ -3700,7 +3730,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             self._wizard_step_failed_models.pop(step, None)
         if batch_dxc_base is None:
             if scan_templates:
-                batch_dxc_base = CREO_BATCH_BASE
+                batch_dxc_base = BATCH_DXC_BASE_SCAN_TEMPLATES
             elif step == WIZARD_STEP_MODELCHECK:
                 batch_dxc_base = BATCH_DXC_BASE_MODELCHECK
             elif step == WIZARD_STEP_JPEG_3D and isinstance(thumbnails_phase, str):
@@ -4001,6 +4031,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return True
         watch = self._wizard_batch_watch
         if watch is not None and watch.get("step") == step:
+            if step == WIZARD_STEP_SCAN and self._wizard_scan_step_has_failed():
+                return False
             if self._wizard_batch_finish_pending(watch, step):
                 return True
             if self._wizard_step_has_remaining_dxc(step):
@@ -7033,6 +7065,12 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             if scan_templates:
                 dxc_candidates = [batch_dir / SCAN_TEMPLATES_DXC_BASENAME]
                 dxc_candidates.extend(batch_dir.glob("scan-*.dxc"))
+                base = (
+                    batch_dxc_base
+                    if batch_dxc_base
+                    else BATCH_DXC_BASE_SCAN_TEMPLATES
+                )
+                dxc_candidates.extend(batch_dir.glob(f"{base}-*.dxc"))
             else:
                 bases = (
                     [batch_dxc_base]
@@ -8403,7 +8441,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 else []
             )
             if scan_templates:
-                model_chunks = [latest_files]
+                model_chunks = self._chunk_paths(latest_files, SCAN_TEMPLATES_CHUNK_SIZE)
+                if not model_chunks:
+                    model_chunks = [[]]
             else:
                 effective_chunk = (
                     chunk_size_override
@@ -8421,23 +8461,22 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     self._wizard_step, working_dir
                 )
             chunk_base = CREO_BATCH_BASE
-            if not scan_templates and batch_task_kind:
+            if scan_templates:
+                chunk_base = BATCH_DXC_BASE_SCAN_TEMPLATES
+            elif batch_task_kind:
                 chunk_base = _batch_dxc_base_for_task_kind(batch_task_kind)
             self._cleanup_leftover_batch_files(
                 batch_dir,
                 scan_templates=scan_templates,
                 keep_runner_scripts=self._debug_mode,
-                batch_dxc_base=None if scan_templates else chunk_base,
+                batch_dxc_base=chunk_base,
             )
             if scan_templates:
                 output_dir_attr = _xml_attr_escape(_dxc_path_str(batch_dir))
             else:
                 output_dir_attr = _xml_attr_escape(working_dir_raw)
             for idx, chunk in enumerate(model_chunks, start=1):
-                if scan_templates:
-                    chunk_path = batch_dir / SCAN_TEMPLATES_DXC_BASENAME
-                else:
-                    chunk_path = batch_dir / f"{chunk_base}-{idx}.dxc"
+                chunk_path = batch_dir / f"{chunk_base}-{idx}.dxc"
                 group_lines = [
                     f'    <Group DSQM="_LOCAL" Name="{group_name_attr}" Output="2" '
                     f'OutputDir="{output_dir_attr}" PrimaryContent="0" '
@@ -8456,63 +8495,55 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 file_content = f"<DXC>\n    <Windchill/>\n{data_block}</DXC>\n"
                 chunk_path.write_text(file_content, encoding="utf-8")
 
+            num_chunks = len(model_chunks)
+            expected_outputs_per_chunk: list[list[str]] = []
+            output_to_model_per_chunk: list[dict[str, str]] = []
+            for chunk in model_chunks:
+                names: list[str] = []
+                out_to_model: dict[str, str] = {}
+                for p in chunk:
+                    if scan_templates or use_modelcheck_config:
+                        self._append_modelcheck_expected_outputs(
+                            names, out_to_model, p
+                        )
+                    else:
+                        out = self._expected_output_basename(
+                            p, is_modelcheck=False
+                        )
+                        if out:
+                            names.append(out)
+                            out_to_model[out] = p.name
+                expected_outputs_per_chunk.append(names)
+                output_to_model_per_chunk.append(out_to_model)
             if scan_templates:
-                scan_expected: list[str] = []
-                for p in latest_files:
-                    out = self._expected_output_basename(p, is_modelcheck=True)
-                    if out:
-                        scan_expected.append(out)
-                runner_text = self._build_scan_templates_runner_ps1(
-                    ptcdbatch_bat,
-                    batch_dir,
-                    kill_bat,
-                    scan_expected,
-                    self._output_timeout_sec,
-                    self._xtop_gone_timeout_sec,
-                    debug_log_path,
-                    cooperative_stop=True,
-                )
+                runner_task_kind = "modelcheck"
+                effective_chunk = SCAN_TEMPLATES_CHUNK_SIZE
             else:
-                num_chunks = len(model_chunks)
-                expected_outputs_per_chunk: list[list[str]] = []
-                output_to_model_per_chunk: list[dict[str, str]] = []
-                for chunk in model_chunks:
-                    names: list[str] = []
-                    out_to_model: dict[str, str] = {}
-                    for p in chunk:
-                        if use_modelcheck_config:
-                            self._append_modelcheck_expected_outputs(
-                                names, out_to_model, p
-                            )
-                        else:
-                            out = self._expected_output_basename(
-                                p, is_modelcheck=False
-                            )
-                            if out:
-                                names.append(out)
-                                out_to_model[out] = p.name
-                    expected_outputs_per_chunk.append(names)
-                    output_to_model_per_chunk.append(out_to_model)
                 runner_task_kind = (
                     batch_task_kind
                     if batch_task_kind is not None
                     else self._runner_task_kind(task_display_raw)
                 )
-                runner_text = self._build_chunk_runner_ps1(
-                    ptcdbatch_bat,
-                    batch_dir,
-                    kill_bat,
-                    num_chunks,
-                    expected_outputs_per_chunk,
-                    output_to_model_per_chunk,
-                    runner_task_kind,
-                    self._output_timeout_sec,
-                    self._xtop_gone_timeout_sec,
-                    debug_log_path,
-                    cooperative_stop=True,
-                    chunk_base=chunk_base,
-                    chunk_size=effective_chunk,
+                effective_chunk = (
+                    chunk_size_override
+                    if chunk_size_override is not None
+                    else self._chunk_size
                 )
+            runner_text = self._build_chunk_runner_ps1(
+                ptcdbatch_bat,
+                batch_dir,
+                kill_bat,
+                num_chunks,
+                expected_outputs_per_chunk,
+                output_to_model_per_chunk,
+                runner_task_kind,
+                self._output_timeout_sec,
+                self._xtop_gone_timeout_sec,
+                debug_log_path,
+                cooperative_stop=True,
+                chunk_base=chunk_base,
+                chunk_size=effective_chunk,
+            )
             runner_ps1_path.write_text(runner_text, encoding="utf-8-sig")
         except OSError as exc:
             messagebox.showerror(
@@ -8529,14 +8560,14 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             self._refresh_action_buttons_run()
             return
         self._schedule_post_batch_task_refresh()
-        launched_dxc_count = 1 if scan_templates else len(model_chunks)
+        launched_dxc_count = len(model_chunks)
         self._start_wizard_batch_output_watch(
             self._wizard_step,
             batch_dir,
             scan_templates,
             launched_dxc_count=launched_dxc_count,
             thumbnails_phase=thumbnails_phase,
-            batch_dxc_base=None if scan_templates else chunk_base,
+            batch_dxc_base=chunk_base if scan_templates else None,
         )
         self._refresh_action_buttons_run()
         try:

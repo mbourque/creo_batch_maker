@@ -1189,6 +1189,9 @@
     <ul>
         <li><a href="#summary" id="mq-sidebar-score-link">Score</a></li>
         <li><a href="#statistics">Scan Information</a></li>
+        {% if template_information_div %}
+        <li><a href="#template-information">Template Information</a></li>
+        {% endif %}
         <hr>
         {% for section in check_sections %}
         <li title="{{ section.category }}" class="sidebar-check-nav wrapper-{{ section.class }}"
@@ -1207,6 +1210,7 @@
         <div id="summary-section">
             {{ summary_div }}
             {{ statistics_div }}
+            {{ template_information_div | safe }}
         </div>
     </div>
 
