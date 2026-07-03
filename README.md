@@ -96,7 +96,7 @@ Click **Create Report**. When finished, choose whether to open `index.html` in y
 If the report already exists, **Open Report** opens it without rebuilding.
 
 On **Duplicate Models** warnings, the report lists each duplicate under the count (`Preview the model : …`); click a model name to jump to that model’s row when it appears elsewhere in the report.
-In **Scan Information → Statistics**, the table includes a **Bulk parts** row from unique `BULK_ITEMS` model names (`item/info1`, not `ans`). Under **Models skipped**, drag a name into Creo to open it (click does not open the file). Long lists use **More...** / **Collapse** like Family table detail. After **Scan Templates**, **Template Information** in the sidebar summarizes datums, views, parameters, layers, relations, symbols, sheet sizes, notes, length units, designated attributes, accuracy, and related details read from `templates\*.xml`.
+In **Scan Information → Statistics**, the table starts with **Parts**, **Assemblies**, and **Drawings** counts, and includes a **Bulk parts** row from unique `BULK_ITEMS` model names (`item/info1`, not `ans`). Under **Models skipped**, drag a name into Creo to open it (click does not open the file). Long lists use **More...** / **Collapse** like Family table detail. After **Scan Templates**, **Template Information** in the sidebar summarizes datums, views, parameters, layers, relations, symbols, sheet sizes, notes, length units, designated attributes, accuracy, and related details read from `templates\*.xml`.
 
 ## Settings (Setup step only)
 
@@ -122,7 +122,7 @@ Open **Settings** from the menu:
 | **Start over…**            | Clear batch outputs in the working folder and return to Setup. Keeps your Creo models.            |
 | **Zip report…**            | Package `index.html` and related files into a zip (when a report exists).                         |
 | **Save / Open…**           | Save or load `app_settings.json`.                                                                 |
-| **Recent scans**           | Switch to a recently batched working folder (up to 10; shown only when the list is not empty).   |
+| **Recent scans**           | On **Setup** only: switch to a recently batched working folder (up to 10; hidden when the list is empty).   |
 
 
 **Configuration** opens ModelCHECK config files in Notepad (`configs\` folder).

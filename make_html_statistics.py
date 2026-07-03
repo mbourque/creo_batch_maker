@@ -523,6 +523,13 @@ PERFORMANCE_REPORT_ISSUE_ROW_CHECKS: dict[str, str] = {
 }
 
 PERFORMANCE_TABLE_ROWS: list[tuple[str, str | None]] = [
+    ("Parts", "_PART_COUNT"),
+    ("Assemblies", "_ASSEMBLY_COUNT"),
+    ("Drawings", "_DRAWING_COUNT"),
+    ("Sheetmetal parts", "_SHEETMETAL_PARTS"),
+    ("Multibody parts", "_MULTIBODY_PARTS"),
+    ("Skeleton parts", "_SKELETON_MODELS"),
+    ("Bulk parts", "_BULK_PARTS"),
     ("Total components in all assemblies", "NUM_COMPONENTS"),
     ("Number of unique models", "UNQ_COMPONENTS"),
     ("Duplicate models", "_DUPLICATE_MODELS"),
@@ -536,10 +543,6 @@ PERFORMANCE_TABLE_ROWS: list[tuple[str, str | None]] = [
     ("Number of mechanism components", "_MECH_COMPONENTS"),
     ("Number of family table generics", "_FAMILY_GENERIC_PART_COUNT"),
     ("Number of family table instances", "_FAMILY_INSTANCE_COUNT"),
-    ("Sheetmetal parts", "_SHEETMETAL_PARTS"),
-    ("Multibody parts", "_MULTIBODY_PARTS"),
-    ("Skeleton parts", "_SKELETON_MODELS"),
-    ("Bulk parts", "_BULK_PARTS"),
 ]
 
 
@@ -563,7 +566,9 @@ class PerformanceMetrics:
     fixed_components: int = 0
     suppressed_components: int = 0
     files_seen: int = 0
+    part_count: int = 0
     assembly_count: int = 0
+    drawing_count: int = 0
 
 
 def _parse_int_metric(text: str | None) -> int | None:
@@ -738,12 +743,12 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
             skeleton_keys.add(_skeleton_identity_key(model))
 
         if pro_type == "PRT":
+            metrics.part_count += 1
             if _is_sheetmetal_part(file_element):
                 metrics.sheetmetal_parts += 1
             if _is_multibody_part(file_element):
                 metrics.multibody_parts += 1
-
-        if pro_type == "ASM":
+        elif pro_type == "ASM":
             metrics.assembly_count += 1
             metrics.total_num_components += _parse_int_metric(_check_ans_text(file_element, "NUM_COMPONENTS")) or 0
             metrics.master_rep_component_count += _master_rep_count_from_element(file_element)
@@ -753,6 +758,8 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
             asm_subassemblies[_assembly_name_key(model, path)] = [
                 child.casefold() for child in asm_children
             ]
+        elif pro_type == "DRW":
+            metrics.drawing_count += 1
 
     metrics.unique_model_count = len(unique_models)
     metrics.max_assembly_depth = _batch_max_assembly_depth(asm_subassemblies)
@@ -770,6 +777,9 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
 
 def performance_metrics_answers(metrics: PerformanceMetrics) -> dict[str, str]:
     answers: dict[str, str] = {
+        "_PART_COUNT": str(metrics.part_count),
+        "_ASSEMBLY_COUNT": str(metrics.assembly_count),
+        "_DRAWING_COUNT": str(metrics.drawing_count),
         "NUM_COMPONENTS": str(metrics.total_num_components),
         "UNQ_COMPONENTS": str(metrics.unique_model_count),
         "_MAX_ASSEMBLY_DEPTH": str(metrics.max_assembly_depth),
@@ -802,6 +812,9 @@ def _resolve_performance_value(answers: dict[str, str], key: str | None) -> tupl
     if key == "_FAMILY_INSTANCE_COUNT":
         val = answers.get(key)
         return (val if val is not None else "—", "FAMILY_INFO")
+    if key in ("_PART_COUNT", "_ASSEMBLY_COUNT", "_DRAWING_COUNT"):
+        val = answers.get(key)
+        return (val if val is not None else "—", None)
     if key == "_SHEETMETAL_PARTS":
         val = answers.get(key)
         return (val if val is not None else "—", "SHTMTL_THICK")

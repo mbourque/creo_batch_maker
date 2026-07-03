@@ -27,7 +27,6 @@ from make_html_summary import (
     generate_adjusted_summary_shell,
     get_category_descriptions,
     scan_file_stats,
-    scan_pro_type_counts,
     scan_visible_issue_summary,
 )
 
@@ -758,12 +757,10 @@ def create_html_report(
 ) -> None:
     category_descriptions = get_category_descriptions(model_checks_path)
     master_root = ET.parse(master_xml_path).getroot()
-    pro_type_counts = scan_pro_type_counts(master_root)
     files_scanned, _, _ = scan_file_stats(master_root)
     issue_summary = scan_visible_issue_summary(master_root, model_checks_path)
     summary_div = generate_adjusted_summary_shell(
         category_descriptions,
-        pro_type_counts,
         files_scanned=files_scanned,
         issue_summary=issue_summary,
     )

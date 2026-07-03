@@ -5425,14 +5425,14 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._refresh_recent_scans_menu()
 
     def _refresh_recent_scans_menu(self) -> None:
-        """Rebuild File → Recent scans (hidden when the list is empty)."""
+        """Rebuild File → Recent scans (Setup step only; hidden when the list is empty)."""
         fm = getattr(self, "_file_menu", None)
         rs_menu = getattr(self, "_recent_scans_menu", None)
         if fm is None or rs_menu is None:
             return
         rs_menu.delete(0, "end")
         idx = self._file_menu_recent_scans_index
-        if not self._recent_scans:
+        if self._wizard_step != WIZARD_STEP_SETUP or not self._recent_scans:
             if idx is not None:
                 try:
                     fm.delete(idx)

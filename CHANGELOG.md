@@ -2,21 +2,41 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-03 — v1.11.35
+
+- **Report → Statistics**: **Sheetmetal parts**, **Multibody parts**, **Skeleton parts**, and **Bulk parts** moved directly under **Drawings**.
+
+## 2026-07-03 — v1.11.34
+
+- **Report → Score**: **Visible issues** label renamed to **Total issues**.
+
+## 2026-07-03 — v1.11.33
+
+- **Report**: **Parts**, **Assemblies**, and **Drawings** counts moved from **Score** to the top of the **Scan Information → Statistics** list.
+
+## 2026-07-03 — v1.11.32
+
+- **Report**: **Parts**, **Assemblies**, and **Drawings** counts moved from **Score** to the top of **Scan Information**.
+
+## 2026-07-03 — v1.11.31
+
+- **File → Recent scans**: shown on the **Setup** wizard step only (hidden on Templates, ModelCHECK, Thumbnails, and Report).
+
 ## 2026-07-03 — v1.11.30
 
-- **Report → Template Information**: part and assembly **Start relations** heading drops the count; relations render in one block with line breaks (no extra gap between lines).
-
-## 2026-07-03 — v1.11.29
-
-- **Report → Template Information**: part and assembly **Start relations** list one relation per line and drop the `Model=` prefix.
+- **Report > Template Information**: part and assembly **Start relations** heading drops the count; relations render in one block with line breaks (no extra gap between lines).
 
 ## 2026-07-03 — v1.11.28
 
 - **Report > Template Information**: drawing adds sheet sizes, symbols, sheet count, and notes; part adds length units, designated attributes, and accuracy; assembly adds designated attributes (from template scan XML).
 
+
+
 ## 2026-07-03 — v1.11.19
 
 - **Scan Templates**: each template (part, assembly, drawing) runs in its own batch chunk — one model at a time — instead of all templates in a single run.
+
+
 
 ## 2026-07-03 — v1.11.18
 

@@ -246,7 +246,6 @@ _MQ_DASHBOARD_CSS = """
 
 def generate_adjusted_summary_shell(
     category_descriptions: dict[str, str],
-    pro_type_counts: dict[str, int] | None = None,
     *,
     files_scanned: int = 0,
     issue_summary: dict | None = None,
@@ -256,10 +255,6 @@ def generate_adjusted_summary_shell(
     grades are baked from master.xml when ``issue_summary`` is provided so the browser does not
     need a full DOM scan on first load. Client-side JS recalculates after removals or filters.
     """
-    pt = pro_type_counts or {}
-    prt_n = pt.get("PRT", 0)
-    asm_n = pt.get("ASM", 0)
-    drw_n = pt.get("DRW", 0)
     summary = issue_summary or {}
     pass_issues = summary.get("pass_issues", 0)
     visible_issues = summary.get("warn_issues", 0) + summary.get("err_issues", 0)
@@ -280,10 +275,7 @@ def generate_adjusted_summary_shell(
         <div class="mq-hero-top">
           <div class="mq-stats">
             <p><strong>Files scanned:</strong> <span id="mq-stat-models" data-mq-scan-fixed="1">{files_scanned}</span></p>
-            <p><strong>Parts scanned:</strong> <span id="mq-stat-parts" data-mq-scan-fixed="1">{prt_n}</span></p>
-            <p><strong>Assemblies scanned:</strong> <span id="mq-stat-assemblies" data-mq-scan-fixed="1">{asm_n}</span></p>
-            <p><strong>Drawings scanned:</strong> <span id="mq-stat-drawings" data-mq-scan-fixed="1">{drw_n}</span></p>
-            <p><strong>Visible issues:</strong> <span id="mq-stat-issues">{visible_issues}</span></p>
+            <p><strong>Total issues:</strong> <span id="mq-stat-issues">{visible_issues}</span></p>
             <p><strong>Models with warnings:</strong> <span id="mq-stat-warn-models">{warn_models}</span></p>
             <p><strong>Models with errors:</strong> <span id="mq-stat-err-models">{err_models}</span></p>
           </div>
@@ -402,7 +394,6 @@ def generate_summary_div(master_xml_path, model_checks_xml_path):
         categories,
         category_descriptions,
         file_stats,
-        pro_type_counts,
         visible_issues,
         overall_letter,
     ):
@@ -421,10 +412,7 @@ def generate_summary_div(master_xml_path, model_checks_xml_path):
         <div class="mq-hero-top">
           <div class="mq-stats">
             <p><strong>Files scanned:</strong> {total_f}</p>
-            <p><strong>Parts scanned:</strong> {pro_type_counts.get("PRT", 0)}</p>
-            <p><strong>Assemblies scanned:</strong> {pro_type_counts.get("ASM", 0)}</p>
-            <p><strong>Drawings scanned:</strong> {pro_type_counts.get("DRW", 0)}</p>
-            <p><strong>Visible issues:</strong> {visible_issues}</p>
+            <p><strong>Total issues:</strong> {visible_issues}</p>
             <p><strong>Models with warnings:</strong> {warn_f}</p>
             <p><strong>Models with errors:</strong> {err_f}</p>
           </div>
@@ -502,7 +490,6 @@ def generate_summary_div(master_xml_path, model_checks_xml_path):
     category_descriptions = get_category_descriptions(model_checks_xml_path)
     categories = categorize_checks(master_root, model_root)
     file_stats = scan_file_stats(master_root)
-    pro_type_counts = scan_pro_type_counts(master_root)
 
     agg_pass = sum(c["PASS"] for c in categories.values())
     agg_warn = sum(c["WARNING"] for c in categories.values())
@@ -515,7 +502,6 @@ def generate_summary_div(master_xml_path, model_checks_xml_path):
         categories,
         category_descriptions,
         file_stats,
-        pro_type_counts,
         visible_issues,
         overall_letter,
     )
