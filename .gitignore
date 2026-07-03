@@ -18,3 +18,4 @@ package_cad_assessment_tool.bat
 models/
 push_settings_to_creo.bat
 developer_notes.md
+configs/sample_start.mcs
