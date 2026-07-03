@@ -851,6 +851,39 @@ def _prepend_recent_scan(recent: list[str], working_dir: str) -> list[str]:
     return [path, *rest[: _RECENT_SCANS_MAX - 1]]
 
 
+def _format_recent_scan_menu_label(index: int, path: str, *, max_len: int = 52) -> str:
+    """Menu label: ``1. C:/PTC/XMA3/.../Widget_Asm`` (full path when short enough)."""
+    prefix = f"{index}. "
+    trimmed = path.strip()
+    if not trimmed:
+        return prefix.rstrip()
+    try:
+        resolved = Path(trimmed).expanduser()
+        folder = (resolved.name or trimmed).replace("\\", "/")
+        display = str(resolved).replace("\\", "/")
+    except (OSError, ValueError):
+        folder = trimmed.replace("\\", "/")
+        display = folder
+    full = f"{prefix}{display}"
+    if len(full) <= max_len:
+        return full
+    parts = [p for p in display.split("/") if p]
+    if len(parts) >= 2 and len(parts[0]) == 2 and parts[0][1] == ":":
+        start = "/".join(parts[: min(3, len(parts) - 1)])
+    elif parts:
+        start = parts[0]
+    else:
+        start = display[:12]
+    middle = f"{start}/.../{folder}"
+    candidate = f"{prefix}{middle}"
+    if len(candidate) <= max_len:
+        return candidate
+    budget = max_len - len(prefix) - len("/.../") - len(folder)
+    if budget < 4:
+        return f"{prefix}.../{folder}"[:max_len]
+    return f"{prefix}{start[:budget]}/.../{folder}"[:max_len]
+
+
 def _canonical_app_settings(data: dict[str, object]) -> dict[str, object]:
     """Keys persisted in app_settings.json (task selection is not stored)."""
     return {
@@ -5375,13 +5408,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     pass
                 self._file_menu_recent_scans_index = None
             return
-        for path in self._recent_scans:
-            try:
-                label = Path(path).name or path
-            except OSError:
-                label = path
+        for index, path in enumerate(self._recent_scans, start=1):
             rs_menu.add_command(
-                label=label,
+                label=_format_recent_scan_menu_label(index, path),
                 command=lambda p=path: self._on_file_menu_recent_scan(p),
             )
         if idx is None:
