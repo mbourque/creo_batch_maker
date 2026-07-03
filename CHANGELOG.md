@@ -2,6 +2,30 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-03 — v1.11.42
+
+- **Report → Statistics**: **Users** renamed to **Last saved by**.
+
+## 2026-07-03 — v1.11.41
+
+- **Report → Statistics**: **Users** list is right-aligned like the other statistic values.
+
+## 2026-07-03 — v1.11.40
+
+- **Report → Statistics**: **Users** list is plain text (normal weight, wraps at spaces).
+
+## 2026-07-03 — v1.11.39
+
+- **Report → Statistics**: **Users** list wraps across lines and uses normal (not bold) weight.
+
+## 2026-07-03 — v1.11.38
+
+- **Report → Statistics**: **Users** also parses truncated `LastSaved` values such as `JERRY.L.TAYLOR -` (no text after the dash).
+
+## 2026-07-03 — v1.11.37
+
+- **Report → Statistics**: **Users** lists unique usernames from each model’s `LastSaved` field (text before ` - `, e.g. `MBOURQUE`).
+
 ## 2026-07-03 — v1.11.36
 
 - **Report → Statistics**: first row is **Scan date** (e.g. Thursday July 3, 2026 8:15am), from when `master.xml` was written.

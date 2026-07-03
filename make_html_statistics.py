@@ -526,6 +526,7 @@ PERFORMANCE_REPORT_ISSUE_ROW_CHECKS: dict[str, str] = {
 
 PERFORMANCE_TABLE_ROWS: list[tuple[str, str | None]] = [
     ("Scan date", "_SCAN_DATE"),
+    ("Last saved by", "_USERS"),
     ("Parts", "_PART_COUNT"),
     ("Assemblies", "_ASSEMBLY_COUNT"),
     ("Drawings", "_DRAWING_COUNT"),
@@ -573,6 +574,7 @@ class PerformanceMetrics:
     assembly_count: int = 0
     drawing_count: int = 0
     scan_date: str = ""
+    users: list[str] = field(default_factory=list)
 
 
 def _parse_int_metric(text: str | None) -> int | None:
@@ -713,6 +715,21 @@ def _is_sheetmetal_part(file_element: ET.Element) -> bool:
     return _find_check(file_element, "SHTMTL_THICK") is not None
 
 
+def _username_from_last_saved(last_saved: str) -> str | None:
+    """Username is the text before `` -`` in ``LastSaved``.
+
+    Handles ``MBOURQUE - Pro/E v. …`` and truncated values like ``JERRY.L.TAYLOR -``.
+    """
+    text = (last_saved or "").strip()
+    if not text:
+        return None
+    if " -" in text:
+        user = text.split(" -", 1)[0].strip()
+    else:
+        user = text
+    return user or None
+
+
 def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
     """Batch-wide performance table metrics from every ``File`` entry in master.xml."""
     metrics = PerformanceMetrics()
@@ -721,12 +738,21 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
     skeleton_keys: set[str] = set()
     bulk_part_keys: set[str] = set()
     asm_subassemblies: dict[str, list[str]] = {}
+    users: list[str] = []
+    users_seen: set[str] = set()
 
     for file_element in master_root.findall("File"):
         metrics.files_seen += 1
         model = (file_element.findtext("Model") or "").strip()
         path = (file_element.findtext("Path") or "").strip()
         pro_type = (file_element.findtext("ProType") or "").strip().upper()
+
+        user = _username_from_last_saved(file_element.findtext("LastSaved") or "")
+        if user:
+            key = user.casefold()
+            if key not in users_seen:
+                users_seen.add(key)
+                users.append(user)
 
         metrics.duplicate_models += _counts_as_report_issue(file_element, "DUPLICATE_MODELS")
         for bulk_name in _bulk_item_names(file_element):
@@ -776,6 +802,7 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
     )
     metrics.family_generic_part_count = len(family_generics)
     metrics.family_instance_count = sum(len(row.instance_names) for row in family_generics)
+    metrics.users = users
     return metrics
 
 
@@ -804,6 +831,7 @@ def _scan_date_for_report(master_path: str = "") -> str:
 def performance_metrics_answers(metrics: PerformanceMetrics) -> dict[str, str]:
     answers: dict[str, str] = {
         "_SCAN_DATE": metrics.scan_date or "—",
+        "_USERS": ", ".join(metrics.users) if metrics.users else "—",
         "_PART_COUNT": str(metrics.part_count),
         "_ASSEMBLY_COUNT": str(metrics.assembly_count),
         "_DRAWING_COUNT": str(metrics.drawing_count),
@@ -839,7 +867,7 @@ def _resolve_performance_value(answers: dict[str, str], key: str | None) -> tupl
     if key == "_FAMILY_INSTANCE_COUNT":
         val = answers.get(key)
         return (val if val is not None else "—", "FAMILY_INFO")
-    if key in ("_SCAN_DATE", "_PART_COUNT", "_ASSEMBLY_COUNT", "_DRAWING_COUNT"):
+    if key in ("_SCAN_DATE", "_USERS", "_PART_COUNT", "_ASSEMBLY_COUNT", "_DRAWING_COUNT"):
         val = answers.get(key)
         return (val if val is not None else "—", None)
     if key == "_SHEETMETAL_PARTS":
@@ -905,12 +933,14 @@ def generate_performance_table_html(
         if value == "—":
             val_html = '<span class="mq-perf-missing">—</span>'
             title_attr = ' title="Not in ModelCHECK master.xml"' if check_key is None else ""
+            val_class = "mq-perf-val"
         else:
             val_html = _esc(value)
             title_attr = ""
+            val_class = "mq-perf-plain" if label == "Last saved by" else "mq-perf-val"
         body_rows.append(
             f"<tr><td class=\"mq-perf-label\">{label_esc}</td>"
-            f"<td class=\"mq-perf-val\"{title_attr}>{val_html}</td></tr>"
+            f"<td class=\"{val_class}\"{title_attr}>{val_html}</td></tr>"
         )
     table_body = "\n".join(body_rows)
     extras = extra_summary_html or ""
@@ -1334,9 +1364,11 @@ _MQ_STATS_CSS = """
 
 .mq-perf-table tr:last-child td { border-bottom: none; }
 
-.mq-perf-label { text-align: left; color: #1a1a1a; }
+.mq-perf-label { text-align: left; color: #1a1a1a; width: 1%; white-space: nowrap; vertical-align: top; }
 
 .mq-perf-val { text-align: right; font-weight: 600; color: #0f172a; white-space: nowrap; }
+
+.mq-perf-plain { font-weight: 400; color: #334155; white-space: normal; text-align: right; line-height: 1.45; }
 
 .mq-perf-missing { color: #94a3b8; font-weight: 400; }
 
