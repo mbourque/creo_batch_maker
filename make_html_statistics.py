@@ -527,6 +527,7 @@ PERFORMANCE_REPORT_ISSUE_ROW_CHECKS: dict[str, str] = {
 PERFORMANCE_TABLE_ROWS: list[tuple[str, str | None]] = [
     ("Scan date", "_SCAN_DATE"),
     ("Last saved by", "_USERS"),
+    ("Models scanned", "_FILES_SCANNED"),
     ("Parts", "_PART_COUNT"),
     ("Assemblies", "_ASSEMBLY_COUNT"),
     ("Drawings", "_DRAWING_COUNT"),
@@ -534,6 +535,7 @@ PERFORMANCE_TABLE_ROWS: list[tuple[str, str | None]] = [
     ("Multibody parts", "_MULTIBODY_PARTS"),
     ("Skeleton parts", "_SKELETON_MODELS"),
     ("Bulk parts", "_BULK_PARTS"),
+    ("Total size of scanned models", "_TOTAL_SCANNED_SIZE"),
     ("Total components in all assemblies", "NUM_COMPONENTS"),
     ("Number of unique models", "UNQ_COMPONENTS"),
     ("Duplicate models", "_DUPLICATE_MODELS"),
@@ -570,11 +572,13 @@ class PerformanceMetrics:
     fixed_components: int = 0
     suppressed_components: int = 0
     files_seen: int = 0
+    files_scanned: int = 0
     part_count: int = 0
     assembly_count: int = 0
     drawing_count: int = 0
     scan_date: str = ""
     users: list[str] = field(default_factory=list)
+    total_scanned_bytes: int = 0
 
 
 def _parse_int_metric(text: str | None) -> int | None:
@@ -715,6 +719,30 @@ def _is_sheetmetal_part(file_element: ET.Element) -> bool:
     return _find_check(file_element, "SHTMTL_THICK") is not None
 
 
+def _file_size_bytes_from_element(file_element: ET.Element) -> int | None:
+    """``FILE_SIZE`` check ``<ans>`` is size in bytes when it is all digits."""
+    check = _find_check(file_element, "FILE_SIZE")
+    if check is None:
+        return None
+    for child in check:
+        if child.tag == "ans":
+            text = (child.text or "").strip()
+            if text.isdigit():
+                return int(text)
+            return None
+    return None
+
+
+def _format_total_scanned_size(total_bytes: int) -> str:
+    """e.g. ``842.37 MB`` or ``1.24 GB`` (1024-based)."""
+    if total_bytes <= 0:
+        return "—"
+    mb = total_bytes / (1024 * 1024)
+    if mb >= 1024:
+        return f"{mb / 1024:.2f} GB"
+    return f"{mb:.2f} MB"
+
+
 def _username_from_last_saved(last_saved: str) -> str | None:
     """Username is the text before `` -`` in ``LastSaved``.
 
@@ -746,6 +774,8 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
         model = (file_element.findtext("Model") or "").strip()
         path = (file_element.findtext("Path") or "").strip()
         pro_type = (file_element.findtext("ProType") or "").strip().upper()
+        if _file_in_report_scan(file_element):
+            metrics.files_scanned += 1
 
         user = _username_from_last_saved(file_element.findtext("LastSaved") or "")
         if user:
@@ -771,6 +801,11 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
             skeleton_keys.add(_skeleton_identity_key(skel_name))
         if _is_skeleton_name(model) and not skel_instances:
             skeleton_keys.add(_skeleton_identity_key(model))
+
+        if pro_type in ("PRT", "ASM", "DRW"):
+            size_bytes = _file_size_bytes_from_element(file_element)
+            if size_bytes is not None:
+                metrics.total_scanned_bytes += size_bytes
 
         if pro_type == "PRT":
             metrics.part_count += 1
@@ -832,6 +867,7 @@ def performance_metrics_answers(metrics: PerformanceMetrics) -> dict[str, str]:
     answers: dict[str, str] = {
         "_SCAN_DATE": metrics.scan_date or "—",
         "_USERS": ", ".join(metrics.users) if metrics.users else "—",
+        "_FILES_SCANNED": str(metrics.files_scanned),
         "_PART_COUNT": str(metrics.part_count),
         "_ASSEMBLY_COUNT": str(metrics.assembly_count),
         "_DRAWING_COUNT": str(metrics.drawing_count),
@@ -847,6 +883,7 @@ def performance_metrics_answers(metrics: PerformanceMetrics) -> dict[str, str]:
         "_SKELETON_MODELS": str(metrics.skeleton_models),
         "_DUPLICATE_MODELS": str(metrics.duplicate_models),
         "_BULK_PARTS": str(metrics.bulk_parts),
+        "_TOTAL_SCANNED_SIZE": _format_total_scanned_size(metrics.total_scanned_bytes),
         "_FIXED_COMPONENTS": str(metrics.fixed_components),
         "_SUPPRESSED_COMPONENTS": str(metrics.suppressed_components),
     }
@@ -867,9 +904,19 @@ def _resolve_performance_value(answers: dict[str, str], key: str | None) -> tupl
     if key == "_FAMILY_INSTANCE_COUNT":
         val = answers.get(key)
         return (val if val is not None else "—", "FAMILY_INFO")
-    if key in ("_SCAN_DATE", "_USERS", "_PART_COUNT", "_ASSEMBLY_COUNT", "_DRAWING_COUNT"):
+    if key in (
+        "_SCAN_DATE",
+        "_USERS",
+        "_FILES_SCANNED",
+        "_PART_COUNT",
+        "_ASSEMBLY_COUNT",
+        "_DRAWING_COUNT",
+    ):
         val = answers.get(key)
         return (val if val is not None else "—", None)
+    if key == "_TOTAL_SCANNED_SIZE":
+        val = answers.get(key)
+        return (val if val is not None else "—", "FILE_SIZE")
     if key == "_SHEETMETAL_PARTS":
         val = answers.get(key)
         return (val if val is not None else "—", "SHTMTL_THICK")

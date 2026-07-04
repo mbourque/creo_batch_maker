@@ -807,6 +807,23 @@ def _normalize_xtop_gone_timeout_sec(value: object) -> int:
     return n
 
 
+def _xtop_is_running() -> bool:
+    """True when Creo ``xtop.exe`` is running (Windows)."""
+    if sys.platform != "win32":
+        return False
+    try:
+        result = subprocess.run(
+            ["tasklist", "/FI", "IMAGENAME eq xtop.exe", "/NH"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000),
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return "xtop.exe" in (result.stdout or "").casefold()
+
+
 def _normalize_xtop_timeout_sec(value: object) -> int:
     """Legacy key ``xtop_timeout_sec`` in app_settings.json."""
     return _normalize_xtop_gone_timeout_sec(value)
@@ -8239,6 +8256,14 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 self._wizard_thumbnails_go_phase_owned_by_on_go = False
 
     def _on_go_impl(self) -> None:
+        if _xtop_is_running():
+            messagebox.showwarning(
+                "Creo is running",
+                "Creo (xtop) is currently running.\n\n"
+                "Quit Creo completely, then try again.",
+            )
+            return
+
         working_dir_raw = (self.working_directory.get() or "").strip()
         loadpoint_raw = (self.creo_loadpoint.get() or "").strip().rstrip("\\/")
         task_display_raw = (self.task.get() or "").strip()

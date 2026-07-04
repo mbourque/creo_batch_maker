@@ -247,7 +247,6 @@ _MQ_DASHBOARD_CSS = """
 def generate_adjusted_summary_shell(
     category_descriptions: dict[str, str],
     *,
-    files_scanned: int = 0,
     issue_summary: dict | None = None,
 ) -> str:
     """
@@ -274,7 +273,6 @@ def generate_adjusted_summary_shell(
       <div class="mq-hero-card">
         <div class="mq-hero-top">
           <div class="mq-stats">
-            <p><strong>Files scanned:</strong> <span id="mq-stat-models" data-mq-scan-fixed="1">{files_scanned}</span></p>
             <p><strong>Total issues:</strong> <span id="mq-stat-issues">{visible_issues}</span></p>
             <p><strong>Models with warnings:</strong> <span id="mq-stat-warn-models">{warn_models}</span></p>
             <p><strong>Models with errors:</strong> <span id="mq-stat-err-models">{err_models}</span></p>
@@ -294,7 +292,7 @@ def generate_adjusted_summary_shell(
       </div>
       <div class="mq-rationale">
         <h3>How the grade works</h3>
-        <p>Files scanned and PASS check totals stay fixed from the batch. Grades use PASS plus the WARNING and ERROR rows still shown; remove sections or models to update the score.</p>
+        <p>PASS check totals stay fixed from the batch. Grades use PASS plus the WARNING and ERROR rows still shown; remove sections or models to update the score.</p>
         <ul>
           <li><strong>Grade A:</strong> Warnings under 5% of checks (PASS + visible issues), no errors.</li>
           <li><strong>Grade B:</strong> Warnings are 5% to 25% of checks, no errors.</li>
@@ -397,7 +395,7 @@ def generate_summary_div(master_xml_path, model_checks_xml_path):
         visible_issues,
         overall_letter,
     ):
-        total_f, warn_f, err_f = file_stats
+        _, warn_f, err_f = file_stats
         grade_class = grade_css_class(overall_letter)
         grade_letter = html.escape(overall_letter)
         parts = [
@@ -411,7 +409,6 @@ def generate_summary_div(master_xml_path, model_checks_xml_path):
         <h2>Model Quality Report</h2>
         <div class="mq-hero-top">
           <div class="mq-stats">
-            <p><strong>Files scanned:</strong> {total_f}</p>
             <p><strong>Total issues:</strong> {visible_issues}</p>
             <p><strong>Models with warnings:</strong> {warn_f}</p>
             <p><strong>Models with errors:</strong> {err_f}</p>

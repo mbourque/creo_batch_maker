@@ -2,7 +2,23 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
-## 2026-07-03 — v1.11.42
+## 2026-07-04 — v1.11.47
+
+- **Report → Statistics**: **Files scanned** renamed to **Models scanned**.
+
+## 2026-07-04 — v1.11.46
+
+- **Report**: **Files scanned** moved from **Score** to **Statistics**, under **Last saved by**.
+
+## 2026-07-04 — v1.11.45
+
+- **Report → Statistics**: **Total size of scanned models** sums each model’s `FILE_SIZE` (bytes) and shows MB or GB.
+
+## 2026-07-04 — v1.11.44
+
+- **GO**: if Creo (**xtop**) is already running, a warning asks you to quit Creo and the batch does not start.
+
+## 2026-07-03 — v1.11.43
 
 - **Report → Statistics**: **Users** renamed to **Last saved by**.
 
@@ -22,37 +38,55 @@ Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. 
 
 - **Report → Statistics**: **Users** also parses truncated `LastSaved` values such as `JERRY.L.TAYLOR -` (no text after the dash).
 
+
+
 ## 2026-07-03 — v1.11.37
 
-- **Report → Statistics**: **Users** lists unique usernames from each model’s `LastSaved` field (text before ` - `, e.g. `MBOURQUE`).
+- **Report → Statistics**: **Users** lists unique usernames from each model’s `LastSaved` field (text before `-`, e.g. `MBOURQUE`).
+
+
 
 ## 2026-07-03 — v1.11.36
 
 - **Report → Statistics**: first row is **Scan date** (e.g. Thursday July 3, 2026 8:15am), from when `master.xml` was written.
 
+
+
 ## 2026-07-03 — v1.11.35
 
 - **Report → Statistics**: **Sheetmetal parts**, **Multibody parts**, **Skeleton parts**, and **Bulk parts** moved directly under **Drawings**.
+
+
 
 ## 2026-07-03 — v1.11.34
 
 - **Report → Score**: **Visible issues** label renamed to **Total issues**.
 
+
+
 ## 2026-07-03 — v1.11.33
 
 - **Report**: **Parts**, **Assemblies**, and **Drawings** counts moved from **Score** to the top of the **Scan Information → Statistics** list.
+
+
 
 ## 2026-07-03 — v1.11.32
 
 - **Report**: **Parts**, **Assemblies**, and **Drawings** counts moved from **Score** to the top of **Scan Information**.
 
+
+
 ## 2026-07-03 — v1.11.31
 
 - **File → Recent scans**: shown on the **Setup** wizard step only (hidden on Templates, ModelCHECK, Thumbnails, and Report).
 
+
+
 ## 2026-07-03 — v1.11.30
 
 - **Report > Template Information**: part and assembly **Start relations** heading drops the count; relations render in one block with line breaks (no extra gap between lines).
+
+
 
 ## 2026-07-03 — v1.11.28
 
