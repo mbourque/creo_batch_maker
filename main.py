@@ -136,6 +136,11 @@ WIZARD_BATCH_AUTO_ADVANCE_HOLD_MS = 1500
 SCAN_BATCH_RUNNER_EXIT_GRACE_SEC = 15
 BATCH_TIMEOUT_LOG_PREFIX = "creo-batch-timeouts-"
 BATCH_STOP_FLAG_BASENAME = "creo-batch-stop.requested"
+BATCH_PAUSE_FLAG_BASENAME = "creo-batch-pause.requested"
+# Written by the runner only while it is actually held (safe gap); UI polls this.
+BATCH_PAUSE_ACTIVE_BASENAME = "creo-batch-pause.active"
+# Runner polls this often while paused (between chunks / before kill).
+BATCH_PAUSE_POLL_MS = 1000
 # Written by the generated runner when all chunks finish (works even when PowerShell -NoExit keeps the window open).
 BATCH_RUN_COMPLETE_FLAG_SUFFIX = "-run.complete"
 # After writing the stop flag, wait briefly for the runner to exit before force-killing.
@@ -5316,6 +5321,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         )
         file_menu.add_command(label="Zip report...", command=self._on_file_menu_zip_report)
         file_menu.add_separator()
+        file_menu.add_command(label="Pause", command=self._on_file_menu_pause)
         file_menu.add_command(label="Stop", command=self._on_file_menu_stop)
         file_menu.add_command(label="Start over...", command=self._on_file_menu_start_over)
         file_menu.add_separator()
@@ -5427,6 +5433,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             fm.entryconfigure(
                 "Zip report...", state=tk.NORMAL if zip_report_ok else tk.DISABLED
             )
+        except tk.TclError:
+            pass
+        try:
+            fm.entryconfigure("Pause", state=tk.NORMAL if batch_stop else tk.DISABLED)
         except tk.TclError:
             pass
         try:
@@ -5777,6 +5787,191 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return False, str(exc)
         return True, None
 
+    def _on_file_menu_pause(self) -> None:
+        if not self._batch_stop_available():
+            messagebox.showinfo("Pause", "No batch is running.")
+            return
+        watch = self._wizard_batch_watch
+        step = watch.get("step") if watch else self._wizard_step
+        if not isinstance(step, int):
+            step = self._wizard_step
+        if step not in (WIZARD_STEP_SCAN, WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
+            messagebox.showinfo(
+                "Pause",
+                "Pause is only available during Scan Templates, ModelCHECK, or Thumbnails.",
+            )
+            return
+        batch_dir, _ = self._wizard_batch_dxc_context_for_step(step)
+        if batch_dir is None or not batch_dir.is_dir():
+            messagebox.showwarning("Pause", "Could not find the batch folder for this step.")
+            return
+        self._automatic_wizard_paused = True
+        self._cancel_automatic_wizard_chain()
+        self._request_batch_runner_pause(batch_dir)
+        self._show_batch_pause_dialog(batch_dir, step)
+
+    def _batch_pause_is_active(self, batch_dir: Path) -> bool:
+        """True when the runner has entered the pause hold (safe to use interactive Creo)."""
+        try:
+            return (batch_dir / BATCH_PAUSE_ACTIVE_BASENAME).is_file()
+        except OSError:
+            return False
+
+    def _show_batch_pause_dialog(self, batch_dir: Path, step: int) -> None:
+        """Wait for the runner to hold, then show Resume/Stop (safe to use Creo)."""
+        step_label = (
+            WIZARD_STEPPER_LABELS[step]
+            if 0 <= step < len(WIZARD_STEPPER_LABELS)
+            else "batch"
+        )
+
+        def handle_stop_choice() -> None:
+            self._on_file_menu_stop()
+            try:
+                still_paused = (batch_dir / BATCH_PAUSE_FLAG_BASENAME).is_file()
+            except OSError:
+                still_paused = False
+            if still_paused and self._batch_stop_available():
+                self._show_batch_pause_dialog(batch_dir, step)
+
+        if not self._batch_pause_is_active(batch_dir):
+            wait_action = self._show_batch_pause_waiting_dialog(batch_dir, step_label)
+            if wait_action == "stop":
+                handle_stop_choice()
+                return
+            if wait_action == "cancel":
+                self._clear_batch_pause_flag(batch_dir)
+                self._automatic_wizard_paused = False
+                return
+            # "ready" — runner is held
+
+        ready_action = self._show_batch_pause_ready_dialog(step_label)
+        if ready_action == "stop":
+            handle_stop_choice()
+            return
+        self._clear_batch_pause_flag(batch_dir)
+        self._automatic_wizard_paused = False
+
+    def _show_batch_pause_waiting_dialog(
+        self, batch_dir: Path, step_label: str
+    ) -> str:
+        """Block until the runner is held, or the user cancels pause / stops."""
+        dialog = ctk.CTkToplevel(self)
+        dialog.withdraw()
+        dialog.title("Pause")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+
+        action = {"value": "cancel"}
+        poll_job: dict[str, object | None] = {"id": None}
+
+        def close(choice: str) -> None:
+            jid = poll_job.get("id")
+            if jid is not None:
+                try:
+                    dialog.after_cancel(jid)  # type: ignore[arg-type]
+                except (tk.TclError, ValueError):
+                    pass
+                poll_job["id"] = None
+            action["value"] = choice
+            dialog.destroy()
+
+        message = (
+            f"Pause requested on the {step_label} step.\n\n"
+            "Please wait for the current chunk to finish…\n"
+            "Do not start interactive Creo yet."
+        )
+        ctk.CTkLabel(dialog, text=message, justify="left", wraplength=420).pack(
+            anchor="w", padx=16, pady=(16, 12)
+        )
+
+        def poll_until_active() -> None:
+            poll_job["id"] = None
+            try:
+                if not dialog.winfo_exists():
+                    return
+            except tk.TclError:
+                return
+            if self._batch_pause_is_active(batch_dir):
+                close("ready")
+                return
+            try:
+                poll_job["id"] = dialog.after(500, poll_until_active)
+            except tk.TclError:
+                pass
+
+        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_row.pack(anchor="e", padx=16, pady=(0, 16))
+        stop_btn = self._mk_dialog_button(
+            btn_row, text="Stop", width=88, primary=False, command=lambda: close("stop")
+        )
+        cancel_btn = self._mk_dialog_button(
+            btn_row,
+            text="Cancel pause",
+            width=110,
+            primary=False,
+            command=lambda: close("cancel"),
+        )
+        stop_btn.pack(side="right", padx=(8, 0))
+        cancel_btn.pack(side="right")
+
+        dialog.bind("<Escape>", lambda _e: close("cancel"))
+        dialog.protocol("WM_DELETE_WINDOW", lambda: close("cancel"))
+
+        poll_until_active()
+        self._run_modal_toplevel_wait(
+            dialog,
+            anchor=self,
+            focus_widget=cancel_btn,
+            repaints=(stop_btn, cancel_btn),
+        )
+        return action["value"]
+
+    def _show_batch_pause_ready_dialog(self, step_label: str) -> str:
+        """Shown when the runner is held — safe to use interactive Creo."""
+        dialog = ctk.CTkToplevel(self)
+        dialog.withdraw()
+        dialog.title("Pause")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+
+        action = {"value": "resume"}
+
+        def close(choice: str) -> None:
+            action["value"] = choice
+            dialog.destroy()
+
+        message = (
+            f"Paused on the {step_label} step.\n\n"
+            "Safe to use interactive Creo now.\n"
+            "When you are done, quit Creo and click Resume to continue the batch, or Stop to end it."
+        )
+        ctk.CTkLabel(dialog, text=message, justify="left", wraplength=420).pack(
+            anchor="w", padx=16, pady=(16, 12)
+        )
+        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_row.pack(anchor="e", padx=16, pady=(0, 16))
+        stop_btn = self._mk_dialog_button(
+            btn_row, text="Stop", width=88, primary=False, command=lambda: close("stop")
+        )
+        resume_btn = self._mk_dialog_button(
+            btn_row, text="Resume", width=88, command=lambda: close("resume")
+        )
+        stop_btn.pack(side="right", padx=(8, 0))
+        resume_btn.pack(side="right")
+
+        dialog.bind("<Escape>", lambda _e: close("resume"))
+        dialog.bind("<Return>", lambda _e: close("resume"))
+        dialog.protocol("WM_DELETE_WINDOW", lambda: close("resume"))
+
+        self._run_modal_toplevel_wait(
+            dialog,
+            anchor=self,
+            focus_widget=resume_btn,
+            repaints=(stop_btn, resume_btn),
+        )
+        return action["value"]
+
     def _on_file_menu_stop(self) -> None:
         if not self._batch_stop_available():
             messagebox.showinfo("Stop", "No batch is running.")
@@ -5855,6 +6050,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             self._close_stray_batch_runner_windows()
         if batch_dir is not None and batch_dir.is_dir():
             self._cleanup_leftover_batch_dxc(batch_dir, scan_templates=scan_templates)
+            self._clear_batch_pause_flag(batch_dir)
             self._clear_batch_stop_flag(batch_dir)
         return self._run_kill_bat()
 
@@ -7116,11 +7312,30 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             pass
 
     @staticmethod
+    def _clear_batch_pause_flag(batch_dir: Path) -> None:
+        for name in (BATCH_PAUSE_FLAG_BASENAME, BATCH_PAUSE_ACTIVE_BASENAME):
+            try:
+                flag = batch_dir / name
+                if flag.is_file():
+                    flag.unlink()
+            except OSError:
+                pass
+
+    @staticmethod
     def _request_batch_runner_stop(batch_dir: Path | None) -> None:
         if batch_dir is None or not batch_dir.is_dir():
             return
         try:
             (batch_dir / BATCH_STOP_FLAG_BASENAME).write_text("", encoding="utf-8")
+        except OSError:
+            pass
+
+    @staticmethod
+    def _request_batch_runner_pause(batch_dir: Path | None) -> None:
+        if batch_dir is None or not batch_dir.is_dir():
+            return
+        try:
+            (batch_dir / BATCH_PAUSE_FLAG_BASENAME).write_text("", encoding="utf-8")
         except OSError:
             pass
 
@@ -7144,6 +7359,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             CreoDistributedBatchMakerApp._cleanup_batch_run_complete_flags(
                 batch_dir, batch_dxc_base=batch_dxc_base
             )
+            CreoDistributedBatchMakerApp._clear_batch_pause_flag(batch_dir)
             CreoDistributedBatchMakerApp._clear_batch_stop_flag(batch_dir)
             if not keep_runner_scripts:
                 CreoDistributedBatchMakerApp._remove_batch_runner_scripts(batch_dir)
@@ -7206,17 +7422,74 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
     @classmethod
     def _batch_runner_stop_helpers_ps1(cls) -> list[str]:
+        poll_ms = int(BATCH_PAUSE_POLL_MS)
         return [
             f"$StopFlagPath = Join-Path -Path $WorkDir -ChildPath '{BATCH_STOP_FLAG_BASENAME}'",
+            f"$PauseFlagPath = Join-Path -Path $WorkDir -ChildPath '{BATCH_PAUSE_FLAG_BASENAME}'",
+            f"$PauseActivePath = Join-Path -Path $WorkDir -ChildPath '{BATCH_PAUSE_ACTIVE_BASENAME}'",
             "$stopRequested = $false",
+            "$pauseActive = $false",
             "",
             "function Test-StopRequested {",
             "    return (Test-Path -LiteralPath $StopFlagPath)",
             "}",
             "",
+            "function Test-PauseRequested {",
+            "    return (Test-Path -LiteralPath $PauseFlagPath)",
+            "}",
+            "",
+            "function Clear-PauseActiveFlag {",
+            "    try {",
+            "        if (Test-Path -LiteralPath $PauseActivePath) {",
+            "            Remove-Item -LiteralPath $PauseActivePath -Force -ErrorAction Stop",
+            "        }",
+            "    } catch { }",
+            "    $script:pauseActive = $false",
+            "}",
+            "",
+            "function Set-PauseActiveFlag {",
+            "    try {",
+            '        Set-Content -LiteralPath $PauseActivePath -Value "1" -Encoding UTF8 -Force',
+            "    } catch { }",
+            "    $script:pauseActive = $true",
+            "}",
+            "",
             "function Invoke-StopRequested {",
             '    Write-ChLog "STOPPED: stop requested from app."',
+            "    Clear-PauseActiveFlag",
             "    $script:stopRequested = $true",
+            "}",
+            "",
+            "function Wait-IfPaused {",
+            "    if (-not (Test-PauseRequested)) {",
+            "        if ($script:pauseActive) {",
+            '            Write-ChLog "RESUMED: pause flag cleared; continuing batch."',
+            "            Clear-PauseActiveFlag",
+            "        }",
+            "        if (Test-StopRequested) {",
+            "            Invoke-StopRequested",
+            "            return $false",
+            "        }",
+            "        return $true",
+            "    }",
+            "    if (-not $script:pauseActive) {",
+            '        Write-ChLog "PAUSED: pause requested from app; waiting for resume."',
+            "        Set-PauseActiveFlag",
+            "    }",
+            "    while (Test-PauseRequested) {",
+            "        if (Test-StopRequested) {",
+            "            Invoke-StopRequested",
+            "            return $false",
+            "        }",
+            f"        Start-Sleep -Milliseconds {poll_ms}",
+            "    }",
+            "    if (Test-StopRequested) {",
+            "        Invoke-StopRequested",
+            "        return $false",
+            "    }",
+            '    Write-ChLog "RESUMED: pause flag cleared; continuing batch."',
+            "    Clear-PauseActiveFlag",
+            "    return $true",
             "}",
             "",
             "function Wait-InterruptibleSeconds {",
@@ -7229,6 +7502,15 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "    return $true",
             "}",
             "",
+        ]
+
+    @classmethod
+    def _batch_runner_pause_check_ps1(cls, *, indent: str) -> list[str]:
+        """Hold between chunks / before kill when pause flag is present. Returns false path via stopRequested."""
+        return [
+            f"{indent}if (-not (Wait-IfPaused)) {{",
+            f"{indent}    break",
+            f"{indent}}}",
         ]
 
     @classmethod
@@ -7775,6 +8057,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     f"{i}    }}",
                     f"{i}}}",
                     f"{i}if (-not $stopRequested) {{",
+                    f"{i}    if (-not (Wait-IfPaused)) {{ }}",
+                    f"{i}}}",
+                    f"{i}if (-not $stopRequested) {{",
                 ]
             )
         else:
@@ -8111,7 +8396,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "",
             "for ($chunk = 1; $chunk -le $NumChunks; $chunk++) {",
             *(
-                ["    if ($stopRequested) { break }"]
+                (
+                    ["    if ($stopRequested) { break }"]
+                    + cls._batch_runner_pause_check_ps1(indent="    ")
+                )
                 if cooperative_stop
                 else []
             ),

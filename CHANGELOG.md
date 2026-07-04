@@ -2,6 +2,18 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-04 — v1.11.50
+
+- **File → Pause**: first dialog asks you to wait for the current chunk; a second dialog appears when it is safe to use interactive Creo (**Resume** / **Stop**).
+
+## 2026-07-04 — v1.11.49
+
+- **File → Pause**: dialog updates when the batch is actually held (green **safe to use interactive Creo**), not only when Pause is clicked.
+
+## 2026-07-04 — v1.11.48
+
+- **File → Pause**: pause Scan Templates, ModelCHECK, or Thumbnails after the current chunk (writes `creo-batch-pause.requested`); dialog offers **Resume** or **Stop**. Blocks automatic mode until you resume or stop.
+
 ## 2026-07-04 — v1.11.47
 
 - **Report → Statistics**: **Files scanned** renamed to **Models scanned**.
