@@ -1,6 +1,6 @@
-"""Update sample_start.mcs from ModelCHECK template XML under a working directory.
+"""Update start.mcs from ModelCHECK template XML under a working directory.
 
-Updates ``sample_start.mcs`` from template ModelCHECK XML under ``<working_dir>\\templates\\``:
+Updates ``start.mcs`` from template ModelCHECK XML under ``<working_dir>\\templates\\``:
 part (``part_template.p.xml``), assembly (``assembly_template.a.xml``), and drawing
 (``drawing_template.d.xml``).
 
@@ -10,8 +10,8 @@ is written as: anchor, generated lines, then a blank line after the last item. P
 ``PARAM_INFO``; layers from ``EXTRA_LAYERS``; drawing symbols from ``SYMBOL_INFO`` (unique ``info1``).
 
 Usage:
-    python update_sample_start_from_xml.py
-    python update_sample_start_from_xml.py --dry-run
+    python update_start_from_xml.py
+    python update_start_from_xml.py --dry-run
 
 Uses working_directory from app_settings.json (same as the GUI). Sections with no matching
 template XML are reset to anchor comments only.
@@ -64,7 +64,7 @@ def _load_working_directory_from_settings() -> str | None:
 
 
 def _default_mcs_path() -> Path:
-    return _app_dir() / "configs" / "sample_start.mcs"
+    return _app_dir() / "configs" / "start.mcs"
 
 
 def _section_bounds(lines: list[str], start_marker: str, end_marker: str) -> tuple[int, int]:
@@ -189,7 +189,7 @@ def _is_drw_symbol_marker(line: str) -> bool:
 
 
 def _format_mcs_line(keyword: str, value: str) -> str:
-    # sample_start.mcs aligns the value column at char 22 (keyword field width 21).
+    # start.mcs aligns the value column at char 22 (keyword field width 21).
     return f"{keyword:<21}{value}"
 
 
@@ -866,12 +866,12 @@ def _strip_template_extracted_lines(lines: list[str]) -> list[str]:
     return [line for line in lines if not _is_template_extracted_line(line)]
 
 
-def clear_sample_start_template_blocks(
+def clear_start_template_blocks(
     mcs_path: Path,
     *,
     dry_run: bool = False,
 ) -> None:
-    """Reset PRT/ASM/DRW template blocks in sample_start.mcs to anchor comments only."""
+    """Reset PRT/ASM/DRW template blocks in start.mcs to anchor comments only."""
     if not mcs_path.is_file():
         raise FileNotFoundError(f"MCS file not found:\n{mcs_path}")
     original = mcs_path.read_text(encoding="utf-8")
@@ -881,7 +881,7 @@ def clear_sample_start_template_blocks(
         mcs_path.write_text(updated_text, encoding="utf-8")
 
 
-def update_sample_start(
+def update_start(
     mcs_path: Path,
     *,
     part_xml_path: Path | None = None,
@@ -938,18 +938,18 @@ def main(argv: list[str] | None = None) -> int:
     default_mcs = _default_mcs_path()
 
     parser = argparse.ArgumentParser(
-        description="Update sample_start.mcs from template ModelCHECK XML (part, assembly, drawing)",
+        description="Update start.mcs from template ModelCHECK XML (part, assembly, drawing)",
     )
     parser.add_argument(
         "--mcs",
         type=Path,
         default=default_mcs,
-        help=f"sample_start.mcs to update (default: {default_mcs})",
+        help=f"start.mcs to update (default: {default_mcs})",
     )
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Print exact MCS lines that would be written; do not update sample_start.mcs",
+        help="Print exact MCS lines that would be written; do not update start.mcs",
     )
     args = parser.parse_args(argv)
 
@@ -976,7 +976,7 @@ def main(argv: list[str] | None = None) -> int:
             drw_params,
             drw_layers,
             drw_symbols,
-        ) = update_sample_start(
+        ) = update_start(
             args.mcs.resolve(),
             part_xml_path=part_path,
             asm_xml_path=asm_path,
@@ -997,7 +997,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"MCS: {args.mcs.resolve()}", file=sys.stderr)
 
     if args.dry_run:
-        print("(dry run — sample_start.mcs not written)", file=sys.stderr)
+        print("(dry run — start.mcs not written)", file=sys.stderr)
         if part_path:
             for line in _mcs_output_lines(part_params, part_layers):
                 print(line)
@@ -1022,7 +1022,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         if not part_path and not asm_path and not drw_path:
             print(
-                "Cleared template blocks in sample_start.mcs (anchors only; no template XML)",
+                "Cleared template blocks in start.mcs (anchors only; no template XML)",
                 file=sys.stderr,
             )
         else:
@@ -1036,7 +1036,7 @@ def main(argv: list[str] | None = None) -> int:
                     f"{len(drw_params)} DRW_PARAMETER, {len(drw_layers)} DRW_LAYER, "
                     f"{len(drw_symbols)} DRW_SYMBOL"
                 )
-            print(f"Updated sample_start.mcs ({'; '.join(parts)})", file=sys.stderr)
+            print(f"Updated start.mcs ({'; '.join(parts)})", file=sys.stderr)
     return 0
 
 

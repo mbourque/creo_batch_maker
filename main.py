@@ -24,7 +24,7 @@ import build_errors_warnings_report
 import merge_master_xml
 import make_html_statistics
 import patch
-import update_sample_start_from_xml
+import update_start_from_xml
 from build_errors_warnings_report import _SHARED_PLACEHOLDER_JPEG
 
 # Non-greedy inner; Creo files may contain multiple <DESCRIPTION> blocks — the first
@@ -1166,7 +1166,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._post_map_refresh_done = False
         self._suppress_settings_autosave = False
         self._settings_config_relative: dict[str, str] = {
-            "Model Checks...": "default_checks.mch",
+            "Model Checks...": "templates/checks.mch",
             "Config.pro...": "config.pro",
             "Angles...": "angles.txt",
             "GMC...": "config.gmc",
@@ -1213,8 +1213,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             task_display
         )
 
-    def _update_sample_start_from_template_xml_if_present(self) -> tuple[bool, str, str]:
-        """Refresh configs\\sample_start.mcs when template scan XML exists.
+    def _update_start_from_template_xml_if_present(self) -> tuple[bool, str, str]:
+        """Refresh configs\\start.mcs when template scan XML exists.
 
         Returns (ok, error_message, status_note). status_note is updated or skipped.
         """
@@ -1223,7 +1223,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         cleared = "Template extraction: cleared"
         error = "Template extraction: error"
         if self._wizard_step_outcome.get(WIZARD_STEP_SCAN) == "skipped":
-            ok, err = self._clear_sample_start_mcs()
+            ok, err = self._clear_start_mcs()
             if not ok:
                 return False, err, ""
             return True, "", cleared
@@ -1237,9 +1237,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         part_path = part_xml if part_xml.is_file() else None
         asm_path = asm_xml if asm_xml.is_file() else None
         drw_path = drw_xml if drw_xml.is_file() else None
-        mcs_path = _app_bundle_dir() / "configs" / "sample_start.mcs"
+        mcs_path = _app_bundle_dir() / "configs" / "start.mcs"
         try:
-            update_sample_start_from_xml.update_sample_start(
+            update_start_from_xml.update_start(
                 mcs_path.resolve(),
                 part_xml_path=part_path,
                 asm_xml_path=asm_path,
@@ -1251,32 +1251,32 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return True, "", cleared
         return True, "", updated
 
-    def _clear_sample_start_mcs(self) -> tuple[bool, str]:
-        """Reset bundled ``configs\\sample_start.mcs`` template blocks (anchor lines only)."""
-        mcs_path = (_app_bundle_dir() / "configs" / "sample_start.mcs").resolve()
+    def _clear_start_mcs(self) -> tuple[bool, str]:
+        """Reset bundled ``configs\\start.mcs`` template blocks (anchor lines only)."""
+        mcs_path = (_app_bundle_dir() / "configs" / "start.mcs").resolve()
         try:
-            update_sample_start_from_xml.clear_sample_start_template_blocks(mcs_path)
+            update_start_from_xml.clear_start_template_blocks(mcs_path)
         except (FileNotFoundError, OSError, ET.ParseError) as exc:
             return False, str(exc)
         return True, ""
 
-    def _sync_sample_start_for_modelcheck_go(self) -> tuple[bool, str, str]:
-        """Apply template XML to sample_start.mcs only after Scan Templates completed (not Skip)."""
+    def _sync_start_for_modelcheck_go(self) -> tuple[bool, str, str]:
+        """Apply template XML to start.mcs only after Scan Templates completed (not Skip)."""
         cleared = "Template extraction: cleared"
         if self._wizard_step_outcome.get(WIZARD_STEP_SCAN) != "done":
-            ok, err = self._clear_sample_start_mcs()
+            ok, err = self._clear_start_mcs()
             if not ok:
                 return False, err, ""
             return True, "", cleared
-        return self._update_sample_start_from_template_xml_if_present()
+        return self._update_start_from_template_xml_if_present()
 
-    def _apply_sample_start_after_template_scan(self) -> None:
-        """Merge template scan XML into sample_start.mcs when Scan Templates batch completes."""
-        ok, err, _note = self._update_sample_start_from_template_xml_if_present()
+    def _apply_start_after_template_scan(self) -> None:
+        """Merge template scan XML into start.mcs when Scan Templates batch completes."""
+        ok, err, _note = self._update_start_from_template_xml_if_present()
         if not ok:
             messagebox.showwarning(
                 "Scan Templates",
-                "Could not update configs\\sample_start.mcs from template XML:\n\n" + err,
+                "Could not update configs\\start.mcs from template XML:\n\n" + err,
             )
 
     def _effective_ttd_filename(self, task_display: str) -> str:
@@ -2354,7 +2354,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 path.unlink()
             except OSError as exc:
                 errors.append(f"{path}\n{exc}")
-        self._update_sample_start_from_template_xml_if_present()
+        self._update_start_from_template_xml_if_present()
         self._refresh_task_options()
         self._refresh_wizard_template_status()
         self._refresh_wizard_footer()
@@ -3864,9 +3864,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             step = watch.get("step")
             if step == WIZARD_STEP_SCAN and self._wizard_scan_step_has_failed():
                 return
-            if step == WIZARD_STEP_SCAN and not watch.get("sample_start_applied"):
-                watch["sample_start_applied"] = True
-                self._apply_sample_start_after_template_scan()
+            if step == WIZARD_STEP_SCAN and not watch.get("start_applied"):
+                watch["start_applied"] = True
+                self._apply_start_after_template_scan()
             if step == WIZARD_STEP_JPEG_3D:
                 self._update_create_report_task_list(advance_from_jpeg=False)
             if self._automatic_mode and step in (
@@ -4258,11 +4258,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._cancel_wizard_batch_output_watch()
         self._close_batch_runner_window()
         if step == WIZARD_STEP_SCAN:
-            ok, err = self._clear_sample_start_mcs()
+            ok, err = self._clear_start_mcs()
             if not ok:
                 messagebox.showwarning(
                     "Scan Templates",
-                    "Could not reset configs\\sample_start.mcs:\n\n" + err,
+                    "Could not reset configs\\start.mcs:\n\n" + err,
                 )
                 return
             if self._warn_wizard_working_directory_missing_models():
@@ -8684,7 +8684,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return
 
         if self._is_regular_modelcheck_task(task_display_raw):
-            ok, err, _ = self._sync_sample_start_for_modelcheck_go()
+            ok, err, _ = self._sync_start_for_modelcheck_go()
             if not ok:
                 messagebox.showerror("GO", err)
                 return

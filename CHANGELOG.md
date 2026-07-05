@@ -2,6 +2,18 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-05 — v1.11.55
+
+- **Maintenance**: renamed `update_sample_start_from_xml.py` to `update_start_from_xml.py` (same behavior; updates `start.mcs`).
+
+## 2026-07-05 — v1.11.54
+
+- **Settings → Model Checks…** opens `configs\templates\checks.mch` (was `default_checks.mch`).
+
+## 2026-07-05 — v1.11.53
+
+- **Scan Templates**: template XML is merged into `configs\start.mcs` (renamed from `sample_start.mcs`).
+
 ## 2026-07-05 — v1.11.52
 
 - Dialogs (warnings, pause, settings, About, and similar) open centered on the main window instead of the screen corner.

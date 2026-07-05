@@ -1,9 +1,9 @@
 ! Conditional file for ModelCHECK.
 ! Date: 04-12-2004
 # SET CONFIG FILE
-IF (MODEL_UNIT EQ INCH) config=(default_checks.mch)(sample_start.mcs)(inch.mcn)(sample_status.mcq)
-IF (MODEL_UNIT EQ MM) config=(default_checks.mch)(sample_start.mcs)(mm.mcn)(sample_status.mcq)
-ELSE config=(default_checks.mch)(sample_start.mcs)(mm.mcn)(sample_status.mcq)
+IF (MODEL_UNIT EQ INCH) config=(checks.mch)(start.mcs)(inch.mcn)(status.mcq)
+IF (MODEL_UNIT EQ MM) config=(checks.mch)(sstart.mcs)(mm.mcn)(status.mcq)
+ELSE config=(checks.mch)(start.mcs)(mm.mcn)(status.mcq)
 
 # OVERRIDE CHECKS
 IF (NOCHECK) NOCHECK

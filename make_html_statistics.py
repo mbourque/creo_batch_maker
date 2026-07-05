@@ -47,7 +47,7 @@ from urllib.parse import quote
 
 from make_html_summary import _model_check_category_map
 
-from update_sample_start_from_xml import collect_template_scan_report_blocks
+from update_start_from_xml import collect_template_scan_report_blocks
 
 
 
