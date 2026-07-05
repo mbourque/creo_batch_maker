@@ -932,27 +932,44 @@ def _canonical_app_settings(data: dict[str, object]) -> dict[str, object]:
     }
 
 
+def _toplevel_effective_size(widget: tk.Misc) -> tuple[int, int]:
+    """Best-effort width/height for CTk windows (often 1x1 until after first paint)."""
+    widget.update_idletasks()
+    return (
+        max(widget.winfo_width(), widget.winfo_reqwidth()),
+        max(widget.winfo_height(), widget.winfo_reqheight()),
+    )
+
+
 def _center_toplevel_on_parent(toplevel: tk.Misc, parent: tk.Misc) -> None:
     """Place *toplevel* centered over *parent* (call after widgets are laid out)."""
     toplevel.update_idletasks()
     parent.update_idletasks()
-    tw = toplevel.winfo_width()
-    th = toplevel.winfo_height()
-    if tw <= 1:
-        tw = toplevel.winfo_reqwidth()
-    if th <= 1:
-        th = toplevel.winfo_reqheight()
-    pw = parent.winfo_width()
-    ph = parent.winfo_height()
-    if pw <= 1:
-        pw = parent.winfo_reqwidth()
-    if ph <= 1:
-        ph = parent.winfo_reqheight()
+    tw, th = _toplevel_effective_size(toplevel)
+    pw, ph = _toplevel_effective_size(parent)
     px = parent.winfo_rootx()
     py = parent.winfo_rooty()
     x = px + max(0, (pw - tw) // 2)
     y = py + max(0, (ph - th) // 2)
     toplevel.geometry(f"+{x}+{y}")
+
+
+def _schedule_center_toplevel_on_parent(toplevel: tk.Misc, parent: tk.Misc) -> None:
+    """Center now and again after layout (CTk often reports 1x1 until first paint)."""
+
+    def place() -> None:
+        try:
+            if toplevel.winfo_exists():
+                _center_toplevel_on_parent(toplevel, parent)
+        except tk.TclError:
+            pass
+
+    place()
+    try:
+        toplevel.after_idle(place)
+        toplevel.after(50, place)
+    except tk.TclError:
+        pass
 
 
 def _xml_attr_escape(value: str) -> str:
@@ -2071,22 +2088,13 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         """Show a CTk dialog modally (grab, focus, wait) so it stays in front on Windows."""
         parent = anchor if anchor is not None else self
 
-        def place_centered() -> None:
-            if not dialog.winfo_exists():
-                return
-            dialog.update_idletasks()
-            try:
-                _center_toplevel_on_parent(dialog, parent)
-            except tk.TclError:
-                pass
-
         self._modal_dialog_depth += 1
         try:
             dialog.update_idletasks()
             if not dialog.winfo_exists():
                 return
+            _schedule_center_toplevel_on_parent(dialog, parent)
             dialog.deiconify()
-            place_centered()
             if repaints:
                 self._repaint_dialog_buttons(dialog, *repaints)
             try:
@@ -2110,6 +2118,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                         dialog.attributes("-topmost", False)
                 except tk.TclError:
                     pass
+            _schedule_center_toplevel_on_parent(dialog, parent)
             dialog.wait_window()
         finally:
             try:
@@ -5970,6 +5979,13 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             focus_widget=resume_btn,
             repaints=(stop_btn, resume_btn),
         )
+        if action["value"] == "resume" and _xtop_is_running():
+            messagebox.showwarning(
+                "Creo is running",
+                "Creo (xtop) is currently running.\n\n"
+                "Quit Creo completely, then click Resume again.",
+            )
+            return self._show_batch_pause_ready_dialog(step_label)
         return action["value"]
 
     def _on_file_menu_stop(self) -> None:
@@ -6899,20 +6915,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
     ) -> None:
         anchor = parent if parent is not None else self
 
-        def place_centered() -> None:
-            if not dialog.winfo_exists():
-                return
-            dialog.update_idletasks()
-            try:
-                _center_toplevel_on_parent(dialog, anchor)
-            except tk.TclError:
-                pass
-
         def show() -> None:
             if not dialog.winfo_exists():
                 return
+            _schedule_center_toplevel_on_parent(dialog, anchor)
             dialog.deiconify()
-            place_centered()
             try:
                 dialog.lift()
                 dialog.focus_force()
@@ -6925,7 +6932,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                         focus_widget.select_range(0, "end")
                 except tk.TclError:
                     pass
-            dialog.after(50, place_centered)
+            _schedule_center_toplevel_on_parent(dialog, anchor)
 
         dialog.update_idletasks()
         dialog.after_idle(show)

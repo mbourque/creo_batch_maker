@@ -2,6 +2,14 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-05 — v1.11.52
+
+- Dialogs (warnings, pause, settings, About, and similar) open centered on the main window instead of the screen corner.
+
+## 2026-07-05 — v1.11.51
+
+- **File → Pause**: **Resume** warns if Creo (**xtop**) is still running and keeps the pause dialog open until you quit Creo.
+
 ## 2026-07-04 — v1.11.50
 
 - **File → Pause**: first dialog asks you to wait for the current chunk; a second dialog appears when it is safe to use interactive Creo (**Resume** / **Stop**).

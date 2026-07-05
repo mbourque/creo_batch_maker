@@ -131,7 +131,7 @@ Open **Settings** from the menu:
 ## Tips
 
 - Quit Creo before starting a batch — if **xtop** is running, GO warns you and does not start.
-- **Pause** waits for the current chunk to finish, then shows when it is safe to use interactive Creo; **Resume** continues the batch.
+- **Pause** waits for the current chunk to finish, then shows when it is safe to use interactive Creo; **Resume** continues the batch (warns if **xtop** is still running).
 - After **Stop**, run the same step again — models that already have output are skipped.
 - Large folders are split into chunks (see **Batch settings**). One full run may take a while.
 - For more detail and troubleshooting, see the [documentation wiki](https://github.com/mbourque/creo_batch_maker/wiki/Documentation).
