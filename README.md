@@ -126,7 +126,7 @@ Open **Settings** from the menu:
 | **Recent scans**           | On **Setup** only: switch to a recently batched working folder (up to 10; hidden when the list is empty).   |
 
 
-**Configuration** opens ModelCHECK config files in Notepad (`configs\` folder).
+**Configuration** opens ModelCHECK config files in Notepad (`configs\` folder), including **Start…** for `configs\start.mcs`.
 
 ## Tips
 

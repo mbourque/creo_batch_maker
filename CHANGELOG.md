@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-05 — v1.11.56
+
+- **Configuration → Start…** opens `configs\start.mcs` in Notepad (replaces **Defaults…**).
+
 ## 2026-07-05 — v1.11.55
 
 - **Maintenance**: renamed `update_sample_start_from_xml.py` to `update_start_from_xml.py` (same behavior; updates `start.mcs`).
