@@ -2082,10 +2082,10 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Category>Model Complexity</Category>
         <Description>Checks for part models that contain multiple solid bodies (merged or non-merged) and reports their presence according to company modeling standards. Multi-body parts can occur when geometry is combined through merges, imports, Boolean operations, or when separate solid regions are intentionally maintained within a single part file. While multi-body modeling can be valid in certain advanced design or manufacturing scenarios, uncontrolled or unintended use can increase model complexity, create ambiguity in design intent, complicate mass properties, interfere with manufacturing workflows, and introduce issues in downstream processes such as CAM programming, simulation, and data management. This check helps ensure that the use of multiple solid bodies is intentional, properly controlled, and aligned with company design and modeling guidelines. Multi-body modeling rules and part structure standards are typically configured through Creo part modeling practices and ModelCHECK configuration files, while check behavior and reporting are controlled by the SO26_MULT_BODY settings in the check.mch configuration file.</Description>
         <ModelCheckName>SO26_MULT_BODY</ModelCheckName>
-        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>N</display>
         <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>Number of Multi-Solid Parts</Name>
@@ -2347,9 +2347,10 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Category>Model Complexity</Category>
         <Description>Checks whether the part model contains multiple solid bodies and reports cases where more than one body exists when a single-body design standard is expected according to company modeling guidelines. Multi-body parts can arise from Boolean operations, merges, imports, or intentional design strategies, but if not properly controlled they can introduce ambiguity in design intent, complicate mass property calculations, increase modeling complexity, and create issues in downstream processes such as manufacturing, CAM programming, simulation, and data management. This check helps ensure that multi-body usage is intentional, properly justified, and aligned with organizational standards for part structure. Multi-body modeling rules and part structure requirements are typically governed by Creo part modeling practices and ModelCHECK configuration files, while check behavior and reporting are controlled by the MULTIBODY_MODEL settings in the check.mch configuration file.</Description>
         <ModelCheckName>MULTIBODY_MODEL</ModelCheckName>
-        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <ModelCheckOptions>YNEW Y Y N Y Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
+        <info_check>Y</info_check>
     </Check>
 
     <Check>

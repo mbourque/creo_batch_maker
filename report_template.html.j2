@@ -427,6 +427,19 @@
             return { flagged: flagged, unflagged: unflagged };
         }
 
+        function statFiltersPresentInDom() {
+            var warning = false;
+            var error = false;
+            var sections = document.getElementsByClassName('check-section-wrapper');
+            for (var i = 0; i < sections.length; i++) {
+                var stat = sections[i].getAttribute('data-mq-section-stat') || '';
+                if (stat === 'WARNING') { warning = true; }
+                else if (stat === 'ERROR') { error = true; }
+                if (warning && error) { break; }
+            }
+            return { warning: warning, error: error };
+        }
+
         function mqSetFilterOptionVisible(opt, visible) {
             if (!opt) { return; }
             opt.hidden = !visible;
@@ -449,7 +462,35 @@
             }
         }
 
+        function syncStatFilterOptions() {
+            var sel = document.getElementById('sidebar-view-filter');
+            var wrap = document.getElementById('sidebar-filter-wrap');
+            if (!sel) { return; }
+            var present = statFiltersPresentInDom();
+            var hasIssues = present.warning || present.error;
+            if (wrap) {
+                wrap.style.display = hasIssues ? '' : 'none';
+            }
+            if (!hasIssues) {
+                sel.value = 'all';
+                document.body.removeAttribute('data-mq-view-filter');
+                mqSyncSidebarNav();
+                mqApplySidebarNavOrder('all');
+                return;
+            }
+            mqSetFilterOptionVisible(sel.querySelector('option[value="warning"]'), present.warning);
+            mqSetFilterOptionVisible(sel.querySelector('option[value="error"]'), present.error);
+            if ((sel.value === 'warning' && !present.warning) ||
+                (sel.value === 'error' && !present.error)) {
+                sel.value = 'all';
+                document.body.removeAttribute('data-mq-view-filter');
+                mqSyncSidebarNav();
+                mqApplySidebarNavOrder('all');
+            }
+        }
+
         function syncViewFilterOptions() {
+            syncStatFilterOptions();
             syncCategoryFilterOptions();
             syncModelFilterOptions();
             syncFlaggedFilterOptions();
@@ -1116,6 +1157,7 @@
             function initReportUi() {
                 initPersistedReportState();
                 restoreViewFilterFromDom();
+                syncStatFilterOptions();
                 syncFlaggedFilterOptions();
                 mqInitSidebarNavOrder();
                 mqInitPassBaseline();

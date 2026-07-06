@@ -2,6 +2,18 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-06 — v1.11.59
+
+- **Report**: **Filter view** is hidden when there are no warnings or errors left.
+
+## 2026-07-06 — v1.11.58
+
+- **Report**: **Filter view** hides **Show warnings** or **Show errors** when that severity has no issues.
+
+## 2026-07-05 — v1.11.57
+
+- **Packaging**: PyInstaller spec updated for `update_start_from_xml` (Scan Templates → `start.mcs` in the built exe).
+
 ## 2026-07-05 — v1.11.56
 
 - **Configuration → Start…** opens `configs\start.mcs` in Notepad (replaces **Defaults…**).
