@@ -101,6 +101,7 @@ CREO_BATCH_RUNNER_MODELCHECK_BASENAME = "creo-batch-modelcheck.ps1"
 CREO_BATCH_RUNNER_JPEG_3D_BASENAME = "creo-batch-jpeg3d.ps1"
 CREO_BATCH_RUNNER_JPEG_2D_BASENAME = "creo-batch-jpeg2d.ps1"
 CREO_BATCH_RUNNER_SCAN_TEMPLATES_BASENAME = "creo-batch-scan-templates.ps1"
+PURGE_CACHE_PS1_BASENAME = "purge_cache.ps1"
 CREO_BATCH_RUNNER_BASENAMES = (
     CREO_BATCH_RUNNER_LEGACY_BASENAME,
     CREO_BATCH_RUNNER_MODELCHECK_BASENAME,
@@ -5333,6 +5334,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         file_menu.add_command(label="Pause", command=self._on_file_menu_pause)
         file_menu.add_command(label="Stop", command=self._on_file_menu_stop)
         file_menu.add_command(label="Start over...", command=self._on_file_menu_start_over)
+        file_menu.add_command(label="Purge cache...", command=self._on_file_menu_purge_cache)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self._on_exit)
         menubar.add_cascade(label="File", menu=file_menu)
@@ -5418,6 +5420,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "Save",
             "Save as...",
             "Start over...",
+            "Purge cache...",
         ):
             try:
                 fm.entryconfigure(label, state=tk.NORMAL if fully_enabled else tk.DISABLED)
@@ -6127,6 +6130,47 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "Start over",
             f"Removed scan and batch data from:\n{working_dir}",
         )
+
+    def _on_file_menu_purge_cache(self) -> None:
+        prompt = (
+            "Delete Creo and batch cache files?\n\n"
+            "Removes ProgramData dbatch* folders, ModelCHECK mdlchk cache, "
+            "Parametric\\bin\\*.log files, and Parametric\\bin\\dsm_cache "
+            "(uses creo_loadpoint from app settings).\n\n"
+            "Close Creo first if it is running."
+        )
+        if not self._show_proceed_cancel_dialog("Purge cache", prompt):
+            return
+        ps1 = _app_bundle_dir() / PURGE_CACHE_PS1_BASENAME
+        if not ps1.is_file():
+            messagebox.showerror("Purge cache", f"Could not find:\n{ps1}")
+            return
+        ps_exe = self._resolve_powershell_exe()
+        if not ps_exe:
+            messagebox.showerror("PowerShell Not Found", "Could not locate powershell.exe.")
+            return
+        try:
+            popen_kw: dict = {
+                "args": [
+                    ps_exe,
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(ps1.resolve()),
+                ],
+                "cwd": str(_app_bundle_dir()),
+                "creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000),
+            }
+            startupinfo = self._console_startupinfo(hidden=True)
+            if startupinfo is not None:
+                popen_kw["startupinfo"] = startupinfo
+            subprocess.Popen(**popen_kw)
+        except OSError as exc:
+            messagebox.showerror(
+                "Purge cache",
+                f"Could not start purge script:\n{ps1}\n\n{exc}",
+            )
 
     def _on_exit(self) -> None:
         """Save settings when valid, stop batch runner, then close."""
