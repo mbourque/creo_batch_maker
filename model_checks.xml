@@ -696,7 +696,7 @@ Since an issue may propagate through the associative chain of references between
 ]]></why>
     </Check>
     <Check>
-        <Name>Minimum and Maximum Tolerance Information</Name>
+        <Name>Min and Max Tolerance Information</Name>
         <Category>MBD Readiness</Category>
         <Description>Checks whether feature dimensions and tolerances use valid minimum and maximum tolerance values according to company engineering and manufacturing standards. Proper tolerance ranges are critical for ensuring part fit, function, manufacturability, interchangeability, and inspection accuracy. Incorrect, inconsistent, or unrealistic tolerance limits can increase manufacturing cost, create assembly problems, lead to inspection failures, and reduce overall product quality. This check helps identify dimensions and tolerance definitions that may violate approved engineering practices or downstream manufacturing requirements. Tolerance standards and approved tolerance types are typically configured in the start.mcs file using PRT_TOL_TYPE, ASM_TOL_TYPE, and related tolerance configuration entries, while check behavior and reporting are controlled by the MINMAXTOL_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>MINMAXTOL_INFO</ModelCheckName>
