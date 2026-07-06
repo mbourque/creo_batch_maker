@@ -936,7 +936,7 @@ Retrieval and regeneration issues in models with family tables are more serious 
         </why>
     </Check>
     <Check>
-        <Name>Relations Without Comments</Name>
+        <Name>Relations without Comments</Name>
         <Category>Design Intent Strength</Category>
         <Description>Checks whether relations within the model include meaningful comments or documentation to explain their purpose and behavior. Relations often control important parametric logic, calculations, feature behavior, and automation within a model, and undocumented relations can make models difficult to understand, troubleshoot, or modify over time. Adding clear comments improves readability, maintainability, collaboration, and long-term support of complex parametric designs. Relation definitions and standards are typically configured in the start.mcs file using PRT_RELATION, ASM_RELATION, and related entries, while check behavior and reporting are controlled by the RELATION_COMM settings in the check.mch configuration file.</Description>
         <ModelCheckName>RELATION_COMM</ModelCheckName>
@@ -1402,7 +1402,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
 
      <Check>
-        <Name>Annotations Missing in Combination State</Name>
+        <Name>Annotations missing in Combination State</Name>
         <Category>MBD Readiness</Category>
         <Description>Checks whether required annotations are included and properly displayed within defined combination states used for Model-Based Definition (MBD) workflows. Combination states control the visibility of annotations, views, geometry, and display settings used to communicate manufacturing, inspection, assembly, and engineering requirements directly within the 3D model. Missing annotations in combination states can result in incomplete documentation, incorrect manufacturing interpretation, inspection errors, failed design reviews, and downstream communication problems. This check helps ensure that all required dimensions, GDT annotations, notes, and manufacturing information are visible in the appropriate combination states according to company MBD standards. Combination state and annotation requirements are typically configured through Creo MBD settings and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the ANNTN_NOT_ON_COMB_STATE settings in the check.mch configuration file.</Description>
         <ModelCheckName>ANNTN_NOT_ON_COMB_STATE</ModelCheckName>
@@ -1453,7 +1453,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <info_check>Y</info_check>
     </Check>
     <Check>
-        <Name>Models Used in Drawing</Name>
+        <Name>Models used in Drawing</Name>
         <Category>Consistency</Category>
         <Description>Checks and reports information about the models, parts, assemblies, and references used within the drawing. Drawings often reference multiple models for views, sections, details, BOMs, family tables, and assembly documentation, and properly managing these model references is critical for maintaining drawing accuracy, associativity, revision control, and downstream manufacturing communication. Missing, outdated, incorrect, or unnecessary model references can create drawing inconsistencies, broken views, BOM errors, and downstream data management or manufacturing problems. This check helps ensure that drawings reference the correct approved models and maintain proper model-to-drawing relationships according to company standards. Drawing model reference rules and related standards are typically configured through Creo drawing settings and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the MODELS_USED settings in the check.mch configuration file.</Description>
         <ModelCheckName>MODELS_USED</ModelCheckName>
