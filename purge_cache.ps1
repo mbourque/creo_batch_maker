@@ -9,7 +9,7 @@ function Write-Step([string]$Message) {
 
 function Remove-IfExists([string]$Path, [scriptblock]$Remove) {
     if (-not (Test-Path -LiteralPath $Path)) {
-        Write-Host "  (skip — not found: $Path)"
+        Write-Host "  (skip - not found: $Path)"
         return
     }
     & $Remove
@@ -29,6 +29,26 @@ function Get-CreoLoadpoint {
         throw "creo_loadpoint path does not exist: $loadpoint"
     }
     return $loadpoint
+}
+
+function Get-ParametricBinLogFiles([string]$BinDir) {
+    if (-not (Test-Path -LiteralPath $BinDir)) {
+        return @()
+    }
+    $seen = @{}
+    $files = @()
+    foreach ($item in Get-ChildItem -LiteralPath $BinDir -File -Force -ErrorAction SilentlyContinue) {
+        if ($item.Name -notmatch '\.log(\.\d+)?$') {
+            continue
+        }
+        $key = $item.FullName.ToLowerInvariant()
+        if ($seen.ContainsKey($key)) {
+            continue
+        }
+        $seen[$key] = $true
+        $files += $item
+    }
+    return $files
 }
 
 Write-Step '=== Purge cache ==='
@@ -63,17 +83,17 @@ Remove-IfExists $mdlchkDir {
     }
 }
 
-# 3–4. Creo Parametric\bin logs and dsm_cache
+# 3-4. Creo Parametric\bin logs and dsm_cache
 $loadpoint = Get-CreoLoadpoint
 $binDir = Join-Path $loadpoint 'Parametric\bin'
 $dsmCache = Join-Path $binDir 'dsm_cache'
 
 Write-Step ''
-Write-Step "[3] Removing *.log from Parametric\bin ($binDir)..."
+Write-Step "[3] Removing Parametric\bin log files ($binDir)..."
 Remove-IfExists $binDir {
-    $logs = @(Get-ChildItem -LiteralPath $binDir -Filter '*.log' -File -Force -ErrorAction SilentlyContinue)
+    $logs = @(Get-ParametricBinLogFiles $binDir)
     if ($logs.Count -eq 0) {
-        Write-Host '  (no .log files)'
+        Write-Host '  (no log files)'
     } else {
         foreach ($log in $logs) {
             Write-Host "  removing $($log.FullName)"

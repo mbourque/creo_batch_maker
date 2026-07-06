@@ -6135,7 +6135,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         prompt = (
             "Delete Creo and batch cache files?\n\n"
             "Removes ProgramData dbatch* folders, ModelCHECK mdlchk cache, "
-            "Parametric\\bin\\*.log files, and Parametric\\bin\\dsm_cache "
+            "Parametric\\bin log files (including rotated .log.N), and Parametric\\bin\\dsm_cache "
             "(uses creo_loadpoint from app settings).\n\n"
             "Close Creo first if it is running."
         )
@@ -6150,19 +6150,21 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             messagebox.showerror("PowerShell Not Found", "Could not locate powershell.exe.")
             return
         try:
+            # Visible console + -NoExit so the user can read purge output (not hidden).
+            ps_args = [
+                "-NoProfile",
+                "-NoExit",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(ps1.resolve()),
+            ]
             popen_kw: dict = {
-                "args": [
-                    ps_exe,
-                    "-NoProfile",
-                    "-ExecutionPolicy",
-                    "Bypass",
-                    "-File",
-                    str(ps1.resolve()),
-                ],
+                "args": [ps_exe, *ps_args],
                 "cwd": str(_app_bundle_dir()),
-                "creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000),
+                "creationflags": subprocess.CREATE_NEW_CONSOLE,
             }
-            startupinfo = self._console_startupinfo(hidden=True)
+            startupinfo = self._console_startupinfo(show_normal=True)
             if startupinfo is not None:
                 popen_kw["startupinfo"] = startupinfo
             subprocess.Popen(**popen_kw)

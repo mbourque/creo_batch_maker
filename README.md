@@ -123,7 +123,7 @@ Open **Settings** from the menu:
 | **Pause**                  | Pause a running Scan Templates / ModelCHECK / Thumbnails batch after the current chunk. First wait for the chunk to finish, then a second dialog when it is safe to use interactive Creo (**Resume**). Blocks automatic mode until you resume or stop. |
 | **Stop**                   | Stop the running batch (keeps outputs already written). Pauses automatic mode until you continue. |
 | **Start over…**            | Clear batch outputs in the working folder and return to Setup. Keeps your Creo models.            |
-| **Purge cache…**           | Delete Creo/batch cache files (dbatch folders, mdlchk cache, Parametric logs, dsm_cache). Confirm first. |
+| **Purge cache…**           | Delete Creo/batch cache files (dbatch folders, mdlchk cache, Parametric logs, dsm_cache). Confirm first; opens a PowerShell window that stays open so you can read what was removed. |
 | **Zip report…**            | Package `index.html` and related files into a zip (when a report exists).                         |
 | **Save / Open…**           | Save or load `app_settings.json`.                                                                 |
 | **Recent scans**           | On **Setup** only: switch to a recently batched working folder (up to 10; hidden when the list is empty).   |

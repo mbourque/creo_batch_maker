@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-06 — v1.11.75
+
+- **File → Purge cache…**: opens a visible PowerShell window (stays open) so you can see what was removed or skipped.
+
 ## 2026-07-06 — v1.11.72
 
 - **Report**: checks marked `<info_check>Y</info_check>` in `model_checks.xml` with `INFO` results appear as **Information** sections; **Filter view > Show information** (excluded from score and issue counts).
