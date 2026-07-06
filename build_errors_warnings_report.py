@@ -44,6 +44,37 @@ def _direct_child_ans(check_el: ET.Element) -> ET.Element | None:
     return None
 
 
+def _ans_element_is_empty(ans_el: ET.Element | None) -> bool:
+    """True for missing ``<ans>``, ``<ans />``, or ``<ans></ans>``."""
+    if ans_el is None:
+        return True
+    if (ans_el.text or "").strip():
+        return False
+    return not "".join(ans_el.itertext()).strip()
+
+
+def _ans_text_from_element(ans_el: ET.Element | None) -> str:
+    if _ans_element_is_empty(ans_el):
+        return ""
+    return "".join(ans_el.itertext()).strip()
+
+
+def _info_ans_is_reportable(ans: str, *, ans_empty: bool = False) -> bool:
+    """False for empty ``<ans>`` / ``<ans />``, zero, negative, NA, NO, or NOT FOUND INFO answers."""
+    if ans_empty:
+        return False
+    text = (ans or "").strip()
+    if not text or text == "0":
+        return False
+    upper = text.upper()
+    if upper in ("NA", "NO", "NOT FOUND"):
+        return False
+    try:
+        return float(text.replace(",", "")) > 0.0
+    except ValueError:
+        return True
+
+
 def _mb_from_file_size_check(check_el: ET.Element) -> float | None:
     """Creo FILE_SIZE check: <ans> is size in bytes when it is all digits."""
     ans_el = _direct_child_ans(check_el)
@@ -369,16 +400,19 @@ def _parse_master_root(root: ET.Element) -> dict:
                 name = check.get("name") or ""
                 desc_el = check.find("desc")
                 msg_el = check.find("msg")
-                ans_el = check.find("ans")
                 desc = desc_el.text if desc_el is not None else ""
                 msg = msg_el.text if msg_el is not None else ""
-                ans = ans_el.text if ans_el is not None else ""
-                condensed_msg = f"{msg.strip()} {ans.strip()}" if msg and ans else msg.strip()
+                ans_el = _direct_child_ans(check)
+                ans_empty = _ans_element_is_empty(ans_el)
+                ans = _ans_text_from_element(ans_el)
+                condensed_msg = f"{msg.strip()} {ans}" if msg and ans else msg.strip()
 
                 check_entry: dict = {
                     "stat": stat,
                     "name": name,
                     "desc": desc,
+                    "ans": ans,
+                    "ans_empty": ans_empty,
                     "condensed_msg": condensed_msg,
                 }
                 duplicate_models = _parse_duplicate_models_check(check)
@@ -628,6 +662,31 @@ def get_check_descriptions(model_checks_file: str) -> dict:
     return descriptions
 
 
+def get_info_check_names(model_checks_file: str) -> frozenset[str]:
+    """ModelCheckName values marked ``<info_check>Y</info_check>`` in model_checks.xml."""
+    tree = ET.parse(model_checks_file)
+    names: set[str] = set()
+    for check in tree.getroot().findall("Check"):
+        hide_from_report = check.find("hideFromReport")
+        if hide_from_report is not None and (hide_from_report.text or "").strip() == "Y":
+            continue
+        info_el = check.find("info_check")
+        if info_el is None or (info_el.text or "").strip().upper() != "Y":
+            continue
+        mcn = check.find("ModelCheckName")
+        if mcn is not None and (mcn.text or "").strip():
+            names.add(mcn.text.strip())
+    return frozenset(names)
+
+
+def _section_stat_type_from_dict_key(check_key: str) -> str:
+    if check_key.startswith("INFO:"):
+        return "INFO"
+    if "ERROR" in check_key:
+        return "ERRORS"
+    return "WARNINGS"
+
+
 def create_placeholder_image(output_path: str, width: int = 300, height: int = 231) -> None:
     img = Image.new("RGB", (width, height), color="#e0e0e0")
     draw = ImageDraw.Draw(img)
@@ -781,6 +840,7 @@ def create_html_report(
 
     check_sections: list = []
     check_dict: dict = defaultdict(list)
+    info_check_names = get_info_check_names(model_checks_path)
     more_info_index = build_more_info_name_index(working_dir)
     ensure_shared_placeholder_jpeg(report_assets_dir)
     thumbnail_cache: dict[str, str] = {}
@@ -795,55 +855,64 @@ def create_html_report(
             if not description_data:
                 continue
 
-            if check["stat"] in ("ERROR", "WARNING"):
-                pro_type = (file_info.get("pro_type") or "").strip()
-                thumb_key = (drag_image_display_name, pro_type.casefold())
-                if thumb_key not in thumbnail_cache:
-                    thumbnail_cache[thumb_key] = thumbnail_src_for_report(
-                        report_assets_dir,
-                        working_dir,
-                        drag_image_display_name,
-                        pro_type=pro_type,
-                    )
-                image_url = thumbnail_cache[thumb_key]
+            stat = check["stat"]
+            is_issue = stat in ("ERROR", "WARNING")
+            is_info = stat == "INFO" and check_name in info_check_names
+            if is_info and not _info_ans_is_reportable(
+                check.get("ans", ""), ans_empty=check.get("ans_empty", False)
+            ):
+                continue
+            if not is_issue and not is_info:
+                continue
 
-                duplicate_detail = ""
-                duplicate_models = check.get("duplicate_models")
-                if duplicate_models:
-                    duplicate_detail = build_duplicate_models_detail_html(
-                        duplicate_models,
-                        jump_display_names=jump_display_names,
-                    )
-
-                check_dict[f"{check['stat']}: {check['name']}"].append(
-                    {
-                        "file_path": file_path,
-                        "desc": check["desc"],
-                        "condensed_msg": check["condensed_msg"],
-                        "duplicate_models_detail_html": duplicate_detail,
-                        "stat": check["stat"],
-                        "last_saved": file_info["last_saved"],
-                        "created": file_info["created"],
-                        "file_size": file_info["file_size"],
-                        "num_features": file_info["num_features"],
-                        "overall_size": file_info["overall_size"],
-                        "units_length": file_info["units_length"],
-                        # Keep report text on the original model, but allow drag/image fallback.
-                        "display_name": original_display_name,
-                        "display_name_link_text": display_name_link_text(
-                            original_display_name, drag_image_display_name
-                        ),
-                        "model_href": model_file_link_href(drag_image_display_name),
-                        "image_url": image_url,
-                        # Keep detail HTML lookup tied to the original model entry.
-                        "more_info_link": resolve_more_info_link(
-                            working_dir, original_display_name, more_info_index
-                        ),
-                        "file_list_id": safe_file_list_id(check_name, file_info.get("model") or ""),
-                        "category": description_data["category"],
-                        "pro_type": (file_info.get("pro_type") or "").strip().upper(),
-                    }
+            pro_type = (file_info.get("pro_type") or "").strip()
+            thumb_key = (drag_image_display_name, pro_type.casefold())
+            if thumb_key not in thumbnail_cache:
+                thumbnail_cache[thumb_key] = thumbnail_src_for_report(
+                    report_assets_dir,
+                    working_dir,
+                    drag_image_display_name,
+                    pro_type=pro_type,
                 )
+            image_url = thumbnail_cache[thumb_key]
+
+            duplicate_detail = ""
+            duplicate_models = check.get("duplicate_models")
+            if duplicate_models:
+                duplicate_detail = build_duplicate_models_detail_html(
+                    duplicate_models,
+                    jump_display_names=jump_display_names,
+                )
+
+            check_dict[f"{stat}: {check_name}"].append(
+                {
+                    "file_path": file_path,
+                    "desc": check["desc"],
+                    "condensed_msg": check["condensed_msg"],
+                    "duplicate_models_detail_html": duplicate_detail,
+                    "stat": stat,
+                    "last_saved": file_info["last_saved"],
+                    "created": file_info["created"],
+                    "file_size": file_info["file_size"],
+                    "num_features": file_info["num_features"],
+                    "overall_size": file_info["overall_size"],
+                    "units_length": file_info["units_length"],
+                    # Keep report text on the original model, but allow drag/image fallback.
+                    "display_name": original_display_name,
+                    "display_name_link_text": display_name_link_text(
+                        original_display_name, drag_image_display_name
+                    ),
+                    "model_href": model_file_link_href(drag_image_display_name),
+                    "image_url": image_url,
+                    # Keep detail HTML lookup tied to the original model entry.
+                    "more_info_link": resolve_more_info_link(
+                        working_dir, original_display_name, more_info_index
+                    ),
+                    "file_list_id": safe_file_list_id(check_name, file_info.get("model") or ""),
+                    "category": description_data["category"],
+                    "pro_type": (file_info.get("pro_type") or "").strip().upper(),
+                }
+            )
 
     for check_index, (check, files) in enumerate(check_dict.items()):
         check_name = check.split(": ", 1)[1]
@@ -862,7 +931,7 @@ def create_html_report(
                 "why": description_data["why"],
                 "count": len(files),
                 "entity_word": _section_heading_entity_word(files),
-                "stat_type": "ERRORS" if "ERROR" in check else "WARNINGS",
+                "stat_type": _section_stat_type_from_dict_key(check),
                 "files": files,
             }
         )

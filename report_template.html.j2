@@ -82,11 +82,22 @@
             border-bottom: 1px solid #ccc;
             content-visibility: auto; contain-intrinsic-size: auto 320px;
         }
+        /* Information sections: only when Filter view is Show information. */
+        body:not([data-mq-view-filter="information"]) .check-section-wrapper[data-mq-section-stat="INFO"],
+        body:not([data-mq-view-filter="information"]) .sidebar-check-nav[data-mq-sidebar-stat="INFO"] { display: none !important; }
         /* View filters — CSS toggles rows/sections (no per-click walk of every issue row). */
         body[data-mq-view-filter="warning"] .check-section-wrapper[data-mq-section-stat="ERROR"],
-        body[data-mq-view-filter="warning"] .sidebar-check-nav[data-mq-sidebar-stat="ERROR"] { display: none !important; }
+        body[data-mq-view-filter="warning"] .check-section-wrapper[data-mq-section-stat="INFO"],
+        body[data-mq-view-filter="warning"] .sidebar-check-nav[data-mq-sidebar-stat="ERROR"],
+        body[data-mq-view-filter="warning"] .sidebar-check-nav[data-mq-sidebar-stat="INFO"] { display: none !important; }
         body[data-mq-view-filter="error"] .check-section-wrapper[data-mq-section-stat="WARNING"],
-        body[data-mq-view-filter="error"] .sidebar-check-nav[data-mq-sidebar-stat="WARNING"] { display: none !important; }
+        body[data-mq-view-filter="error"] .check-section-wrapper[data-mq-section-stat="INFO"],
+        body[data-mq-view-filter="error"] .sidebar-check-nav[data-mq-sidebar-stat="WARNING"],
+        body[data-mq-view-filter="error"] .sidebar-check-nav[data-mq-sidebar-stat="INFO"] { display: none !important; }
+        body[data-mq-view-filter="information"] .check-section-wrapper[data-mq-section-stat="WARNING"],
+        body[data-mq-view-filter="information"] .check-section-wrapper[data-mq-section-stat="ERROR"],
+        body[data-mq-view-filter="information"] .sidebar-check-nav[data-mq-sidebar-stat="WARNING"],
+        body[data-mq-view-filter="information"] .sidebar-check-nav[data-mq-sidebar-stat="ERROR"] { display: none !important; }
         body[data-mq-view-filter="flagged"] .file-row:not(:has(.mq-issue-row.flagged)) { display: none !important; }
         body[data-mq-view-filter="flagged"] .check-section-wrapper:not(:has(.file-row .mq-issue-row.flagged)) { display: none !important; }
         body[data-mq-view-filter="unflagged"] .file-row:has(.mq-issue-row.flagged) { display: none !important; }
@@ -430,14 +441,16 @@
         function statFiltersPresentInDom() {
             var warning = false;
             var error = false;
+            var info = false;
             var sections = document.getElementsByClassName('check-section-wrapper');
             for (var i = 0; i < sections.length; i++) {
                 var stat = sections[i].getAttribute('data-mq-section-stat') || '';
                 if (stat === 'WARNING') { warning = true; }
                 else if (stat === 'ERROR') { error = true; }
-                if (warning && error) { break; }
+                else if (stat === 'INFO') { info = true; }
+                if (warning && error && info) { break; }
             }
-            return { warning: warning, error: error };
+            return { warning: warning, error: error, info: info };
         }
 
         function mqSetFilterOptionVisible(opt, visible) {
@@ -467,11 +480,11 @@
             var wrap = document.getElementById('sidebar-filter-wrap');
             if (!sel) { return; }
             var present = statFiltersPresentInDom();
-            var hasIssues = present.warning || present.error;
+            var hasFilterable = present.warning || present.error || present.info;
             if (wrap) {
-                wrap.style.display = hasIssues ? '' : 'none';
+                wrap.style.display = hasFilterable ? '' : 'none';
             }
-            if (!hasIssues) {
+            if (!hasFilterable) {
                 sel.value = 'all';
                 document.body.removeAttribute('data-mq-view-filter');
                 mqSyncSidebarNav();
@@ -480,8 +493,10 @@
             }
             mqSetFilterOptionVisible(sel.querySelector('option[value="warning"]'), present.warning);
             mqSetFilterOptionVisible(sel.querySelector('option[value="error"]'), present.error);
+            mqSetFilterOptionVisible(sel.querySelector('option[value="information"]'), present.info);
             if ((sel.value === 'warning' && !present.warning) ||
-                (sel.value === 'error' && !present.error)) {
+                (sel.value === 'error' && !present.error) ||
+                (sel.value === 'information' && !present.info)) {
                 sel.value = 'all';
                 document.body.removeAttribute('data-mq-view-filter');
                 mqSyncSidebarNav();
@@ -528,9 +543,13 @@
         }
 
         function mqSectionMatchesFilter(wrapper, mode) {
-            if (!wrapper || mode === 'all' || isSortByIssueCountMode(mode)) { return true; }
-            if (mode === 'warning') { return wrapper.getAttribute('data-mq-section-stat') !== 'ERROR'; }
-            if (mode === 'error') { return wrapper.getAttribute('data-mq-section-stat') !== 'WARNING'; }
+            if (!wrapper) { return true; }
+            var stat = wrapper.getAttribute('data-mq-section-stat') || '';
+            if (stat === 'INFO' && mode !== 'information') { return false; }
+            if (mode === 'all' || isSortByIssueCountMode(mode)) { return true; }
+            if (mode === 'warning') { return stat === 'WARNING'; }
+            if (mode === 'error') { return stat === 'ERROR'; }
+            if (mode === 'information') { return stat === 'INFO'; }
             if (isCategoryFilterMode(mode)) { return wrapper.getAttribute('data-mq-category') === mode; }
             if (mode === 'flagged') { return wrapper.querySelector('.mq-issue-row.flagged') !== null; }
             if (mode === 'unflagged') { return wrapper.querySelector('.mq-issue-row:not(.flagged)') !== null; }
@@ -580,14 +599,59 @@
 
         var mqModelJumpTargets = null;
 
+        function mqModelJumpKey(modelName) {
+            return (modelName || '').toLowerCase();
+        }
+
+        function mqIsModelJumpRowVisible(row) {
+            if (!row || !document.body.contains(row)) { return false; }
+            var stat = (row.getAttribute('data-mq-stat') || '').toUpperCase();
+            var mode = document.body.getAttribute('data-mq-view-filter') || 'all';
+            if (stat === 'INFO' && mode !== 'information') { return false; }
+            if (mode === 'warning' && stat !== 'WARNING') { return false; }
+            if (mode === 'error' && stat !== 'ERROR') { return false; }
+            return row.offsetParent !== null;
+        }
+
+        function mqFindModelJumpTarget(modelName) {
+            var key = mqModelJumpKey(modelName);
+            if (!key) { return null; }
+            var rows = document.querySelectorAll('.file-list[data-mq-model]');
+            var fallback = null;
+            for (var i = 0; i < rows.length; i++) {
+                var row = rows[i];
+                if (mqModelJumpKey(row.getAttribute('data-mq-model')) !== key) { continue; }
+                var stat = (row.getAttribute('data-mq-stat') || '').toUpperCase();
+                if (stat === 'INFO') {
+                    if (!fallback) { fallback = row; }
+                    continue;
+                }
+                if (mqIsModelJumpRowVisible(row)) { return row; }
+            }
+            if (fallback && mqIsModelJumpRowVisible(fallback)) { return fallback; }
+            mqEnsureModelJumpIndex();
+            var cached = mqModelJumpTargets[key];
+            if (cached && mqIsModelJumpRowVisible(cached)) { return cached; }
+            return null;
+        }
+
         function mqEnsureModelJumpIndex() {
             if (mqModelJumpTargets) { return; }
             mqModelJumpTargets = Object.create(null);
             var rows = document.querySelectorAll('.file-list[data-mq-model]');
             for (var i = 0; i < rows.length; i++) {
-                var key = (rows[i].getAttribute('data-mq-model') || '').toLowerCase();
-                if (key && !mqModelJumpTargets[key]) {
-                    mqModelJumpTargets[key] = rows[i];
+                var row = rows[i];
+                var key = mqModelJumpKey(row.getAttribute('data-mq-model'));
+                if (!key) { continue; }
+                var stat = (row.getAttribute('data-mq-stat') || '').toUpperCase();
+                var existing = mqModelJumpTargets[key];
+                if (!existing) {
+                    mqModelJumpTargets[key] = row;
+                    continue;
+                }
+                var existingStat = (existing.getAttribute('data-mq-stat') || '').toUpperCase();
+                if (existingStat === 'INFO' && stat !== 'INFO') {
+                    mqModelJumpTargets[key] = row;
                 }
             }
         }
@@ -596,8 +660,7 @@
             if (!modelName) { return; }
             var mode = document.body.getAttribute('data-mq-view-filter') || 'all';
             if (mode !== 'all') { setViewFilterAll(); }
-            mqEnsureModelJumpIndex();
-            var target = mqModelJumpTargets[modelName.toLowerCase()];
+            var target = mqFindModelJumpTarget(modelName);
             if (!target || !document.body.contains(target)) { return; }
             if (target.id) {
                 window.location.hash = target.id;
@@ -1210,6 +1273,7 @@
             <option value="all" selected>Show all</option>
             <option value="warning">Show warnings</option>
             <option value="error">Show errors</option>
+            <option value="information">Show information</option>
             <option value="flagged">Show flagged</option>
             <option value="unflagged">Show unflagged</option>
             <option value="sort-by-count">Sort by issue count</option>
@@ -1238,7 +1302,7 @@
         {% for section in check_sections %}
         <li title="{{ section.category }}" class="sidebar-check-nav wrapper-{{ section.class }}"
             data-mq-section-id="wrapper-{{ section.class }}"
-            data-mq-sidebar-stat="{{ 'ERROR' if section.stat_type == 'ERRORS' else 'WARNING' }}"
+            data-mq-sidebar-stat="{{ 'ERROR' if section.stat_type == 'ERRORS' else ('INFO' if section.stat_type == 'INFO' else 'WARNING') }}"
             data-mq-category="{{ section.category | e }}">
             <a href="#{{ section.class }}">{{ section.name }} ({{ section.count }})</a>
         </li>
@@ -1259,12 +1323,12 @@
     {% for section in check_sections %}
     <a id="{{ section.class }}"></a>
     <div class="check-section-wrapper" id="wrapper-{{ section.class }}"
-         data-mq-section-stat="{{ 'ERROR' if section.stat_type == 'ERRORS' else 'WARNING' }}"
+         data-mq-section-stat="{{ 'ERROR' if section.stat_type == 'ERRORS' else ('INFO' if section.stat_type == 'INFO' else 'WARNING') }}"
          data-mq-category="{{ section.category | e }}"
          data-mq-check-name="{{ section.model_check_name | e }}">
         <div class="check-header">
             <div class="check-title">
-                <h2 id="{{ section.class }}"><span class="bold-text">{{ section.stat_type }}:</span> {{ section.count }} {{ section.entity_word }}{% if section.count != 1 %}s{% endif %} with {{ section.name }}</h2>
+                <h2 id="{{ section.class }}"><span class="bold-text">{% if section.stat_type == 'INFO' %}INFORMATION{% elif section.stat_type == 'ERRORS' %}ERRORS{% else %}WARNINGS{% endif %}:</span> {{ section.count }} {{ section.entity_word }}{% if section.count != 1 %}s{% endif %} with {{ section.name }}</h2>
                 <p><strong>Category:</strong> {{ section.category }}</p>
                 <p>{{ section.description }}</p>
                 <div class="why">{{ section.why | safe }}</div>
@@ -1298,7 +1362,7 @@
                     <span class="dimmed-button" title="No matching ModelCHECK detail HTML (*.P.html / *.A.html / *.D.html) found in this folder.">No detail file</span>
                     {% endif %}
                 </p>
-                <p class="mq-issue-desc">{% if file.stat == 'ERROR' %}<img class="mq-stat-icon" src="msgs_error.png" alt="ERROR" width="16" height="16">{% else %}<img class="mq-stat-icon" src="msgs_warning.png" alt="WARNING" width="16" height="16">{% endif %}<span>{{ file.desc | e }}</span></p>
+                <p class="mq-issue-desc">{% if file.stat == 'ERROR' %}<img class="mq-stat-icon" src="msgs_error.png" alt="ERROR" width="16" height="16">{% elif file.stat == 'WARNING' %}<img class="mq-stat-icon" src="msgs_warning.png" alt="WARNING" width="16" height="16">{% elif file.stat == 'INFO' %}<img class="mq-stat-icon" src="msgs_info.png" alt="INFO" width="16" height="16">{% endif %}<span>{{ file.desc | e }}</span></p>
                 <p>{{ file.condensed_msg | e }}</p>
                 {% if file.duplicate_models_detail_html %}
                 {{ file.duplicate_models_detail_html | safe }}

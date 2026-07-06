@@ -62,6 +62,7 @@ If you are using relative accuracy, you must consider the bounding box diagonal 
         <ModelCheckOptions>YN N N N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Buried Features</Name>
@@ -110,6 +111,7 @@ Note that sometimes unattached features are acceptable, because later features c
         <ModelCheckOptions>YNEW Y Y E E Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Cosmetic Features</Name>
@@ -119,6 +121,7 @@ Note that sometimes unattached features are acceptable, because later features c
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Cylinder Cuts/Slots</Name>
@@ -146,6 +149,7 @@ Note that sometimes unattached features are acceptable, because later features c
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
+        <info_check>Y</info_check>
         <why><![CDATA[
 <p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/datums.html" target="_HELP">Help on this topic...</a></p>
 ]]></why>
@@ -170,6 +174,7 @@ Note that sometimes unattached features are acceptable, because later features c
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
+        <info_check>Y</info_check>
         <why><![CDATA[
 <p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/datums.html" target="_HELP">Help on this topic...</a></p>
 ]]></why>
@@ -206,6 +211,7 @@ Note that sometimes unattached features are acceptable, because later features c
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Coordinate Systems Information</Name>
@@ -215,6 +221,7 @@ Note that sometimes unattached features are acceptable, because later features c
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Datum Curves Information</Name>
@@ -224,6 +231,7 @@ Note that sometimes unattached features are acceptable, because later features c
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Datum Planes Information</Name>
@@ -233,6 +241,7 @@ Note that sometimes unattached features are acceptable, because later features c
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Datum Points Information</Name>
@@ -242,6 +251,7 @@ Note that sometimes unattached features are acceptable, because later features c
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Duplicate Models</Name>
@@ -375,6 +385,7 @@ Layers can only organize view items such as datums, surface quilts, and componen
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>File Size</Name>
@@ -384,6 +395,7 @@ Layers can only organize view items such as datums, surface quilts, and componen
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Freeform Features</Name>
@@ -393,6 +405,7 @@ Layers can only organize view items such as datums, surface quilts, and componen
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Family Table Default Values</Name>
@@ -402,6 +415,7 @@ Layers can only organize view items such as datums, surface quilts, and componen
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Feature Template Standard Parameters</Name>
@@ -448,6 +462,7 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Hole Diameters</Name>
@@ -466,6 +481,7 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckOptions>YN Y Y N Y Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Imported Features</Name>
@@ -514,6 +530,7 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckOptions>YNEW Y Y W W Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
+        <info_check>Y</info_check>
         <why><![CDATA[
 <p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/layer.html" target="_HELP">Help on this topic...</a></p>
 ]]></why>
@@ -542,6 +559,7 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckOptions>YNEW Y Y W W Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
+        <info_check>Y</info_check>
         <why>Layers are used in models and drawings to control which view items are displayed. Models and drawings with many pieces of information can be difficult to work with if all of the information is turned on at the same time. By organizing view items into different layers, you can select which layers are displayed, hidden, or isolated so you can focus on the desired information.
             Understanding the number of layers in your models and the occurrence of layers without entities is a good starting point for assessing how effectively you are using layers. A high level view of how layers are being used is also helpful for very specialized types of CAD data conversion projects.
             Note: Layers can only organize view items such as datums, surface quilts, and components. The hiding or isolation of specific features within a part’s solid or within a surface’s quilt is not possible with layers. Instead, simplified representations should be created to control the presence of specific features.
@@ -558,6 +576,7 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckOptions>YNEW Y Y W W Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
+        <info_check>Y</info_check>
         <why>Layers are used in models and drawings to control which view items are displayed. Models and drawings with many pieces of information can be difficult to work with if all of the information is turned on at the same time. By organizing view items into different layers, you can select which layers are displayed, hidden, or isolated so you can focus on the desired information.
             Understanding the number of layers in your models and the occurrence of layers without entities is a good starting point for assessing how effectively you are using layers. A high level view of how layers are being used is also helpful for very specialized types of CAD data conversion projects.
             Note: Layers can only organize view items such as datums, surface quilts, and components. The hiding or isolation of specific features within a part’s solid or within a surface’s quilt is not possible with layers. Instead, simplified representations should be created to control the presence of specific features.
@@ -574,6 +593,7 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
         <why>Layers are used in models and drawings to control which view items are displayed. Models and drawings with many pieces of information can be difficult to work with if all of the information is turned on at the same time. By organizing view items into different layers, you can select which layers are displayed, hidden, or isolated so you can focus on the desired information.
             Understanding the number of layers in your models and the occurrence of layers without entities is a good starting point for assessing how effectively you are using layers. A high level view of how layers are being used is also helpful for very specialized types of CAD data conversion projects.
             Note: Layers can only organize view items such as datums, surface quilts, and components. The hiding or isolation of specific features within a part’s solid or within a surface’s quilt is not possible with layers. Instead, simplified representations should be created to control the presence of specific features.
@@ -590,6 +610,7 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
+        <info_check>Y</info_check>
         <why><![CDATA[
 <p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/layer.html" target="_HELP">Help on this topic...</a></p>
 ]]></why>
@@ -602,6 +623,7 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckOptions>YNEW Y Y W W Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
+        <info_check>Y</info_check>
         <why><![CDATA[
 <p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/layer.html" target="_HELP">Help on this topic...</a></p>
 ]]></why>
@@ -614,6 +636,7 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckOptions>YNEW Y Y W W Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
         <why>Layers are used in models and drawings to control which view items are displayed. Models and drawings with many pieces of information can be difficult to work with if all of the information is turned on at the same time. By organizing view items into different layers, you can select which layers are displayed, hidden, or isolated so you can focus on the desired information.
             Understanding the number of layers in your models and the occurrence of layers without entities is a good starting point for assessing how effectively you are using layers. A high level view of how layers are being used is also helpful for very specialized types of CAD data conversion projects.
             Note: Layers can only organize view items such as datums, surface quilts, and components. The hiding or isolation of specific features within a part’s solid or within a surface’s quilt is not possible with layers. Instead, simplified representations should be created to control the presence of specific features.
@@ -630,6 +653,7 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Lower Tolerance Limits</Name>
@@ -657,6 +681,7 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Merged or Cutout Features</Name>
@@ -678,6 +703,7 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Model Naming</Name>
@@ -696,6 +722,7 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Named Features</Name>
@@ -705,6 +732,7 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Overall Size</Name>
@@ -714,6 +742,7 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Parameter Information</Name>
@@ -723,6 +752,7 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Required Parameter Notes</Name>
@@ -732,6 +762,7 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Unacceptable Parameter Notes</Name>
@@ -741,6 +772,7 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Parameter Renaming</Name>
@@ -750,6 +782,7 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckOptions>YNEW Y Y N Y Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Parameter Spelling</Name>
@@ -760,6 +793,7 @@ Since an issue may propagate through the associative chain of references between
         <why>Incorrect parameter spelling in a model can lead to significant problems, such as misinterpretation of design intent, errors in calculations or automated processes, and increased difficulty in maintaining and updating the model, all of which can compromise the overall integrity and functionality of the design.</why>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Unused Parameters</Name>
@@ -783,6 +817,7 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckOptions>YNEW Y Y N W Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Datum Planes without Children</Name>
@@ -816,6 +851,7 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckOptions>YNEW Y Y W W Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Incomplete References</Name>
@@ -834,6 +870,7 @@ Since an issue may propagate through the associative chain of references between
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Regeneration Errors</Name>
@@ -924,6 +961,7 @@ Retrieval and regeneration issues in models with family tables are more serious 
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Missing Relations</Name>
@@ -953,6 +991,7 @@ Retrieval and regeneration issues in models with family tables are more serious 
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Round Child Features</Name>
@@ -976,6 +1015,7 @@ Retrieval and regeneration issues in models with family tables are more serious 
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Sharp Edges</Name>
@@ -1062,6 +1102,7 @@ When a model has small geometry, the equivalent absolute accuracy should be two 
         <why>Incorrect Y-factor values in sheet metal parts can lead to inaccuracies in bend allowances, resulting in incorrect part dimensions and potential manufacturing errors. Ensuring the Y-factor is correctly defined is crucial for maintaining the precision and functionality of the final product.</why>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Simplified Representation Information</Name>
@@ -1069,6 +1110,7 @@ When a model has small geometry, the equivalent absolute accuracy should be two 
         <Description>Checks and reports information related to simplified representations used within the model or assembly. Simplified representations are commonly used to improve performance, reduce memory usage, simplify large assemblies, and control which components or features are displayed for different design, review, manufacturing, or simulation purposes. Improperly managed simplified representations can lead to missing geometry, incomplete assemblies, incorrect downstream exports, and confusion during collaboration or manufacturing processes. This check helps ensure that simplified representations are properly defined, named, and maintained according to company standards. Simplified representation naming and configuration rules are typically managed in the start.mcs file using PRT_SIMPREP_NAME and related entries, while check behavior and reporting are controlled by the SIMPREP_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>SIMPREP_INFO</ModelCheckName>
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <info_check>Y</info_check>
         <why>Incorrectly defined or unused simplified representations in a model can cause misunderstandings, inaccuracies, and inefficiencies during the design process. Properly managing simplified representations helps organize work in large assemblies, reduces excess regeneration, and ensures clarity, accuracy, and efficiency in the design and review stages.
 <![CDATA[
 <p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/simprep.html" target="_HELP">Help on this topic...</a></p>
@@ -1118,6 +1160,7 @@ Imported sketch geometry can lead to many sketched entities. Even if you have to
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
+        <info_check>Y</info_check>
         <why><![CDATA[
 <p><a href="https://support.ptc.com/help/creo/creo_pma/r13/usascii/index.html#page/model_analysis/modelcheck/sla.html" target="_HELP">Help on this topic...</a></p>
 ]]></why>
@@ -1191,6 +1234,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Unit Length</Name>
@@ -1200,6 +1244,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Unit Mass</Name>
@@ -1218,6 +1263,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Cross-Section Information</Name>
@@ -1227,6 +1273,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>External Dependencies</Name>
@@ -1260,6 +1307,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Missing Standard Notes</Name>
@@ -1269,6 +1317,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <!-- DRAWING REPORT CONFIGURATION -->
     <Check>
@@ -1312,6 +1361,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YNEW Y Y N E Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Drawing Parameters</Name>
@@ -1366,7 +1416,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <Category>MBD Readiness</Category>
         <Description>Checks for annotations that are not associated with or attached to specific model surfaces or geometry references. Annotations without valid surface references may indicate incomplete Model-Based Definition (MBD) practices, broken annotation associations, improperly placed dimensions, or unclear manufacturing and inspection requirements. Unreferenced annotations can create ambiguity during design review, manufacturing, quality inspection, and downstream interpretation of the model, increasing the risk of errors and inconsistent documentation. This check helps ensure that annotations remain properly connected to the intended geometry and accurately communicate design intent according to company MBD and drafting standards. Annotation association requirements and related documentation practices are typically configured through Creo annotation settings and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the ANNTN_MISSING_SURF_REF settings in the check.mch configuration file.</Description>
         <ModelCheckName>ANNTN_MISSING_SURF_REF</ModelCheckName>
-        <ModelCheckOptions>YNEW W E N W Y</ModelCheckOptions>
+        <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>            
     </Check>
@@ -1400,6 +1450,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Models Used in Drawing</Name>
@@ -1409,6 +1460,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YN Y Y Y N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Note Case</Name>
@@ -1418,6 +1470,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YNEW Y Y N W Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Note Font</Name>
@@ -1427,6 +1480,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Note Height</Name>
@@ -1436,6 +1490,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Note Information</Name>
@@ -1445,6 +1500,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Note Spelling</Name>
@@ -1454,6 +1510,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YNEW Y Y N E Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Title Spelling</Name>
@@ -1463,6 +1520,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YNEW Y Y N E Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Symbol Spelling</Name>
@@ -1472,6 +1530,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Unacceptable Notes</Name>
@@ -1481,6 +1540,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Number of Drawing Sheets</Name>
@@ -1490,6 +1550,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Overlapping Information</Name>
@@ -1538,6 +1599,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Standard Detail Setup</Name>
@@ -1547,6 +1609,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Symbol Information</Name>
@@ -1556,6 +1619,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Table Cell Information</Name>
@@ -1565,6 +1629,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Title Information</Name>
@@ -1574,6 +1639,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Unused Models</Name>
@@ -1614,6 +1680,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Assembly Features</Name>
@@ -1623,6 +1690,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Bulk Items</Name>
@@ -1680,6 +1748,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <ModelCheckOptions>YN Y Y Y Y Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Suppressed Components</Name>
@@ -1716,6 +1785,7 @@ If the suppressed features are no longer needed, then they should be removed bef
         <ModelCheckOptions>YN Y Y Y Y Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Circular References</Name>
@@ -2085,6 +2155,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>N</display>
         <enabled>N</enabled>
+        <info_check>Y</info_check>
         <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
@@ -2123,7 +2194,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Category>MBD Readiness</Category>
         <Description>Checks for annotations in the model or drawing that are currently inactive, suppressed, or not visible in the active display state. Inactive annotations may still exist in the model database but are not contributing to the current documentation, which can lead to incomplete communication of design intent, missed manufacturing requirements, or confusion during review and downstream processes. These conditions often arise from combination states, display configurations, legacy annotation practices, or incomplete cleanup of outdated annotation data. This check helps ensure that all required annotations are active, visible where intended, and properly contributing to the model-based definition or drawing. Annotation activation and display rules are typically managed through Creo annotation settings and ModelCHECK MBD/drafting configuration files, while check behavior and reporting are controlled by the ANNTN_INACTIVE settings in the check.mch configuration file.</Description>
         <ModelCheckName>ANNTN_INACTIVE</ModelCheckName>
-        <ModelCheckOptions>YNEW W E N Y Y</ModelCheckOptions>
+        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
     </Check>
@@ -2411,6 +2482,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <ModelCheckOptions>YN N N N Y Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
+        <info_check>Y</info_check>
     </Check>
 
     <Check>
@@ -2421,6 +2493,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <ModelCheckOptions>YN Y Y N Y Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
+        <info_check>Y</info_check>
     </Check>
 
     <Check>
@@ -2489,6 +2562,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <ModelCheckOptions>YN Y Y N Y Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
+        <info_check>Y</info_check>
     </Check>
 
     <Check>
@@ -2499,6 +2573,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <ModelCheckOptions>YN Y Y N Y Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
+        <info_check>Y</info_check>
     </Check>
 
     <Check>
@@ -2509,6 +2584,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <ModelCheckOptions>YN Y Y N Y Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
+        <info_check>Y</info_check>
     </Check>
 
     <Check>
@@ -2516,9 +2592,10 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Category>Consistency</Category>
         <Description>Checks whether standard views defined by company drawing or model templates are present in the model or drawing and ensures they conform to predefined view creation settings. Standard views typically include default orientations such as front, top, right, isometric, and other required engineering or manufacturing views that support consistent documentation and downstream usage. Missing or inconsistent views can lead to incomplete drawings, reduced clarity, and errors in manufacturing, inspection, and communication. Although this check can also be configured to automatically generate missing views, its primary purpose is validation against company standards to ensure consistency and completeness of view definitions. View creation rules and standard view definitions are typically managed through Creo drawing setup files and ModelCHECK configuration settings, while check behavior and reporting are controlled by the CREATE_VIEW settings in the check.mch configuration file.</Description>
         <ModelCheckName>CREATE_VIEW</ModelCheckName>
-        <ModelCheckOptions>YN N N N Y Y</ModelCheckOptions>
+        <ModelCheckOptions>YN Y Y N Y Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
+        <info_check>Y</info_check>
     </Check>
 
     <Check>
@@ -2539,6 +2616,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <ModelCheckOptions>YN Y Y N Y Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
+        <info_check>Y</info_check>
     </Check>
 
     <!-- NEWLY FOUND -->
@@ -2571,6 +2649,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <ModelCheckOptions>YN Y Y N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
+        <info_check>Y</info_check>
     </Check>
 
     <Check>
@@ -2591,6 +2670,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <ModelCheckOptions>YN Y Y N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
+        <info_check>Y</info_check>
     </Check>
 
     <Check>
@@ -2611,6 +2691,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <ModelCheckOptions>YN Y Y N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
+        <info_check>Y</info_check>
     </Check>
 
     <Check>

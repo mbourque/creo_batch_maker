@@ -2,85 +2,131 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-06 — v1.11.69
+
+- **Report**: checks marked `<info_check>Y</info_check>` in `model_checks.xml` with `INFO` results appear as **Information** sections; **Filter view > Show information** (excluded from score and issue counts).
+
+
+
 ## 2026-07-06 — v1.11.59
 
 - **Report**: **Filter view** is hidden when there are no warnings or errors left.
+
+
 
 ## 2026-07-06 — v1.11.58
 
 - **Report**: **Filter view** hides **Show warnings** or **Show errors** when that severity has no issues.
 
+
+
 ## 2026-07-05 — v1.11.57
 
 - **Packaging**: PyInstaller spec updated for `update_start_from_xml` (Scan Templates → `start.mcs` in the built exe).
+
+
 
 ## 2026-07-05 — v1.11.56
 
 - **Configuration → Start…** opens `configs\start.mcs` in Notepad (replaces **Defaults…**).
 
+
+
 ## 2026-07-05 — v1.11.55
 
 - **Maintenance**: renamed `update_sample_start_from_xml.py` to `update_start_from_xml.py` (same behavior; updates `start.mcs`).
+
+
 
 ## 2026-07-05 — v1.11.54
 
 - **Settings → Model Checks…** opens `configs\templates\checks.mch` (was `default_checks.mch`).
 
+
+
 ## 2026-07-05 — v1.11.53
 
 - **Scan Templates**: template XML is merged into `configs\start.mcs` (renamed from `sample_start.mcs`).
+
+
 
 ## 2026-07-05 — v1.11.52
 
 - Dialogs (warnings, pause, settings, About, and similar) open centered on the main window instead of the screen corner.
 
+
+
 ## 2026-07-05 — v1.11.51
 
 - **File → Pause**: **Resume** warns if Creo (**xtop**) is still running and keeps the pause dialog open until you quit Creo.
+
+
 
 ## 2026-07-04 — v1.11.50
 
 - **File → Pause**: first dialog asks you to wait for the current chunk; a second dialog appears when it is safe to use interactive Creo (**Resume** / **Stop**).
 
+
+
 ## 2026-07-04 — v1.11.49
 
 - **File → Pause**: dialog updates when the batch is actually held (green **safe to use interactive Creo**), not only when Pause is clicked.
+
+
 
 ## 2026-07-04 — v1.11.48
 
 - **File → Pause**: pause Scan Templates, ModelCHECK, or Thumbnails after the current chunk (writes `creo-batch-pause.requested`); dialog offers **Resume** or **Stop**. Blocks automatic mode until you resume or stop.
 
+
+
 ## 2026-07-04 — v1.11.47
 
 - **Report → Statistics**: **Files scanned** renamed to **Models scanned**.
+
+
 
 ## 2026-07-04 — v1.11.46
 
 - **Report**: **Files scanned** moved from **Score** to **Statistics**, under **Last saved by**.
 
+
+
 ## 2026-07-04 — v1.11.45
 
 - **Report → Statistics**: **Total size of scanned models** sums each model’s `FILE_SIZE` (bytes) and shows MB or GB.
+
+
 
 ## 2026-07-04 — v1.11.44
 
 - **GO**: if Creo (**xtop**) is already running, a warning asks you to quit Creo and the batch does not start.
 
+
+
 ## 2026-07-03 — v1.11.43
 
 - **Report → Statistics**: **Users** renamed to **Last saved by**.
+
+
 
 ## 2026-07-03 — v1.11.41
 
 - **Report → Statistics**: **Users** list is right-aligned like the other statistic values.
 
+
+
 ## 2026-07-03 — v1.11.40
 
 - **Report → Statistics**: **Users** list is plain text (normal weight, wraps at spaces).
 
+
+
 ## 2026-07-03 — v1.11.39
 
 - **Report → Statistics**: **Users** list wraps across lines and uses normal (not bold) weight.
+
+
 
 ## 2026-07-03 — v1.11.38
 
