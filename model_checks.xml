@@ -863,9 +863,9 @@ Since an issue may propagate through the associative chain of references between
         <enabled>Y</enabled>         
     </Check>
     <Check>
-        <Name>Required Features</Name>
+        <Name>Resumed Features</Name>
         <Category>Model Integrity</Category>
-        <Description>Checks whether required or expected features are present and properly defined within the model. Required features may include standard construction geometry, manufacturing features, reference features, or company-specific design elements necessary for model consistency, functionality, and downstream processes. Missing required features can weaken design intent, reduce model usability, create manufacturing or assembly issues, and lead to incomplete or noncompliant models. Feature requirements are typically configured in the start.mcs file using standard feature definitions and related configuration entries, while check behavior and reporting are controlled by the REG_FEATURES settings in the check.mch configuration file.</Description>
+        <Description>Reports the number of resumed (active) features in the model. Suppressed features are excluded from the count. This is an informational metric that provides an indication of model size and feature complexity for reporting, analysis, and quality metrics. REG_FEATURES does not verify the presence of required features or compare the model against company standards defined in the start.mcs file; it simply reports the total number of active features.</Description>
         <ModelCheckName>REG_FEATURES</ModelCheckName>
         <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
@@ -2566,7 +2566,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
 
     <Check>
-        <Name>Sheetmetal Feature Bend Table</Name>
+        <Name>Sheet Metal Feature Bend Table</Name>
         <Category>Consistency</Category>
         <Description>Checks whether the sheet metal bend table used for flat pattern generation in sheet metal parts adheres to predefined company standards and manufacturing requirements. The bend table defines critical parameters such as bend allowances, K-factors, and material-specific deformation behavior, which directly affect the accuracy of flat patterns used for manufacturing and downstream processes. Incorrect or nonstandard bend table definitions can lead to inaccurate flat patterns, forming issues, incorrect part dimensions, and manufacturing defects. This check helps ensure that sheet metal bend tables are correctly defined, consistent, and aligned with approved engineering and manufacturing standards. Bend table definitions and sheet metal rule settings are typically managed through Creo sheet metal configuration files and ModelCHECK settings, while check behavior and reporting are controlled by the SHTMTL_FBENDTAB settings in the check.mch configuration file..</Description>
         <ModelCheckName>SHTMTL_FBENDTAB</ModelCheckName>
@@ -2577,7 +2577,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
 
     <Check>
-        <Name>Sheetmetal K Factor</Name>
+        <Name>Sheet Metal K Factor</Name>
         <Category>Consistency</Category>
         <Description>Checks whether the K-factor used in sheet metal parts is correctly defined and complies with predefined company standards and manufacturing guidelines. The K-factor controls how sheet metal material stretches during bending and directly affects bend allowance, flat pattern accuracy, and final part dimensions. Incorrect or inconsistent K-factor values can lead to inaccurate flat patterns, assembly fit issues, forming defects, and downstream manufacturing and inspection problems. This check helps ensure that sheet metal K-factor values are consistent, properly defined, and aligned with approved material and process standards. K-factor definitions and sheet metal rules are typically managed through Creo sheet metal configuration settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the SHTMTL_KFACTOR settings in the check.mch configuration file.</Description>
         <ModelCheckName>SHTMTL_KFACTOR</ModelCheckName>

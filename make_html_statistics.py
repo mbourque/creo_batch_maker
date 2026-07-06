@@ -531,7 +531,7 @@ PERFORMANCE_TABLE_ROWS: list[tuple[str, str | None]] = [
     ("Parts", "_PART_COUNT"),
     ("Assemblies", "_ASSEMBLY_COUNT"),
     ("Drawings", "_DRAWING_COUNT"),
-    ("Sheetmetal parts", "_SHEETMETAL_PARTS"),
+    ("Sheet metal parts", "_SHEETMETAL_PARTS"),
     ("Multibody parts", "_MULTIBODY_PARTS"),
     ("Skeleton parts", "_SKELETON_MODELS"),
     ("Bulk parts", "_BULK_PARTS"),
