@@ -528,6 +528,7 @@ PERFORMANCE_TABLE_ROWS: list[tuple[str, str | None]] = [
     ("Scan date", "_SCAN_DATE"),
     ("Last saved by", "_USERS"),
     ("Models scanned", "_FILES_SCANNED"),
+    ("Total size of scanned models", "_TOTAL_SCANNED_SIZE"),
     ("Parts", "_PART_COUNT"),
     ("Assemblies", "_ASSEMBLY_COUNT"),
     ("Drawings", "_DRAWING_COUNT"),
@@ -535,7 +536,7 @@ PERFORMANCE_TABLE_ROWS: list[tuple[str, str | None]] = [
     ("Multibody parts", "_MULTIBODY_PARTS"),
     ("Skeleton parts", "_SKELETON_MODELS"),
     ("Bulk parts", "_BULK_PARTS"),
-    ("Total size of scanned models", "_TOTAL_SCANNED_SIZE"),
+    ("Non solid parts", "_NON_SOLID_PARTS"),
     ("Total components in all assemblies", "NUM_COMPONENTS"),
     ("Number of unique models", "UNQ_COMPONENTS"),
     ("Duplicate models", "_DUPLICATE_MODELS"),
@@ -569,6 +570,7 @@ class PerformanceMetrics:
     skeleton_models: int = 0
     duplicate_models: int = 0
     bulk_parts: int = 0
+    non_solid_parts: int = 0
     fixed_components: int = 0
     suppressed_components: int = 0
     files_seen: int = 0
@@ -719,6 +721,32 @@ def _is_sheetmetal_part(file_element: ET.Element) -> bool:
     return _find_check(file_element, "SHTMTL_THICK") is not None
 
 
+def _body_info_item_state(info2: str) -> str | None:
+    """``BODY_INFO`` ``info2`` tail after ``:`` is ``Type/State/Construction``."""
+    text = (info2 or "").strip()
+    if ":" in text:
+        text = text.split(":", 1)[1].strip()
+    parts = [part.strip() for part in text.split("/")]
+    if len(parts) < 2:
+        return None
+    return parts[1]
+
+
+def _is_non_solid_part(file_element: ET.Element) -> bool:
+    """True when every ``BODY_INFO`` body row has State ``No Geometry``."""
+    check = _find_check(file_element, "BODY_INFO")
+    if check is None or _check_hidden_from_report(check):
+        return False
+    items = check.findall("item")
+    if not items:
+        return False
+    for item in items:
+        state = _body_info_item_state(item.findtext("info2") or "")
+        if not state or state.casefold() != "no geometry":
+            return False
+    return True
+
+
 def _file_size_bytes_from_element(file_element: ET.Element) -> int | None:
     """``FILE_SIZE`` check ``<ans>`` is size in bytes when it is all digits."""
     check = _find_check(file_element, "FILE_SIZE")
@@ -813,6 +841,8 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
                 metrics.sheetmetal_parts += 1
             if _is_multibody_part(file_element):
                 metrics.multibody_parts += 1
+            if _is_non_solid_part(file_element):
+                metrics.non_solid_parts += 1
         elif pro_type == "ASM":
             metrics.assembly_count += 1
             metrics.total_num_components += _parse_int_metric(_check_ans_text(file_element, "NUM_COMPONENTS")) or 0
@@ -883,6 +913,7 @@ def performance_metrics_answers(metrics: PerformanceMetrics) -> dict[str, str]:
         "_SKELETON_MODELS": str(metrics.skeleton_models),
         "_DUPLICATE_MODELS": str(metrics.duplicate_models),
         "_BULK_PARTS": str(metrics.bulk_parts),
+        "_NON_SOLID_PARTS": str(metrics.non_solid_parts),
         "_TOTAL_SCANNED_SIZE": _format_total_scanned_size(metrics.total_scanned_bytes),
         "_FIXED_COMPONENTS": str(metrics.fixed_components),
         "_SUPPRESSED_COMPONENTS": str(metrics.suppressed_components),
@@ -953,6 +984,9 @@ def _resolve_performance_value(answers: dict[str, str], key: str | None) -> tupl
     if key == "_BULK_PARTS":
         val = answers.get(key)
         return (val if val is not None else "—", "BULK_ITEMS")
+    if key == "_NON_SOLID_PARTS":
+        val = answers.get(key)
+        return (val if val is not None else "—", "BODY_INFO")
     val = answers.get(key)
     if val is None:
         return ("—", key)

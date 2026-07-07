@@ -2,6 +2,14 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-07 — v1.11.80
+
+- **Report → Statistics**: **Total size of scanned models** is listed directly under **Models scanned**.
+
+## 2026-07-07 — v1.11.79
+
+- **Report → Statistics**: **Non solid parts** row (under **Bulk parts**) counts parts whose `BODY_INFO` bodies all have **No Geometry**.
+
 ## 2026-07-07 — v1.11.78
 
 - **Report**: information sections have no **Flag** or **Remove** buttons (they do not work with the issue filters).
