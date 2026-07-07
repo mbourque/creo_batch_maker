@@ -124,7 +124,7 @@ Note that sometimes unattached features are acceptable, because later features c
         <info_check>Y</info_check>
     </Check>
     <Check>
-        <Name>Cylinder Cuts/Slots</Name>
+        <Name>Cylinder Cuts and Slots</Name>
         <Category>Model Integrity</Category>
         <Description>Checks for slot or cut features that could be more appropriately modeled as standard cylindrical holes. Using proper hole features instead of manually created cylindrical cuts or slot geometry improves model clarity, manufacturing consistency, hole table support, downstream automation, and compatibility with machining and CAM processes. Nonstandard cut geometry may reduce feature recognition, complicate manufacturing documentation, and make models more difficult to maintain or modify. This check helps encourage the use of standard hole definitions and cleaner modeling practices where appropriate. Hole standards and related geometry definitions are typically configured through ModelCHECK configuration files and external hole definition tables, while check behavior and reporting are controlled by the CYL_CUT_SLOTS settings in the check.mch configuration file.</Description>
         <ModelCheckName>CYL_CUT_SLOTS</ModelCheckName>
@@ -155,7 +155,7 @@ Note that sometimes unattached features are acceptable, because later features c
 ]]></why>
     </Check>
     <Check>
-        <Name>Undefined Material Density</Name>
+        <Name>Undefined Model Density</Name>
         <Category>Consistency</Category>
         <Description>Checks whether materials assigned to the model contain valid and properly defined density values used for mass property calculations and downstream analysis. Accurate material density is critical for correct weight calculations, center of gravity results, simulation accuracy, structural analysis, manufacturing estimates, and BOM data. Missing, incorrect, or unrealistic density values can lead to inaccurate mass properties, poor engineering decisions, and downstream manufacturing or performance issues. This check helps ensure that all assigned materials contain appropriate density definitions that comply with company and engineering standards. Material assignments and approved material definitions are typically managed through Creo material libraries and ModelCHECK material settings, while check behavior and reporting are controlled by the DEF_DENSITY settings in the check.mch configuration file.</Description>
         <ModelCheckName>DEF_DENSITY</ModelCheckName>
@@ -263,7 +263,7 @@ Note that sometimes unattached features are acceptable, because later features c
         <enabled>Y</enabled>         
     </Check>
     <Check>
-        <Name>Early Chamfer Features</Name>
+        <Name>Early Chamfers</Name>
         <Category>Model Integrity</Category>
         <Description>Checks for chamfer features that are created too early in the model feature tree before the primary geometry is fully defined. Chamfers are typically finishing features that should be added later in the modeling process after major geometry, functional features, and design intent have been established. Creating chamfers too early can weaken parent-child relationships, increase regeneration instability, complicate future modifications, and cause downstream features to fail when geometry changes occur. This check helps encourage stronger and more maintainable modeling practices by promoting proper feature order and model structure. Check behavior and reporting are controlled by the EARLY_CHAMFER settings in the check.mch configuration file.</Description>
         <ModelCheckName>EARLY_CHAMFER</ModelCheckName>
@@ -303,7 +303,7 @@ Note that sometimes unattached features are acceptable, because later features c
         </why>
     </Check>
     <Check>
-        <Name>Early Round Features</Name>
+        <Name>Early Rounds</Name>
         <Category>Model Integrity</Category>
         <Description>Checks for round or fillet features that are created too early in the model feature tree before the primary geometry and core design intent are fully established. Rounds are typically finishing features added later in the modeling process after major geometry, functional features, and manufacturing-critical elements have been completed. Creating rounds too early can weaken parent-child relationships, increase regeneration instability, complicate future modifications, and cause downstream features to fail when geometry changes occur. This check helps encourage more robust and maintainable modeling practices by promoting proper feature sequencing and stable model structure. Check behavior and reporting are controlled by the EARLY_ROUND settings in the check.mch configuration file.</Description>
         <ModelCheckName>EARLY_ROUND</ModelCheckName>
@@ -338,7 +338,7 @@ If you feel an edge reference is appropriate and necessary:
         <enabled>Y</enabled>         
     </Check>
     <Check>
-        <Name>Extra Layers</Name>
+        <Name>Non-Start-Part Layers</Name>
         <Category>Consistency</Category>
         <Description>Checks for layers that exist in the model but are not part of the approved company layer structure or start model standards. Extra or unnecessary layers can reduce model organization, create confusion, complicate visibility management, and make models more difficult to maintain and standardize across projects and teams. Uncontrolled layers may also interfere with downstream drawing, manufacturing, data exchange, and automation workflows. This check helps ensure that only approved layers are used and that models remain clean, organized, and compliant with company standards. Approved layer definitions are typically configured in the start.mcs file using PRT_LAYER, ASM_LAYER, DRW_LAYER, PRT_LAYER_UNWANTED, ASM_LAYER_UNWANTED, and related entries, while check behavior and reporting are controlled by the EXTRA_LAYERS settings in the check.mch configuration file.</Description>
         <ModelCheckName>EXTRA_LAYERS</ModelCheckName>
@@ -427,7 +427,7 @@ Layers can only organize view items such as datums, surface quilts, and componen
         <enabled>Y</enabled>         
     </Check>
     <Check>
-        <Name>Geometric Checks</Name>
+        <Name>Geom Checks</Name>
         <Category>Geometry Quality</Category>
         <Description>Checks the model for geometric errors, invalid geometry, and conditions that may affect regeneration, manufacturability, simulation accuracy, or downstream data exchange. Geometric problems can include failed surfaces, gaps, overlaps, self-intersecting geometry, sliver surfaces, inconsistent topology, imported geometry defects, and other conditions that weaken model integrity and stability. Poor geometric quality can lead to regeneration failures, machining issues, inaccurate mass properties, failed simulations, export problems, and manufacturing defects. This check helps identify geometry that may require repair, simplification, or cleanup to ensure robust and reliable model behavior. Geometry quality limits and related standards are typically configured through the constant.mcn file and other ModelCHECK geometry configuration settings, while check behavior and reporting are controlled by the GEOM_CHECKS settings in the check.mch configuration file.</Description>
         <ModelCheckName>GEOM_CHECKS</ModelCheckName>
@@ -505,7 +505,7 @@ Since an issue may propagate through the associative chain of references between
         <enabled>Y</enabled>         
     </Check>
     <Check>
-        <Name>Insert Mode On</Name>
+        <Name>Insert Mode Active</Name>
         <Category>Model Integrity</Category>
         <Description>Checks whether the model is currently using Insert Mode or contains features affected by Insert Mode operations within the feature tree. Insert Mode allows users to temporarily roll back the model history to add, modify, suppress, or troubleshoot features earlier in the regeneration sequence, but improper or unfinished use of Insert Mode can create unstable models, incomplete geometry, suppressed downstream features, and unexpected regeneration behavior. Leaving models in Insert Mode may also cause confusion, hidden geometry changes, and downstream manufacturing or documentation issues. This check helps ensure that Insert Mode is used intentionally and that models are fully regenerated and restored to a stable state before release or downstream use. Check behavior and reporting are controlled by the INSERT_MODE settings in the check.mch configuration file.</Description>
         <ModelCheckName>INSERT_MODE</ModelCheckName>
@@ -656,7 +656,7 @@ Since an issue may propagate through the associative chain of references between
         <info_check>Y</info_check>
     </Check>
     <Check>
-        <Name>Lower Tolerance Limits</Name>
+        <Name>Low Linear Tolerance</Name>
         <Category>MBD Readiness</Category>
         <Description>Checks whether feature dimensions and tolerances use valid and acceptable lower tolerance limits according to company engineering and manufacturing standards. Proper lower tolerance definitions are critical for ensuring part fit, function, manufacturability, inspection accuracy, and assembly performance. Incorrect, excessively tight, or unrealistic lower tolerance limits can increase manufacturing cost, create inspection difficulties, cause fitment problems, and lead to rejected or nonfunctional parts. This check helps identify tolerance definitions that may violate company standards or create downstream production and quality issues. Tolerance standards and approved tolerance types are typically configured in the start.mcs file using PRT_TOL_TYPE, ASM_TOL_TYPE, and related tolerance configuration entries, while check behavior and reporting are controlled by the LOW_TOLERANCE settings in the check.mch configuration file.</Description>
         <ModelCheckName>LOW_TOLERANCE</ModelCheckName>
@@ -796,7 +796,7 @@ Since an issue may propagate through the associative chain of references between
         <info_check>Y</info_check>
     </Check>
     <Check>
-        <Name>Unused Parameters</Name>
+        <Name>Unused Part Parameters</Name>
         <Category>Consistency</Category>
         <Description>Checks a model for parameters that exist but are not being used or are not part of the approved set of parameters defined by company standards. It helps identify unnecessary, obsolete, or redundant parameters that add clutter and can lead to confusion or maintenance issues. ModelCHECK reports these unused parameters so they can be reviewed and removed, improving model quality and consistency.</Description>
         <ModelCheckName>PARAM_UNUSED</ModelCheckName>
@@ -1050,7 +1050,7 @@ When a model has small geometry, the equivalent absolute accuracy should be two 
         </why>
     </Check>
     <Check>
-        <Name>Sheet Metal Bend Tables</Name>
+        <Name>Sheet Metal Bend Table</Name>
         <Category>Model Integrity</Category>
         <Description>Checks whether sheet metal models use valid and approved bend tables required for manufacturing calculations and flat pattern generation. Bend tables define how material behaves during bending operations and are critical for accurate bend allowances, bend deductions, flat lengths, and formed dimensions. Missing, incorrect, or nonstandard bend tables can result in inaccurate flat patterns, manufacturing errors, scrap, and problems during fabrication or CNC programming. This check helps ensure that sheet metal parts use the correct bend table definitions according to company manufacturing standards. Approved bend table names and related standards are typically configured in the start.mcs file using SHTMTL_BTNAME entries, while check behavior and reporting are controlled by the SHTMTL_BENDTAB settings in the check.mch configuration file.</Description>
         <ModelCheckName>SHTMTL_BENDTAB</ModelCheckName>
@@ -1060,7 +1060,7 @@ When a model has small geometry, the equivalent absolute accuracy should be two 
         <enabled>Y</enabled>         
     </Check>
     <Check>
-        <Name>Sheet Metal Flat Patterns</Name>
+        <Name>Sheet Metal Flat Pattern</Name>
         <Category>Model Integrity</Category>
         <Description>Checks whether sheet metal parts contain valid flat pattern representations required for manufacturing, laser cutting, punching, and downstream fabrication processes. Flat patterns are critical for generating accurate unfolded geometry, material layouts, bend calculations, and production documentation. Missing, failed, or improperly defined flat patterns can lead to manufacturing errors, incorrect cut lengths, fabrication delays, and problems with CNC or nesting operations. This check helps ensure that sheet metal models are properly prepared for downstream manufacturing and documentation workflows. Sheet metal standards and related configuration settings are typically managed through sheet metal setup definitions and ModelCHECK configuration files, while check behavior and reporting are controlled by the SHTMTL_FLAT settings in the check.mch configuration file.</Description>
         <ModelCheckName>SHTMTL_FLAT</ModelCheckName>
@@ -1132,7 +1132,7 @@ When a model has small geometry, the equivalent absolute accuracy should be two 
 ]]></why>
     </Check>
     <Check>
-        <Name>Sketch Items</Name>
+        <Name>Too Many Sketch Items</Name>
         <Category>Model Complexity</Category>
         <Description>Checks for sketches that contain excessive numbers of sketch entities or overly complex sketch geometry. Large or complicated sketches can make models difficult to understand, slow regeneration performance, increase rebuild instability, and create downstream manufacturing or editing problems. Overly complex sketches are often harder to troubleshoot, modify, and maintain, especially in large or highly parametric models. This check helps encourage simpler, cleaner sketching practices that improve model robustness, readability, and long-term maintainability. Sketch complexity limits are typically configured in the constant.mcn file using MAX_SKETCH_ITEMS and related settings, while check behavior and reporting are controlled by the SKETCH_ITEMS settings in the check.mch configuration file.</Description>
         <ModelCheckName>SKETCH_ITEMS</ModelCheckName>
@@ -1190,7 +1190,7 @@ Imported sketch geometry can lead to many sketched entities. Even if you have to
 ]]></why>
     </Check>
     <Check>
-        <Name>Start Part Checks</Name>
+        <Name>Missing Start Items</Name>
         <Category>Consistency</Category>
         <Description>Checks whether the model contains the required standard setup items defined in the company start model configuration. Start checks commonly verify required datums, parameters, layers, units, views, relations, materials, and other standard modeling elements that establish consistent design practices across parts, assemblies, and drawings. Missing or incorrect start-model content can weaken design intent, reduce standardization, create downstream manufacturing or documentation issues, and make models more difficult to maintain. This check helps ensure that models are built from approved standards and contain the foundational elements required by the organization. Start-model requirements are typically configured in the start.mcs file using entries such as PRT_PARAMETER, PRT_LAYER, PRT_DATUM_PLANE, MATERIAL_NAME, and related definitions, while check behavior and reporting are controlled by the STARTCHECK settings in the check.mch configuration file.</Description>
         <ModelCheckName>STARTCHECK</ModelCheckName>
@@ -1321,7 +1321,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <!-- DRAWING REPORT CONFIGURATION -->
     <Check>
-        <Name>Boundary Information</Name>
+        <Name>View Boundaries</Name>
         <Category>Geometry Quality</Category>
         <Description>Checks Creo drawings to ensure that no views, entities, dimensions, symbols, notes, or tables are located outside the drawing sheet boundary. It is commonly used to identify misplaced drawing content that could affect drawing readability, plotting, or release quality.</Description>
         <ModelCheckName>BOUND_INFO</ModelCheckName>
@@ -1382,7 +1382,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <enabled>Y</enabled>         
     </Check>
     <Check>
-        <Name>Default Views</Name>
+        <Name>Default Drawing Views</Name>
         <Category>Consistency</Category>
         <Description>Checks whether drawings contain the required default views defined by company drafting standards and approved drawing templates. Default views commonly include standard orientations such as front, top, right, isometric, section, or auxiliary views that are necessary for clearly communicating part geometry, dimensions, manufacturing requirements, and inspection information. Missing or improperly configured default views can reduce drawing clarity, create interpretation errors, and lead to downstream manufacturing or assembly issues. This check helps ensure that drawings contain the expected standard views and maintain consistent documentation practices across the organization. Default drawing view requirements are typically configured through drawing templates, Creo detailing settings, and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the DEFAULT_VIEWS settings in the check.mch configuration file.</Description>
         <ModelCheckName>DEFAULT_VIEWS</ModelCheckName>
@@ -1602,7 +1602,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <info_check>Y</info_check>
     </Check>
     <Check>
-        <Name>Standard Detail Setup</Name>
+        <Name>Standard Drawing DTL Setup</Name>
         <Category>Consistency</Category>
         <Description>Checks whether the drawing uses the correct standard detail setup according to company drafting templates and documentation rules. The standard detail setup defines the baseline configuration for drawing behavior, including dimensioning standards, text styles, view settings, annotation rules, and general drafting environment settings. If the detail setup is incorrect or inconsistent, drawings may display inconsistent formatting, incorrect dimension behavior, nonstandard annotations, and downstream issues in manufacturing, inspection, and data management processes. This check helps ensure that drawings conform to the approved company-standard detailing environment for consistent and high-quality documentation. Standard detail setup definitions are typically configured in the start.mcs file using detail setup files (DTL) and related Creo configuration settings, while check behavior and reporting are controlled by the STD_DTL_SETUP settings in the check.mch configuration file.</Description>
         <ModelCheckName>STD_DTL_SETUP</ModelCheckName>
@@ -1642,7 +1642,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <info_check>Y</info_check>
     </Check>
     <Check>
-        <Name>Unused Models</Name>
+        <Name>Unused Drawing Models</Name>
         <Category>Consistency</Category>
         <Description>Checks whether the drawing contains referenced models (parts or assemblies) that are not actually used in any drawing views, tables, annotations, or other downstream drawing elements. Unused models can increase drawing complexity, cause confusion about design intent, slow performance, and introduce maintenance risks when models are updated or replaced. They may also indicate leftover references from earlier design iterations or incomplete cleanup of drawing content. This check helps ensure that only relevant and actively used models are included in the drawing, improving clarity, efficiency, and data integrity. Model usage rules and reference management are typically controlled through Creo drawing setup and ModelCHECK configuration files, while check behavior and reporting are controlled by the UNUSED_MODELS settings in the check.mch configuration file.</Description>
         <ModelCheckName>UNUSED_MODELS</ModelCheckName>
@@ -1663,7 +1663,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <enabled>Y</enabled>         
     </Check>
     <Check>
-        <Name>View Scale</Name>
+        <Name>Unscaled Drawing Views</Name>
         <Category>Consistency</Category>
         <Description>Checks whether drawing views use appropriate and standardized scale values according to company drafting and documentation rules. Proper view scaling is essential for maintaining drawing readability, ensuring correct representation of geometry, and supporting downstream manufacturing, inspection, and interpretation processes. Incorrect or inconsistent view scales can lead to misinterpretation of dimensions, poor drawing clarity, and noncompliance with drafting standards. This check helps ensure that all drawing views use approved scale values that maintain consistency and clarity across the drawing package. View scale requirements and acceptable scale values are typically configured through Creo drawing setup files and ModelCHECK drafting configuration settings, while check behavior and reporting are controlled by the VIEW_SCALE settings in the check.mch configuration file.</Description>
         <ModelCheckName>VIEW_SCALE</ModelCheckName>
@@ -1714,7 +1714,7 @@ Suppressed features are appropriate if they are only used by particular instance
         </why>
     </Check>
     <Check>
-        <Name>Generic Components Use</Name>
+        <Name>Generic Components</Name>
         <Category>Model Integrity</Category>
         <Description>Checks whether generic family table components are used within an assembly and verifies that only appropriate instance models are placed in the design. Generic models are intended to serve as master templates for family table instances and are typically not meant to be assembled directly. Using generics in assemblies can lead to incorrect BOM data, inaccurate mass properties, invalid dimensions, and downstream manufacturing or documentation errors because the generic does not represent a specific producible configuration. This check helps ensure that assemblies use only valid family table instances, maintaining correct configuration control, design intent, and data integrity. Family table usage rules and component selection standards are typically configured through Creo family table settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the GEN_COMPONENTS settings in the check.mch configuration file.</Description>
         <ModelCheckName>GEN_COMPONENTS</ModelCheckName>
