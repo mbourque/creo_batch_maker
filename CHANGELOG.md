@@ -2,6 +2,18 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-07 — v1.11.83
+
+- **Start over…**: batch status cleanup removes `.pvz` files (not `.pvx`).
+
+## 2026-07-07 — v1.11.82
+
+- **Start over…**: also removes batch status files (`*-run.complete`, pause/stop flags, and `.pvz`).
+
+## 2026-07-07 — v1.11.81
+
+- **Configuration → View scales…**: opens `configs\view_scale.txt` in Notepad.
+
 ## 2026-07-07 — v1.11.80
 
 - **Report → Statistics**: **Total size of scanned models** is listed directly under **Models scanned**.

@@ -566,6 +566,44 @@ def _is_batch_timeout_log_name(name: str) -> bool:
     return n.startswith(BATCH_TIMEOUT_LOG_PREFIX.casefold()) and n.endswith(".txt")
 
 
+_START_OVER_BATCH_STATUS_EXACT_NAMES_CF = frozenset(
+    name.casefold()
+    for name in (
+        BATCH_STOP_FLAG_BASENAME,
+        BATCH_PAUSE_FLAG_BASENAME,
+        BATCH_PAUSE_ACTIVE_BASENAME,
+    )
+)
+
+
+def _is_start_over_batch_status_file(name: str) -> bool:
+    """Batch runner flags, run-complete markers, and Creo ``.pvz`` status files."""
+    n = name.casefold()
+    if n in _START_OVER_BATCH_STATUS_EXACT_NAMES_CF:
+        return True
+    if n.endswith(BATCH_RUN_COMPLETE_FLAG_SUFFIX.casefold()):
+        return True
+    return n.endswith(".pvz")
+
+
+def _remove_batch_status_files_in_directory(directory: Path) -> list[str]:
+    """Remove batch status/flag files (Start over only); return unlink error lines."""
+    errors: list[str] = []
+    if not directory.is_dir():
+        return errors
+    try:
+        for entry in directory.iterdir():
+            if not entry.is_file() or not _is_start_over_batch_status_file(entry.name):
+                continue
+            try:
+                entry.unlink()
+            except OSError as exc:
+                errors.append(f"{entry}\n{exc}")
+    except OSError as exc:
+        errors.append(f"{directory}\n{exc}")
+    return errors
+
+
 def _remove_batch_timeout_logs_in_directory(directory: Path) -> list[str]:
     """Remove ``creo-batch-timeouts-*.txt`` failure logs (Start over only); return unlink error lines."""
     errors: list[str] = []
@@ -1149,6 +1187,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "Inch Settings...",
             "Metric Settings...",
             "Sheetmetal Thickness...",
+            "View scales...",
             "Open configurations...",
         ]
         self._wizard_batch_failed_log_path: Path | None = None
@@ -1178,6 +1217,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "Inch Settings...": "inch.mcn",
             "Metric Settings...": "mm.mcn",
             "Sheetmetal Thickness...": "thick.txt",
+            "View scales...": "view_scale.txt",
         }
 
         self._build_ui()
@@ -6102,7 +6142,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         prompt = (
             "Remove prior scan and batch data from the working folder?\n\n"
             "Keeps Creo models (.prt, .asm, .drw) in the working folder.\n"
-            "Removes templates\\ (including creo-batch-template-scan.json) and modchk\\."
+            "Removes templates\\ (including creo-batch-template-scan.json), modchk\\, "
+            "batch status files (*-run.complete, pause/stop flags, .pvz), and other scan outputs."
         )
         if not self._show_proceed_cancel_dialog("Start over", prompt):
             return
@@ -6111,6 +6152,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._cancel_automatic_wizard_chain()
         errors: list[str] = []
         errors.extend(_remove_batch_timeout_logs_in_directory(working_dir))
+        errors.extend(_remove_batch_status_files_in_directory(working_dir))
         errors.extend(self._clean_start_over_directory(working_dir))
         self._refresh_action_buttons()
         self._wizard_step_outcome.clear()
