@@ -1334,7 +1334,9 @@
                 <div class="why">{{ section.why | safe }}</div>
             </div>
             <div class="check-buttons">
+                {% if section.stat_type != 'INFO' %}
                 <button class="hide-button" onclick="hideCheckSection('wrapper-{{ section.class }}')">Remove&nbsp;this</button>
+                {% endif %}
             </div>
         </div>
         <div class="check-section {{ section.class }}" id="{{ section.class }}">
@@ -1373,9 +1375,11 @@
                 <p><strong>Model Overall Size:</strong> {{ file.overall_size }}</p>
                 <p><strong>Model Units for Length:</strong> {{ file.units_length }}</p>
                 <div class="check-buttons">
+                    {% if file.stat != 'INFO' %}
                     <button class="flag-button button" onclick="toggleFlag('{{ file.file_list_id | escape }}')">Flag&nbsp;this</button>
                     <button class="hide-button button" onclick="hideElementById('{{ file.file_list_id | escape }}')">Remove&nbsp;only&nbsp;this</button>
                     <button class="hide-button button" onclick="hideElementsByClass('{{ file.stat }}{{ (file.desc or '').replace(' ', '').replace(':', '\\:').replace('.', '\\.') }}')">Remove&nbsp;all&nbsp;like&nbsp;this</button>
+                    {% endif %}
                 </div>
             </div>
             </div>

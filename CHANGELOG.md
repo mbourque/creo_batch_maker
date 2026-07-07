@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-07 — v1.11.78
+
+- **Report**: information sections have no **Flag** or **Remove** buttons (they do not work with the issue filters).
+
 ## 2026-07-06 — v1.11.77
 
 - **Report → Statistics**: label **Sheet metal parts** (was **Sheetmetal parts**).

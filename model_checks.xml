@@ -167,7 +167,7 @@ Note that sometimes unattached features are acceptable, because later features c
         </why>
     </Check>
     <Check>
-        <Name>Default Child Features</Name>
+        <Name>Default Datum Plane Children</Name>
         <Category>Consistency</Category>
         <Description>Checks whether required default child features created from standard templates, start parts, or predefined modeling practices are present and properly associated within the model. Default child features often include standard datums, reference geometry, coordinate systems, construction features, or other foundational elements that support stable parametric relationships and consistent modeling practices. Missing or improperly managed default child features can weaken design intent, create unstable dependencies, and reduce model consistency across projects and teams. This check helps ensure that models retain the standard feature structure expected by the organization. Default feature definitions and related standards are typically configured in the start.mcs file using datum, layer, parameter, and feature-related entries, while check behavior and reporting are controlled by the DEFAULT_CHILD settings in the check.mch configuration file.</Description>
         <ModelCheckName>DEFAULT_CHILD</ModelCheckName>
@@ -214,7 +214,7 @@ Note that sometimes unattached features are acceptable, because later features c
         <info_check>Y</info_check>
     </Check>
     <Check>
-        <Name>Coordinate Systems Information</Name>
+        <Name>Datum Coordinate System Information</Name>
         <Category>Consistency</Category>
         <Description>Checks and reports information related to coordinate systems used within the model. Coordinate systems are critical reference elements used for assembly placement, manufacturing setups, CNC programming, simulation, data exchange, robotics, inspection, and integration with downstream systems. Properly defined and consistently managed coordinate systems improve model alignment, interoperability, automation reliability, and communication across engineering workflows. Missing, incorrectly oriented, or poorly named coordinate systems can create assembly positioning errors, manufacturing issues, export problems, and downstream integration failures. This check helps ensure that coordinate systems are properly defined and maintained according to company standards. Coordinate system requirements and naming standards are typically configured in the start.mcs file using PRT_DATUM_CSYS, ASM_DATUM_CSYS, and related entries, while check behavior and reporting are controlled by the DTM_CSYS_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>DTM_CSYS_INFO</ModelCheckName>
@@ -224,7 +224,7 @@ Note that sometimes unattached features are acceptable, because later features c
         <info_check>Y</info_check>
     </Check>
     <Check>
-        <Name>Datum Curves Information</Name>
+        <Name>Datum Curve Information</Name>
         <Category>Design Intent Strength</Category>
         <Description>Checks and reports information related to datum curves used within the model. Datum curves are commonly used as reference geometry for sweeps, surfaces, routing, manufacturing paths, layout control, and complex feature creation. Properly defined and managed datum curves improve design intent, feature stability, model readability, and downstream manufacturing or inspection workflows. Poorly constructed, unnecessary, or inconsistently used datum curves can weaken parametric relationships, complicate modifications, and create downstream geometry or manufacturing issues. This check helps ensure that datum curves are properly defined and used according to company modeling standards. Datum curve requirements and related standards are typically configured through ModelCHECK start.mcs definitions and geometry management practices, while check behavior and reporting are controlled by the DTM_CURVE_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>DTM_CURVE_INFO</ModelCheckName>
@@ -234,7 +234,7 @@ Note that sometimes unattached features are acceptable, because later features c
         <info_check>Y</info_check>
     </Check>
     <Check>
-        <Name>Datum Planes Information</Name>
+        <Name>Datum Plane Information</Name>
         <Category>Consistency</Category>
         <Description>Checks and reports information related to datum planes used within the model. Datum planes are foundational reference features used to define geometry orientation, sketch placement, symmetry, assembly alignment, manufacturing setups, and downstream design intent. Properly defined and consistently managed datum planes improve model stability, readability, maintainability, and communication across engineering workflows. Missing, poorly named, or improperly oriented datum planes can weaken parametric relationships, complicate modifications, and create downstream assembly, manufacturing, or inspection issues. This check helps ensure that datum planes are properly defined and used according to company standards. Datum plane requirements and naming standards are typically configured in the start.mcs file using PRT_DATUM_PLANE, ASM_DATUM_PLANE, and related entries, while check behavior and reporting are controlled by the DTM_PLANE_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>DTM_PLANE_INFO</ModelCheckName>
@@ -244,7 +244,7 @@ Note that sometimes unattached features are acceptable, because later features c
         <info_check>Y</info_check>
     </Check>
     <Check>
-        <Name>Datum Points Information</Name>
+        <Name>Datum Point Information</Name>
         <Category>Design Intent Strength</Category>
         <Description>Checks and reports information related to datum points used within the model. Datum points are commonly used as reference geometry for feature placement, hole locations, coordinate definition, measurement references, manufacturing setups, assembly positioning, and inspection processes. Properly defined and consistently managed datum points improve model clarity, design intent, and downstream workflow reliability. Missing, poorly defined, or inconsistently used datum points can create alignment problems, weak parametric relationships, and downstream manufacturing or inspection issues. This check helps ensure that datum points are properly defined and maintained according to company standards. Datum point requirements and related standards are typically configured through ModelCHECK start.mcs definitions and geometry management practices, while check behavior and reporting are controlled by the DTM_POINT_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>DTM_POINT_INFO</ModelCheckName>
@@ -552,7 +552,7 @@ Since an issue may propagate through the associative chain of references between
         </why>
     </Check>
     <Check>
-        <Name>Blank Datum Layers</Name>
+        <Name>Datum Features on Unblanked Layers</Name>
         <Category>Consistency</Category>
         <Description>Checks whether datum-related layers are properly configured to use the correct blanked or hidden display state according to company standards. Datum layers commonly contain datum planes, axes, coordinate systems, points, and other reference geometry that may clutter the model display if left visible during normal modeling and detailing workflows. Properly blanking datum layers improves model readability, reduces visual complexity, and helps maintain consistent display practices across parts, assemblies, and drawings. Incorrect datum layer visibility settings can make models difficult to navigate and may interfere with downstream drafting, manufacturing, or inspection processes. Datum layer definitions and approved display states are typically configured in the start.mcs file using PRT_LAYER, ASM_LAYER, DRW_LAYER, and related layer configuration entries, while check behavior and reporting are controlled by the LAYER_DTM_BLANK settings in the check.mch configuration file.</Description>
         <ModelCheckName>LAYER_DTM_BLANK</ModelCheckName>
@@ -696,7 +696,7 @@ Since an issue may propagate through the associative chain of references between
 ]]></why>
     </Check>
     <Check>
-        <Name>Min and Max Tolerance Information</Name>
+        <Name>Min Max Linear Tolerance</Name>
         <Category>MBD Readiness</Category>
         <Description>Checks whether feature dimensions and tolerances use valid minimum and maximum tolerance values according to company engineering and manufacturing standards. Proper tolerance ranges are critical for ensuring part fit, function, manufacturability, interchangeability, and inspection accuracy. Incorrect, inconsistent, or unrealistic tolerance limits can increase manufacturing cost, create assembly problems, lead to inspection failures, and reduce overall product quality. This check helps identify dimensions and tolerance definitions that may violate approved engineering practices or downstream manufacturing requirements. Tolerance standards and approved tolerance types are typically configured in the start.mcs file using PRT_TOL_TYPE, ASM_TOL_TYPE, and related tolerance configuration entries, while check behavior and reporting are controlled by the MINMAXTOL_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>MINMAXTOL_INFO</ModelCheckName>
@@ -735,7 +735,7 @@ Since an issue may propagate through the associative chain of references between
         <info_check>Y</info_check>
     </Check>
     <Check>
-        <Name>Overall Size</Name>
+        <Name>Model Overall Size</Name>
         <Category>Geometry Quality</Category>
         <Description>Checks whether the overall physical size of the model falls within defined limits or expected design ranges according to company and manufacturing standards. Monitoring overall model size helps identify parts that may be too large, too small, incorrectly scaled, or outside assembly, packaging, machining, transportation, or manufacturing constraints. Incorrect overall size can lead to fitment problems, tooling issues, assembly interference, excessive material usage, and downstream manufacturing or inspection errors. This check helps ensure that models remain within acceptable dimensional boundaries for their intended application. Overall size limits and related geometry standards are typically configured through ModelCHECK constant and geometry configuration files, while check behavior and reporting are controlled by the OVERALL_SIZE settings in the check.mch configuration file.</Description>
         <ModelCheckName>OVERALL_SIZE</ModelCheckName>
@@ -844,7 +844,7 @@ Since an issue may propagate through the associative chain of references between
 ]]></why>
     </Check>
     <Check>
-        <Name>Model Version</Name>
+        <Name>Last saved Version</Name>
         <Category>Consistency</Category>
         <Description>Checks the Creo version or build information associated with the model to help identify outdated, legacy, or incompatible files. Models created or last saved in older Creo versions may contain deprecated features, outdated data structures, regeneration differences, or compatibility issues that can affect performance, stability, and downstream processes. Monitoring model version information helps organizations maintain consistent CAD environments and supports upgrade, migration, and data management efforts. Version requirements are typically configured in the start.mcs file using PRT_PRO_VERSION and ASM_PRO_VERSION entries, while check behavior and reporting are controlled by the PRO_VERSION settings in the check.mch configuration file.</Description>
         <ModelCheckName>PRO_VERSION</ModelCheckName>
@@ -863,7 +863,7 @@ Since an issue may propagate through the associative chain of references between
         <enabled>Y</enabled>         
     </Check>
     <Check>
-        <Name>Resumed Features</Name>
+        <Name>Regular Features</Name>
         <Category>Model Integrity</Category>
         <Description>Reports the number of resumed (active) features in the model. Suppressed features are excluded from the count. This is an informational metric that provides an indication of model size and feature complexity for reporting, analysis, and quality metrics. REG_FEATURES does not verify the presence of required features or compare the model against company standards defined in the start.mcs file; it simply reports the total number of active features.</Description>
         <ModelCheckName>REG_FEATURES</ModelCheckName>
@@ -1094,7 +1094,7 @@ When a model has small geometry, the equivalent absolute accuracy should be two 
         <enabled>Y</enabled>         
     </Check>
     <Check>
-        <Name>Sheet Metal Y-Factor</Name>
+        <Name>Sheet Metal Y Factor</Name>
         <Category>Model Integrity</Category>
         <Description>Checks whether sheet metal parts use valid and approved Y-factor values for bend calculations and flat pattern development. The Y-factor defines how material stretches and compresses during bending and directly affects bend allowance, flat lengths, and formed dimensions. Incorrect or inconsistent Y-factor values can result in inaccurate flat patterns, poor fitment, manufacturing errors, scrap, and tooling issues during fabrication. This check helps ensure that sheet metal parts use standardized bend calculation behavior that aligns with company manufacturing practices and material specifications. Approved Y-factor values and related sheet metal standards are typically configured in external sheet metal configuration files and ModelCHECK setup files, while check behavior and reporting are controlled by the SHTMTL_YFACTOR settings in the check.mch configuration file.</Description>
         <ModelCheckName>SHTMTL_YFACTOR</ModelCheckName>
@@ -1227,7 +1227,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <enabled>Y</enabled>         
     </Check>
     <Check>
-        <Name>User-Defined Features Information</Name>
+        <Name>User-Defined Features</Name>
         <Category>Design Intent Strength</Category>
         <Description>Checks and reports information related to User-Defined Features (UDFs) used within the model. UDFs are reusable groups of standardized features commonly used to enforce consistent design practices, automate repetitive modeling tasks, and improve efficiency across parts and assemblies. Improperly defined, outdated, or inconsistently applied UDFs can lead to weak design intent, regeneration problems, inconsistent geometry, and downstream manufacturing or documentation issues. This check helps verify that UDFs are properly defined and used according to company modeling standards. UDF-related standards and configuration settings are managed within the ModelCHECK configuration environment, while check behavior and reporting are controlled by the UDF_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>UDF_INFO</ModelCheckName>
@@ -1237,7 +1237,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <info_check>Y</info_check>
     </Check>
     <Check>
-        <Name>Unit Length</Name>
+        <Name>Model Units for Length</Name>
         <Category>Consistency</Category>
         <Description>Checks whether the model uses the correct length units required by company standards, such as millimeters, inches, or centimeters. Consistent unit systems are critical for maintaining accurate dimensions, mass properties, tolerances, manufacturing data, and interoperability with assemblies, drawings, simulations, CAM systems, and downstream data management tools. Incorrect length units can lead to scaling problems, manufacturing errors, assembly mismatches, and translation issues during export or collaboration. This check helps ensure that all models are created and maintained using approved unit standards. Required unit definitions are typically configured in the start.mcs file using PRT_UNITS_LENGTH and ASM_UNITS_LENGTH entries, while check behavior and reporting are controlled by the UNITS_LENGTH settings in the check.mch configuration file.</Description>
         <ModelCheckName>UNITS_LENGTH</ModelCheckName>
@@ -1453,7 +1453,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <info_check>Y</info_check>
     </Check>
     <Check>
-        <Name>Models used in Drawing</Name>
+        <Name>Models Used in Drawing</Name>
         <Category>Consistency</Category>
         <Description>Checks and reports information about the models, parts, assemblies, and references used within the drawing. Drawings often reference multiple models for views, sections, details, BOMs, family tables, and assembly documentation, and properly managing these model references is critical for maintaining drawing accuracy, associativity, revision control, and downstream manufacturing communication. Missing, outdated, incorrect, or unnecessary model references can create drawing inconsistencies, broken views, BOM errors, and downstream data management or manufacturing problems. This check helps ensure that drawings reference the correct approved models and maintain proper model-to-drawing relationships according to company standards. Drawing model reference rules and related standards are typically configured through Creo drawing settings and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the MODELS_USED settings in the check.mch configuration file.</Description>
         <ModelCheckName>MODELS_USED</ModelCheckName>
@@ -1463,7 +1463,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <info_check>Y</info_check>
     </Check>
     <Check>
-        <Name>Note Case</Name>
+        <Name>Note Case Errors</Name>
         <Category>Consistency</Category>
         <Description>Checks whether notes in the drawing use the correct text case formatting according to company drafting standards, such as uppercase, lowercase, or mixed-case requirements. Consistent note formatting improves drawing readability, professionalism, standardization, and communication across engineering, manufacturing, inspection, and downstream documentation processes. Incorrect note case can create inconsistent documentation, reduce clarity, and violate company or industry drafting practices. This check helps ensure that all drawing notes follow approved formatting and presentation standards. Note formatting rules and related drafting standards are typically configured through Creo detailing settings and ModelCHECK drawing configuration files, while check behavior and reporting are controlled by the NOTE_CASE settings in the check.mch configuration file.</Description>
         <ModelCheckName>NOTE_CASE</ModelCheckName>
@@ -1473,7 +1473,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <info_check>Y</info_check>
     </Check>
     <Check>
-        <Name>Note Font</Name>
+        <Name>Non-standard Note Fonts</Name>
         <Category>Consistency</Category>
         <Description>Checks whether notes in the drawing use the approved font types defined by company drafting and documentation standards. Consistent note fonts improve drawing readability, professionalism, print quality, and standardization across engineering, manufacturing, inspection, and downstream documentation workflows. Incorrect or inconsistent fonts can reduce clarity, create formatting issues during printing or PDF generation, and lead to noncompliant drawing presentation standards. This check helps ensure that all drawing notes use approved font settings and maintain consistent visual formatting throughout the documentation package. Note font requirements and related drafting standards are typically configured through Creo detailing settings and ModelCHECK drawing configuration files, while check behavior and reporting are controlled by the NOTE_FONT settings in the check.mch configuration file.</Description>
         <ModelCheckName>NOTE_FONT</ModelCheckName>
@@ -1483,7 +1483,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <info_check>Y</info_check>
     </Check>
     <Check>
-        <Name>Note Height</Name>
+        <Name>Non-standard Note Heights</Name>
         <Category>Consistency</Category>
         <Description>Checks whether notes in the drawing use the correct text height according to company drafting and documentation standards. Consistent note height improves drawing readability, print quality, professionalism, and communication across engineering, manufacturing, inspection, and downstream documentation workflows. Notes that are too small may become unreadable, while oversized notes can create cluttered or unbalanced drawings. Incorrect note heights may also violate company or industry drafting standards and reduce overall drawing quality. This check helps ensure that all drawing notes use approved text sizing and maintain consistent visual presentation throughout the drawing package. Note height requirements and related drafting standards are typically configured through Creo detailing settings and ModelCHECK drawing configuration files, while check behavior and reporting are controlled by the NOTE_HEIGHT settings in the check.mch configuration file.</Description>
         <ModelCheckName>NOTE_HEIGHT</ModelCheckName>
@@ -1503,7 +1503,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <info_check>Y</info_check>
     </Check>
     <Check>
-        <Name>Note Spelling</Name>
+        <Name>Note Spelling Errors</Name>
         <Category>Consistency</Category>
         <Description>Checks notes within the drawing for spelling errors, invalid words, or text that does not comply with company-approved terminology and documentation standards. Correct spelling is important for maintaining drawing clarity, professionalism, manufacturing accuracy, inspection communication, and downstream documentation quality. Misspelled notes can create confusion, misinterpretation of design intent, manufacturing mistakes, and inconsistencies across engineering documentation. This check helps ensure that drawing notes use clear, accurate, and standardized language according to company drafting practices. Spelling validation rules, approved terminology, and related drafting standards are typically configured through Creo detailing settings, custom dictionaries, and ModelCHECK drawing configuration files, while check behavior and reporting are controlled by the NOTE_SPELL settings in the check.mch configuration file.</Description>
         <ModelCheckName>NOTE_SPELL</ModelCheckName>
@@ -1513,7 +1513,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <info_check>Y</info_check>
     </Check>
     <Check>
-        <Name>Title Spelling</Name>
+        <Name>Title Block Spelling Errors</Name>
         <Category>Consistency</Category>
         <Description>Checks titles within the drawing for spelling errors, invalid words, or text that does not comply with company-approved terminology and documentation standards. Drawing titles are critical for identification, traceability, revision control, manufacturing communication, and downstream data management processes, and misspelled or inconsistent titles can create confusion, searchability issues, incorrect documentation, and ERP or Windchill integration problems. This check helps ensure that drawing titles use accurate, professional, and standardized language according to company drafting practices. Spelling validation rules, approved terminology, and related drafting standards are typically configured through Creo detailing settings, custom dictionaries, and ModelCHECK drawing configuration files, while check behavior and reporting are controlled by the TITLE_SPELL settings in the check.mch configuration file.</Description>
         <ModelCheckName>TITLE_SPELL</ModelCheckName>
@@ -1592,7 +1592,7 @@ Suppressed features are appropriate if they are only used by particular instance
 ]]></why>
     </Check>
     <Check>
-        <Name>Sheet Size Information</Name>
+        <Name>Sheet Size</Name>
         <Category>Consistency</Category>
         <Description>Checks and reports information related to drawing sheet sizes used within the drawing package. Sheet size standards are important for maintaining consistent documentation layouts, print scaling, title block formatting, readability, plotting compatibility, and downstream manufacturing or archival processes. Incorrect or nonstandard sheet sizes can create printing issues, formatting inconsistencies, revision control problems, and difficulties with document management systems. This check helps ensure that drawings use approved sheet sizes and comply with company drafting and documentation standards. Approved sheet size definitions and related drawing format standards are typically configured through drawing templates, Creo detailing settings, and ModelCHECK drafting configuration files, while check behavior and reporting are controlled by the SHEET_SIZE_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>SHEET_SIZE_INFO</ModelCheckName>
@@ -1673,7 +1673,7 @@ Suppressed features are appropriate if they are only used by particular instance
     </Check>
     <!-- ASSEMBLY REPORT CONFIGURATION -->
     <Check>
-        <Name>Assembly BOM</Name>
+        <Name>Bill of Material</Name>
         <Category>Consistency</Category>
         <Description>Checks whether the assembly bill of materials (BOM) is correctly defined, structured, and synchronized with the assembly model. The BOM represents the hierarchical structure of components used in an assembly and is critical for manufacturing planning, procurement, cost estimation, configuration control, and downstream systems such as ERP and Windchill. Missing, incorrect, or inconsistent BOM data can lead to incorrect part counts, assembly errors, procurement mistakes, and manufacturing delays. This check helps ensure that the BOM accurately reflects the assembly structure and complies with company data management and documentation standards. BOM definitions and related configuration rules are typically controlled through Creo assembly settings, repeat region tables, and Windchill integration mappings, while check behavior and reporting are controlled by the ASM_BOM settings in the check.mch configuration file.</Description>
         <ModelCheckName>ASM_BOM</ModelCheckName>
@@ -1741,7 +1741,7 @@ Suppressed features are appropriate if they are only used by particular instance
         <enabled>Y</enabled>         
     </Check>
     <Check>
-        <Name>Number of Components</Name>
+        <Name>Parts and Sub-assemblies</Name>
         <Category>Model Complexity</Category>
         <Description>Checks whether the number of components in an assembly is within the limits defined by company standards and expected design complexity guidelines. Excessive component counts can negatively impact assembly performance, regeneration time, system memory usage, manageability, and downstream processes such as BOM handling, manufacturing planning, and simulation. Too few components may also indicate an incomplete or under-defined assembly structure. This check helps ensure that assemblies remain within an acceptable complexity range appropriate for their intended use and performance requirements. Component quantity limits and related assembly complexity standards are typically configured through ModelCHECK performance and configuration settings, while check behavior and reporting are controlled by the NUM_COMPONENTS settings in the check.mch configuration file.</Description>
         <ModelCheckName>NUM_COMPONENTS</ModelCheckName>
@@ -1778,7 +1778,7 @@ If the suppressed features are no longer needed, then they should be removed bef
         <enabled>Y</enabled>         
     </Check>
     <Check>
-        <Name>Unique Components</Name>
+        <Name>Unique Parts and Sub-assemblies</Name>
         <Category>Model Complexity</Category>
         <Description>Checks for components in the assembly that are marked as unique instances and verifies that they are properly defined and managed according to company modeling and configuration control standards. Unique components are non-reusable, instance-specific parts that differ from other occurrences of the same model and are typically used when geometry, parameters, or configurations vary from standard instances. While unique components are sometimes necessary for special design cases, excessive or uncontrolled use can reduce reuse efficiency, increase data management complexity, complicate BOM structure, and introduce inconsistencies in manufacturing, costing, and downstream systems. This check helps ensure that unique components are used intentionally, properly documented, and aligned with company design and configuration management practices. Unique component rules and assembly management practices are typically configured through Creo assembly settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the UNQ_COMPONENTS settings in the check.mch configuration file.</Description>
         <ModelCheckName>UNQ_COMPONENTS</ModelCheckName>
@@ -2414,7 +2414,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
 
     <Check>
-        <Name>Model has Multiple Bodies</Name>
+        <Name>Model has Mutli-bodies</Name>
         <Category>Model Complexity</Category>
         <Description>Checks whether the part model contains multiple solid bodies and reports cases where more than one body exists when a single-body design standard is expected according to company modeling guidelines. Multi-body parts can arise from Boolean operations, merges, imports, or intentional design strategies, but if not properly controlled they can introduce ambiguity in design intent, complicate mass property calculations, increase modeling complexity, and create issues in downstream processes such as manufacturing, CAM programming, simulation, and data management. This check helps ensure that multi-body usage is intentional, properly justified, and aligned with organizational standards for part structure. Multi-body modeling rules and part structure requirements are typically governed by Creo part modeling practices and ModelCHECK configuration files, while check behavior and reporting are controlled by the MULTIBODY_MODEL settings in the check.mch configuration file.</Description>
         <ModelCheckName>MULTIBODY_MODEL</ModelCheckName>
