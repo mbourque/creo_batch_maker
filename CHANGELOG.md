@@ -2,6 +2,26 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-07 — v1.11.88
+
+- **Scan Templates**: template rows for model types turned off in **Scan settings** are hidden; existing templates for those types are cleared when settings change.
+
+## 2026-07-07 — v1.11.87
+
+- **Report → Models failed**: renamed from **Models skipped** (same list of models that did not complete scanning).
+
+## 2026-07-07 — v1.11.86
+
+- **Report → Models skipped**: model types turned off in **Scan settings** are no longer listed as skipped.
+
+## 2026-07-07 — v1.11.85
+
+- **Thumbnails** (drawing-only scan settings): the wizard step now finds `.drw` files and enables **Thumbnails >** instead of reporting no models.
+
+## 2026-07-07 — v1.11.84
+
+- **Settings → Scan settings…**: choose which model types to include when scanning the working folder (parts, assemblies, and/or drawings). Unchecked types are skipped in batch runs.
+
 ## 2026-07-07 — v1.11.83
 
 - **Start over…**: batch status cleanup removes `.pvz` files (not `.pvx`).

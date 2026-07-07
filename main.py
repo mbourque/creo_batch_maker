@@ -196,6 +196,9 @@ WIZARD_AUTOMATIC_MODE_MESSAGE = (
 )
 AUTOMATIC_MODE_DEFAULT = True
 DEBUG_MODE_DEFAULT = False
+SCAN_PARTS_DEFAULT = True
+SCAN_ASSEMBLIES_DEFAULT = True
+SCAN_DRAWINGS_DEFAULT = True
 _RECENT_SCANS_MAX = 10
 # When no Creo loadpoint / no .ttd list yet, File → New uses this default task (filename + UI label).
 DEFAULT_MODELCHECK_TTD = "modelcheck.ttd"
@@ -883,6 +886,35 @@ def _normalize_automatic_mode(value: object) -> bool:
     return False
 
 
+def _normalize_scan_type_flag(value: object, *, default: bool) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return default
+
+
+def _filter_scan_extensions(
+    extensions: tuple[str, ...],
+    *,
+    scan_parts: bool,
+    scan_assemblies: bool,
+    scan_drawings: bool,
+) -> tuple[str, ...]:
+    allowed: set[str] = set()
+    if scan_parts:
+        allowed.add("prt")
+    if scan_assemblies:
+        allowed.add("asm")
+    if scan_drawings:
+        allowed.add("drw")
+    return tuple(ext for ext in extensions if ext in allowed)
+
+
 def _normalize_recent_scans(value: object) -> list[str]:
     """Up to ``_RECENT_SCANS_MAX`` full working-directory paths (most recent first)."""
     if not isinstance(value, list):
@@ -949,7 +981,7 @@ def _format_recent_scan_menu_label(index: int, path: str, *, max_len: int = 52) 
 
 def _canonical_app_settings(data: dict[str, object]) -> dict[str, object]:
     """Keys persisted in app_settings.json (task selection is not stored)."""
-    return {
+    out: dict[str, object] = {
         "working_directory": str(data.get("working_directory") or ""),
         "recent_scans": _normalize_recent_scans(data.get("recent_scans")),
         "creo_loadpoint": str(data.get("creo_loadpoint") or ""),
@@ -968,7 +1000,23 @@ def _canonical_app_settings(data: dict[str, object]) -> dict[str, object]:
         "debug_mode": _normalize_automatic_mode(
             data.get("debug_mode", DEBUG_MODE_DEFAULT)
         ),
+        "scan_parts": _normalize_scan_type_flag(
+            data.get("scan_parts"), default=SCAN_PARTS_DEFAULT
+        ),
+        "scan_assemblies": _normalize_scan_type_flag(
+            data.get("scan_assemblies"), default=SCAN_ASSEMBLIES_DEFAULT
+        ),
+        "scan_drawings": _normalize_scan_type_flag(
+            data.get("scan_drawings"), default=SCAN_DRAWINGS_DEFAULT
+        ),
     }
+    if not (
+        out["scan_parts"] or out["scan_assemblies"] or out["scan_drawings"]
+    ):
+        out["scan_parts"] = SCAN_PARTS_DEFAULT
+        out["scan_assemblies"] = SCAN_ASSEMBLIES_DEFAULT
+        out["scan_drawings"] = SCAN_DRAWINGS_DEFAULT
+    return out
 
 
 def _toplevel_effective_size(widget: tk.Misc) -> tuple[int, int]:
@@ -1165,6 +1213,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._automatic_mode_var = tk.BooleanVar(master=self, value=AUTOMATIC_MODE_DEFAULT)
         self._debug_mode = DEBUG_MODE_DEFAULT
         self._debug_mode_var = tk.BooleanVar(master=self, value=DEBUG_MODE_DEFAULT)
+        self._scan_parts = SCAN_PARTS_DEFAULT
+        self._scan_assemblies = SCAN_ASSEMBLIES_DEFAULT
+        self._scan_drawings = SCAN_DRAWINGS_DEFAULT
         self._automatic_wizard_chain_job: str | None = None
         self._automatic_wizard_paused = False
         self._wizard_report_auto_create_done = False
@@ -1275,9 +1326,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         part_xml = templates_dir / "part_template.p.xml"
         asm_xml = templates_dir / "assembly_template.a.xml"
         drw_xml = templates_dir / "drawing_template.d.xml"
-        part_path = part_xml if part_xml.is_file() else None
-        asm_path = asm_xml if asm_xml.is_file() else None
-        drw_path = drw_xml if drw_xml.is_file() else None
+        part_path = part_xml if part_xml.is_file() and self._scan_parts else None
+        asm_path = asm_xml if asm_xml.is_file() and self._scan_assemblies else None
+        drw_path = drw_xml if drw_xml.is_file() and self._scan_drawings else None
         mcs_path = _app_bundle_dir() / "configs" / "start.mcs"
         try:
             update_start_from_xml.update_start(
@@ -1353,7 +1404,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         templates = Path(wd) / "templates"
         if templates.is_dir():
             if self._working_directory_has_creo_models(
-                str(templates), extensions=_CREO_MODEL_EXTENSIONS_ALL
+                str(templates), extensions=self._enabled_scan_extensions()
             ):
                 return True
         return bool(self._pending_template_sources)
@@ -1366,12 +1417,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         templates_dir = Path(wd) / "templates"
         if not templates_dir.is_dir():
             return False
-        for name in (
-            "part_template.p.xml",
-            "assembly_template.a.xml",
-            "drawing_template.d.xml",
-        ):
-            if (templates_dir / name).is_file():
+        for kind in ("prt", "asm", "drw"):
+            if not self._scan_kind_enabled(kind):
+                continue
+            xml_name = _START_TEMPLATE_XML_NAMES.get(kind)
+            if xml_name and (templates_dir / xml_name).is_file():
                 return True
         return False
 
@@ -1398,9 +1448,15 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 return False
         except OSError:
             return False
-        needs_part = self._working_directory_has_creo_models(s, extensions=("prt",))
-        needs_asm = self._working_directory_has_creo_models(s, extensions=("asm",))
-        needs_drawing = self._working_directory_has_creo_models(s, extensions=("drw",))
+        needs_part = self._scan_parts and self._working_directory_has_creo_models(
+            s, extensions=("prt",)
+        )
+        needs_asm = self._scan_assemblies and self._working_directory_has_creo_models(
+            s, extensions=("asm",)
+        )
+        needs_drawing = self._scan_drawings and self._working_directory_has_creo_models(
+            s, extensions=("drw",)
+        )
         if needs_part and not _directory_has_thumbnail_suffix(d, "part"):
             return False
         if needs_asm and not _directory_has_thumbnail_suffix(d, "assembly"):
@@ -1412,14 +1468,20 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         return True
 
     def _wizard_thumbnails_needs_part_phase(self, working_dir_str: str | None = None) -> bool:
+        if not self._scan_parts:
+            return False
         s = (working_dir_str if working_dir_str is not None else self.working_directory.get()).strip()
         return bool(s) and self._working_directory_has_creo_models(s, extensions=("prt",))
 
     def _wizard_thumbnails_needs_assembly_phase(self, working_dir_str: str | None = None) -> bool:
+        if not self._scan_assemblies:
+            return False
         s = (working_dir_str if working_dir_str is not None else self.working_directory.get()).strip()
         return bool(s) and self._working_directory_has_creo_models(s, extensions=("asm",))
 
     def _wizard_thumbnails_needs_drawing_phase(self, working_dir_str: str | None = None) -> bool:
+        if not self._scan_drawings:
+            return False
         s = (working_dir_str if working_dir_str is not None else self.working_directory.get()).strip()
         return bool(s) and self._working_directory_has_creo_models(s, extensions=("drw",))
 
@@ -1431,13 +1493,19 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return "jpeg3d_asm"
         return "jpeg2d"
 
-    @staticmethod
-    def _wizard_thumbnails_phase_scan_extensions(phase: str) -> tuple[str, ...]:
+    def _wizard_thumbnails_phase_scan_extensions(self, phase: str) -> tuple[str, ...]:
         if phase == _WIZARD_THUMBNAILS_PHASE_PART:
-            return ("prt",)
-        if phase == _WIZARD_THUMBNAILS_PHASE_ASSEMBLY:
-            return ("asm",)
-        return ("drw",)
+            base = ("prt",)
+        elif phase == _WIZARD_THUMBNAILS_PHASE_ASSEMBLY:
+            base = ("asm",)
+        else:
+            base = ("drw",)
+        return _filter_scan_extensions(
+            base,
+            scan_parts=self._scan_parts,
+            scan_assemblies=self._scan_assemblies,
+            scan_drawings=self._scan_drawings,
+        )
 
     @staticmethod
     def _wizard_thumbnails_phase_rename_middle(phase: str) -> str:
@@ -1451,29 +1519,41 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         """First thumbnail sub-phase that still has models missing output."""
         wd_str = str(working_dir)
         if self._wizard_thumbnails_needs_part_phase(wd_str):
-            latest = self._scan_models_non_recursive(working_dir, extensions=("prt",))
-            paths = self._get_latest_model_files(latest)
-            pending = self._filter_models_missing_task_output(
-                paths, working_dir, "jpeg3d_part"
+            extensions = self._wizard_thumbnails_phase_scan_extensions(
+                _WIZARD_THUMBNAILS_PHASE_PART
             )
-            if pending:
-                return _WIZARD_THUMBNAILS_PHASE_PART
+            if extensions:
+                latest = self._scan_models_non_recursive(working_dir, extensions=extensions)
+                paths = self._get_latest_model_files(latest)
+                pending = self._filter_models_missing_task_output(
+                    paths, working_dir, "jpeg3d_part"
+                )
+                if pending:
+                    return _WIZARD_THUMBNAILS_PHASE_PART
         if self._wizard_thumbnails_needs_assembly_phase(wd_str):
-            latest = self._scan_models_non_recursive(working_dir, extensions=("asm",))
-            paths = self._get_latest_model_files(latest)
-            pending = self._filter_models_missing_task_output(
-                paths, working_dir, "jpeg3d_asm"
+            extensions = self._wizard_thumbnails_phase_scan_extensions(
+                _WIZARD_THUMBNAILS_PHASE_ASSEMBLY
             )
-            if pending:
-                return _WIZARD_THUMBNAILS_PHASE_ASSEMBLY
+            if extensions:
+                latest = self._scan_models_non_recursive(working_dir, extensions=extensions)
+                paths = self._get_latest_model_files(latest)
+                pending = self._filter_models_missing_task_output(
+                    paths, working_dir, "jpeg3d_asm"
+                )
+                if pending:
+                    return _WIZARD_THUMBNAILS_PHASE_ASSEMBLY
         if self._wizard_thumbnails_needs_drawing_phase(wd_str) and self._wizard_jpeg_2d_display():
-            latest = self._scan_models_non_recursive(working_dir, extensions=("drw",))
-            paths = self._get_latest_model_files(latest)
-            pending = self._filter_models_missing_task_output(
-                paths, working_dir, "jpeg2d"
+            extensions = self._wizard_thumbnails_phase_scan_extensions(
+                _WIZARD_THUMBNAILS_PHASE_2D
             )
-            if pending:
-                return _WIZARD_THUMBNAILS_PHASE_2D
+            if extensions:
+                latest = self._scan_models_non_recursive(working_dir, extensions=extensions)
+                paths = self._get_latest_model_files(latest)
+                pending = self._filter_models_missing_task_output(
+                    paths, working_dir, "jpeg2d"
+                )
+                if pending:
+                    return _WIZARD_THUMBNAILS_PHASE_2D
         return None
 
     def _wizard_thumbnails_mark_phase_done(self, phase: str) -> None:
@@ -1591,6 +1671,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if phase == _WIZARD_THUMBNAILS_PHASE_2D and not self._wizard_jpeg_2d_display():
             return False
         extensions = self._wizard_thumbnails_phase_scan_extensions(phase)
+        if not extensions:
+            return False
         latest = self._scan_models_non_recursive(working_dir, extensions=extensions)
         paths = self._get_latest_model_files(latest)
         pending = self._filter_models_missing_task_output(
@@ -1665,12 +1747,33 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
     def _is_jpeg_export_task(self, task_display: str) -> bool:
         return self._is_jpeg_3d_task(task_display) or self._is_jpeg_2d_plot_task(task_display)
 
+    def _enabled_scan_extensions(self) -> tuple[str, ...]:
+        return _filter_scan_extensions(
+            _CREO_MODEL_EXTENSIONS_ALL,
+            scan_parts=self._scan_parts,
+            scan_assemblies=self._scan_assemblies,
+            scan_drawings=self._scan_drawings,
+        )
+
+    def _enabled_scan_types_label(self) -> str:
+        exts = self._enabled_scan_extensions()
+        if not exts:
+            return ".prt, .asm, or .drw"
+        return "/".join(f".{ext}" for ext in exts)
+
     def _model_scan_extensions_for_task(self, task_display: str) -> tuple[str, ...]:
         if self._is_jpeg_2d_plot_task(task_display):
-            return ("drw",)
-        if self._is_jpeg_3d_task(task_display):
-            return ("prt", "asm")
-        return _CREO_MODEL_EXTENSIONS_ALL
+            task_exts: tuple[str, ...] = ("drw",)
+        elif self._is_jpeg_3d_task(task_display):
+            task_exts = ("prt", "asm")
+        else:
+            task_exts = _CREO_MODEL_EXTENSIONS_ALL
+        return _filter_scan_extensions(
+            task_exts,
+            scan_parts=self._scan_parts,
+            scan_assemblies=self._scan_assemblies,
+            scan_drawings=self._scan_drawings,
+        )
 
     def _model_scan_types_label(self, task_display: str) -> str:
         return "/".join(f".{ext}" for ext in self._model_scan_extensions_for_task(task_display))
@@ -2230,10 +2333,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             )
         if step == WIZARD_STEP_SCAN:
             return (
-                "Optional: upload templates for model types in your working folder, then run "
-                "ModelCHECK on them to seed configs. Part template is always shown; assembly and "
-                "drawing rows appear only when .asm or .drw files are present. At least one "
-                "template is required to scan."
+                "Optional: upload templates for model types enabled in Scan settings, then run "
+                "ModelCHECK on them to seed configs. Assembly and drawing rows appear when "
+                ".asm or .drw files are in the working folder (or a template is already set). "
+                "At least one template is required to scan."
             )
         if step == WIZARD_STEP_MODELCHECK:
             return (
@@ -2266,6 +2369,35 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         kill = _app_bundle_dir() / "kill.bat"
         return ptc.is_file() and kill.is_file()
 
+    def _scan_kind_enabled(self, kind: str) -> bool:
+        if kind == "prt":
+            return self._scan_parts
+        if kind == "asm":
+            return self._scan_assemblies
+        if kind == "drw":
+            return self._scan_drawings
+        return True
+
+    def _clear_template_artifacts_for_kind(self, kind: str) -> None:
+        self._pending_template_sources.pop(kind, None)
+        for path in self._template_scan_artifact_paths(kind):
+            try:
+                path.unlink()
+            except OSError:
+                pass
+
+    def _clear_templates_for_disabled_scan_types(self) -> None:
+        """Remove template picks and files for model types turned off in Scan settings."""
+        changed = False
+        for kind in ("prt", "asm", "drw"):
+            if self._scan_kind_enabled(kind):
+                continue
+            if self._template_has_selection(kind):
+                self._clear_template_artifacts_for_kind(kind)
+                changed = True
+        if changed:
+            self._update_start_from_template_xml_if_present()
+
     def _template_dest_path(self, kind: str) -> Path | None:
         dest_dir = self._start_templates_dir()
         if dest_dir is None:
@@ -2294,6 +2426,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         except OSError as exc:
             return False, f"Could not create templates folder:\n{dest_dir.resolve()}\n\n{exc}"
         for kind, source in list(self._pending_template_sources.items()):
+            if not self._scan_kind_enabled(kind):
+                self._pending_template_sources.pop(kind, None)
+                continue
             dest = self._template_dest_path(kind)
             if dest is None:
                 continue
@@ -2308,7 +2443,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         return True, ""
 
     def _wizard_template_kind_visible(self, kind: str) -> bool:
-        """Show a template row for part always; asm/drw only when WD has that type or template is set."""
+        """Show a template row only for enabled scan types; asm/drw when WD has that type or set."""
+        if not self._scan_kind_enabled(kind):
+            return False
         if kind == "prt":
             return True
         if self._template_has_selection(kind):
@@ -2407,7 +2544,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
     def _templates_upload_count(self) -> int:
         return sum(
-            1 for kind, _ in _START_TEMPLATE_KINDS if self._template_has_selection(kind)
+            1
+            for kind, _ in _START_TEMPLATE_KINDS
+            if self._scan_kind_enabled(kind) and self._template_has_selection(kind)
         )
 
     def _discard_working_templates_on_skip(self) -> None:
@@ -2449,7 +2588,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if step == WIZARD_STEP_REPORT and prev != WIZARD_STEP_REPORT:
             self._wizard_report_auto_create_done = False
         self._wizard_step = step
-        task_display = self._wizard_task_display_for_step(step)
+        if step == WIZARD_STEP_JPEG_3D:
+            task_display = self._wizard_thumbnails_task_display_to_run()
+        else:
+            task_display = self._wizard_task_display_for_step(step)
         if task_display:
             self.task.set(task_display)
         self._refresh_configuration_menu()
@@ -2557,13 +2699,15 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return []
         if step == WIZARD_STEP_JPEG_3D:
             pending: list[Path] = []
-            phase_specs = (
-                (("prt",), "jpeg3d_part"),
-                (("asm",), "jpeg3d_asm"),
-                (("drw",), "jpeg2d"),
-            )
-            for extensions, kind in phase_specs:
+            for phase, kind in (
+                (_WIZARD_THUMBNAILS_PHASE_PART, "jpeg3d_part"),
+                (_WIZARD_THUMBNAILS_PHASE_ASSEMBLY, "jpeg3d_asm"),
+                (_WIZARD_THUMBNAILS_PHASE_2D, "jpeg2d"),
+            ):
                 if kind == "jpeg2d" and not self._wizard_jpeg_2d_display():
+                    continue
+                extensions = self._wizard_thumbnails_phase_scan_extensions(phase)
+                if not extensions:
                     continue
                 scanned = self._scan_models_non_recursive(working_dir, extensions=extensions)
                 latest = self._get_latest_model_files(scanned)
@@ -2919,61 +3063,26 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             self._wizard_batch_waiting_on_step(WIZARD_STEP_JPEG_3D)
         )
 
-    @staticmethod
     def _wizard_batch_cache_thumbnail_phase_flags(
-        watch: dict[str, object], *, working_dir_str: str, drawing_task_ok: bool
+        self,
+        watch: dict[str, object],
+        *,
+        working_dir_str: str,
+        drawing_task_ok: bool,
     ) -> None:
         """Store which thumbnail progress rows apply (fixed for this GO; no per-tick iterdir)."""
         watch["thumbnails_show_part"] = bool(
-            working_dir_str
-            and CreoDistributedBatchMakerApp._static_thumbnails_needs_part_phase(working_dir_str)
+            working_dir_str and self._wizard_thumbnails_needs_part_phase(working_dir_str)
         )
         watch["thumbnails_show_asm"] = bool(
             working_dir_str
-            and CreoDistributedBatchMakerApp._static_thumbnails_needs_assembly_phase(working_dir_str)
+            and self._wizard_thumbnails_needs_assembly_phase(working_dir_str)
         )
         watch["thumbnails_show_drawing"] = bool(
             working_dir_str
             and drawing_task_ok
-            and CreoDistributedBatchMakerApp._static_thumbnails_needs_drawing_phase(working_dir_str)
+            and self._wizard_thumbnails_needs_drawing_phase(working_dir_str)
         )
-
-    @staticmethod
-    def _static_thumbnails_needs_part_phase(working_dir_str: str) -> bool:
-        return CreoDistributedBatchMakerApp._static_working_directory_has_creo_models(
-            working_dir_str, extensions=("prt",)
-        )
-
-    @staticmethod
-    def _static_thumbnails_needs_assembly_phase(working_dir_str: str) -> bool:
-        return CreoDistributedBatchMakerApp._static_working_directory_has_creo_models(
-            working_dir_str, extensions=("asm",)
-        )
-
-    @staticmethod
-    def _static_thumbnails_needs_drawing_phase(working_dir_str: str) -> bool:
-        return CreoDistributedBatchMakerApp._static_working_directory_has_creo_models(
-            working_dir_str, extensions=("drw",)
-        )
-
-    @staticmethod
-    def _static_working_directory_has_creo_models(
-        working_dir_str: str, *, extensions: tuple[str, ...]
-    ) -> bool:
-        s = (working_dir_str or "").strip()
-        if not s:
-            return False
-        pattern = _creo_model_name_pattern(extensions)
-        try:
-            d = Path(s).expanduser()
-            if not d.is_dir():
-                return False
-            for entry in d.iterdir():
-                if entry.is_file() and pattern.match(entry.name):
-                    return True
-            return False
-        except OSError:
-            return False
 
     def _wizard_batch_sync_progress_snapshot(self, watch: dict[str, object]) -> None:
         """One chunk .dxc glob and pass-complete check per UI tick (shared by progress UI)."""
@@ -3534,6 +3643,27 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             label.configure(text="")
             label.pack_forget()
 
+    def _wizard_thumbnails_latest_models(self, working_dir: Path) -> list[Path]:
+        """Top-level models included in any applicable thumbnail pass."""
+        seen: set[Path] = set()
+        out: list[Path] = []
+        for phase in (
+            _WIZARD_THUMBNAILS_PHASE_PART,
+            _WIZARD_THUMBNAILS_PHASE_ASSEMBLY,
+            _WIZARD_THUMBNAILS_PHASE_2D,
+        ):
+            if phase == _WIZARD_THUMBNAILS_PHASE_2D and not self._wizard_jpeg_2d_display():
+                continue
+            extensions = self._wizard_thumbnails_phase_scan_extensions(phase)
+            if not extensions:
+                continue
+            scanned = self._scan_models_non_recursive(working_dir, extensions=extensions)
+            for path in self._get_latest_model_files(scanned):
+                if path not in seen:
+                    seen.add(path)
+                    out.append(path)
+        return out
+
     def _wizard_thumbnails_task_display_to_run(self) -> str:
         """Pick 3D or 2D batch task for the next thumbnail sub-phase."""
         wd = (self.working_directory.get() or "").strip()
@@ -3606,6 +3736,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return False
         expected_any = False
         for kind, dest_name in _START_TEMPLATE_DEST_NAMES.items():
+            if not self._scan_kind_enabled(kind):
+                continue
             dest = templates_dir / dest_name
             if not dest.is_file():
                 continue
@@ -3621,6 +3753,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return []
         found: list[str] = []
         for kind, dest_name in _START_TEMPLATE_DEST_NAMES.items():
+            if not self._scan_kind_enabled(kind):
+                continue
             if not (templates_dir / dest_name).is_file():
                 continue
             xml_name = _START_TEMPLATE_XML_NAMES.get(kind)
@@ -4438,6 +4572,14 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if self._wizard_batch_waiting_on_step(WIZARD_STEP_SCAN):
             return
         labels = {k: label.rstrip(".") for k, label in _START_TEMPLATE_KINDS}
+        if not self._scan_kind_enabled(kind):
+            title = labels.get(kind, "Template")
+            messagebox.showinfo(
+                "Scan settings",
+                f"{title} is not available because that model type is turned off in "
+                "Settings → Scan settings…",
+            )
+            return
         title = labels.get(kind, "Template")
         wd = (self.working_directory.get() or "").strip()
         if not wd or not Path(wd).is_dir():
@@ -4715,11 +4857,15 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 label.configure(text="Working directory is not ready.", text_color="#666666")
                 return
             if working_dir.is_dir():
-                latest_files = self._latest_models_for_task(working_dir, task_display)
-                task_kind = self._runner_task_kind(task_display)
-                pending_files = self._filter_models_missing_task_output(
-                    latest_files, working_dir, task_kind
-                )
+                if step == WIZARD_STEP_JPEG_3D:
+                    latest_files = self._wizard_thumbnails_latest_models(working_dir)
+                    pending_files = self._wizard_step_pending_models(step)
+                else:
+                    latest_files = self._latest_models_for_task(working_dir, task_display)
+                    task_kind = self._runner_task_kind(task_display)
+                    pending_files = self._filter_models_missing_task_output(
+                        latest_files, working_dir, task_kind
+                    )
                 lines: list[str] = []
                 lines.append(
                     self._format_batch_model_count_message(
@@ -5381,6 +5527,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
         general_settings_menu = tk.Menu(menubar, tearoff=0)
         general_settings_menu.add_command(
+            label="Scan settings...",
+            command=self._on_scan_settings,
+        )
+        general_settings_menu.add_command(
             label="Batch settings...",
             command=self._on_batch_settings,
         )
@@ -5665,6 +5815,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     "xtop_timeout_sec": self._xtop_gone_timeout_sec,
                     "automatic_mode": self._automatic_mode,
                     "debug_mode": self._debug_mode,
+                    "scan_parts": self._scan_parts,
+                    "scan_assemblies": self._scan_assemblies,
+                    "scan_drawings": self._scan_drawings,
                     "recent_scans": self._recent_scans,
                 }
             ),
@@ -5706,7 +5859,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         s = (working_dir_str if working_dir_str is not None else self.working_directory.get()).strip()
         if not s or not _working_directory_exists_as_dir(s):
             return False
-        return self._working_directory_has_creo_models(s, extensions=_CREO_MODEL_EXTENSIONS_ALL)
+        return self._working_directory_has_creo_models(s, extensions=self._enabled_scan_extensions())
 
     def _warn_wizard_working_directory_missing_models(self) -> bool:
         """Warn when the working folder has no batchable Creo models. Returns True if missing."""
@@ -5715,7 +5868,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return False
         if self._wizard_working_directory_has_models(wd):
             return False
-        types_label = "/".join(f".{ext}" for ext in _CREO_MODEL_EXTENSIONS_ALL)
+        types_label = self._enabled_scan_types_label()
         messagebox.showwarning(
             "Working directory",
             "No Creo models found in this folder.\n\n"
@@ -5739,7 +5892,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 "Templates",
                 "No template models found.\n\n"
                 "Use Browse on the Scan Templates wizard step to copy at least one "
-                f".prt, .asm, or .drw into:\n{Path(wd) / 'templates'}",
+                f"{self._enabled_scan_types_label()} into:\n{Path(wd) / 'templates'}",
             )
             return
         scan_exts = self._model_scan_extensions_for_task(task_display)
@@ -6355,6 +6508,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         """Keep checkbox/batch settings from memory so merge writes cannot drop them."""
         data["automatic_mode"] = self._automatic_mode
         data["debug_mode"] = self._debug_mode
+        data["scan_parts"] = self._scan_parts
+        data["scan_assemblies"] = self._scan_assemblies
+        data["scan_drawings"] = self._scan_drawings
         data["chunk_size"] = self._chunk_size
         data["output_timeout_sec"] = self._output_timeout_sec
         data["xtop_timeout_sec"] = self._xtop_gone_timeout_sec
@@ -6421,6 +6577,103 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._xtop_gone_timeout_sec = _normalize_xtop_gone_timeout_sec(xtop_gone_timeout_sec)
         data = self._merge_session_into_app_settings_dict(self._read_app_settings_dict())
         return self._write_app_settings_dict(data)
+
+    def _persist_scan_settings(
+        self,
+        *,
+        scan_parts: bool,
+        scan_assemblies: bool,
+        scan_drawings: bool,
+    ) -> str | None:
+        self._scan_parts = _normalize_scan_type_flag(scan_parts, default=SCAN_PARTS_DEFAULT)
+        self._scan_assemblies = _normalize_scan_type_flag(
+            scan_assemblies, default=SCAN_ASSEMBLIES_DEFAULT
+        )
+        self._scan_drawings = _normalize_scan_type_flag(
+            scan_drawings, default=SCAN_DRAWINGS_DEFAULT
+        )
+        if not (self._scan_parts or self._scan_assemblies or self._scan_drawings):
+            self._scan_parts = SCAN_PARTS_DEFAULT
+            self._scan_assemblies = SCAN_ASSEMBLIES_DEFAULT
+            self._scan_drawings = SCAN_DRAWINGS_DEFAULT
+        data = self._merge_session_into_app_settings_dict(self._read_app_settings_dict())
+        err = self._write_app_settings_dict(data)
+        if err is None:
+            self._clear_templates_for_disabled_scan_types()
+        return err
+
+    def _on_scan_settings(self) -> None:
+        dialog = self._create_modal_toplevel("Scan settings")
+        body = ctk.CTkFrame(dialog, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=20, pady=(16, 8))
+
+        ctk.CTkLabel(
+            body,
+            text="Which Creo models to include when scanning the working folder",
+            font=ctk.CTkFont(size=14, weight="bold"),
+        ).pack(anchor="w")
+        ctk.CTkLabel(
+            body,
+            text="Choose one or more types. Unchecked types are ignored for batch runs "
+            "(ModelCHECK, thumbnails, and scan templates). Re-run GO after changing these.",
+            justify="left",
+            wraplength=500,
+            text_color="#555555",
+        ).pack(anchor="w", pady=(4, 16))
+
+        parts_var = tk.BooleanVar(value=self._scan_parts)
+        asm_var = tk.BooleanVar(value=self._scan_assemblies)
+        drw_var = tk.BooleanVar(value=self._scan_drawings)
+
+        checks = ctk.CTkFrame(body, fg_color="transparent")
+        checks.pack(anchor="w", fill="x")
+        ctk.CTkCheckBox(checks, text="Parts (.prt)", variable=parts_var).pack(
+            anchor="w", pady=(0, 8)
+        )
+        ctk.CTkCheckBox(checks, text="Assemblies (.asm)", variable=asm_var).pack(
+            anchor="w", pady=(0, 8)
+        )
+        ctk.CTkCheckBox(checks, text="Drawings (.drw)", variable=drw_var).pack(anchor="w")
+
+        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_row.pack(anchor="e", padx=20, pady=(0, 16))
+
+        def close_dialog() -> None:
+            dialog.destroy()
+
+        def on_ok() -> None:
+            if not (parts_var.get() or asm_var.get() or drw_var.get()):
+                messagebox.showwarning(
+                    "Scan settings",
+                    "Choose at least one model type to scan.",
+                    parent=dialog,
+                )
+                return
+            err = self._persist_scan_settings(
+                scan_parts=bool(parts_var.get()),
+                scan_assemblies=bool(asm_var.get()),
+                scan_drawings=bool(drw_var.get()),
+            )
+            if err:
+                messagebox.showerror("Scan settings", err, parent=dialog)
+                return
+            self._refresh_wizard_ui()
+            self._refresh_action_buttons()
+            self._warn_if_working_directory_has_no_creo_models()
+            close_dialog()
+
+        ok_btn = ctk.CTkButton(btn_row, text="OK", width=80, command=on_ok)
+        ok_btn.pack(side="right", padx=(12, 0))
+        cancel_btn = ctk.CTkButton(btn_row, text="Cancel", width=80, command=close_dialog)
+        cancel_btn.pack(side="right")
+
+        dialog.bind("<Escape>", lambda _e: close_dialog())
+        dialog.protocol("WM_DELETE_WINDOW", close_dialog)
+        self._run_modal_toplevel_wait(
+            dialog,
+            focus_widget=ok_btn,
+            repaints=(ok_btn, cancel_btn),
+        )
 
     def _on_batch_settings(self) -> None:
         dialog = self._create_modal_toplevel("Batch settings")
@@ -6747,7 +7000,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
     def _go_fields_valid(self) -> bool:
         wd = (self.working_directory.get() or "").strip()
         lp = (self.creo_loadpoint.get() or "").strip().rstrip("\\/")
-        task_display = (self.task.get() or "").strip()
+        if self._wizard_step == WIZARD_STEP_JPEG_3D:
+            task_display = self._wizard_thumbnails_task_display_to_run()
+        else:
+            task_display = (self.task.get() or "").strip()
         if self._is_create_report_task(task_display):
             return False
         task_fn = self._task_filename_from_ui(task_display)
@@ -6755,7 +7011,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return False
         if _path_contains_spaces(wd):
             return False
-        if not self._go_model_source_ready(wd, self.task.get() or ""):
+        if not self._go_model_source_ready(wd, task_display):
             return False
         if not lp or not _creo_loadpoint_has_parametric_dir(lp):
             return False
@@ -7173,6 +7429,20 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             data.get("debug_mode", DEBUG_MODE_DEFAULT)
         )
         self._debug_mode_var.set(self._debug_mode)
+        self._scan_parts = _normalize_scan_type_flag(
+            data.get("scan_parts"), default=SCAN_PARTS_DEFAULT
+        )
+        self._scan_assemblies = _normalize_scan_type_flag(
+            data.get("scan_assemblies"), default=SCAN_ASSEMBLIES_DEFAULT
+        )
+        self._scan_drawings = _normalize_scan_type_flag(
+            data.get("scan_drawings"), default=SCAN_DRAWINGS_DEFAULT
+        )
+        if not (self._scan_parts or self._scan_assemblies or self._scan_drawings):
+            self._scan_parts = SCAN_PARTS_DEFAULT
+            self._scan_assemblies = SCAN_ASSEMBLIES_DEFAULT
+            self._scan_drawings = SCAN_DRAWINGS_DEFAULT
+        self._clear_templates_for_disabled_scan_types()
         self._recent_scans = _normalize_recent_scans(data.get("recent_scans"))
         self._set_creo_loadpoint_value(str(data.get("creo_loadpoint") or ""))
         self._warn_if_creo_loadpoint_missing_parametric()
@@ -8666,6 +8936,13 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             self._warn_if_working_directory_has_spaces()
             return
         scan_extensions = self._model_scan_extensions_for_task(task_display_raw)
+        if not scan_extensions:
+            messagebox.showwarning(
+                "Scan settings",
+                "No model types are enabled for this task.\n\n"
+                "Open Settings → Scan settings… and enable the types you need.",
+            )
+            return
         types_label = self._model_scan_types_label(task_display_raw)
         scan_templates = self._is_scan_templates_task(task_display_raw)
         if scan_templates:
@@ -8683,7 +8960,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             if scan_templates:
                 messagebox.showwarning(
                     "Templates",
-                    "GO needs at least one Creo template (.prt, .asm, or .drw) in:\n"
+                    f"GO needs at least one Creo template ({self._enabled_scan_types_label()}) in:\n"
                     f"{Path(working_dir_raw) / 'templates'}\n\n"
                     "Use Browse on the Scan Templates wizard step to upload templates first.",
                 )

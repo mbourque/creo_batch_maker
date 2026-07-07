@@ -99,6 +99,79 @@ def load_working_directory_from_settings() -> str | None:
     return wd or None
 
 
+SCAN_PARTS_DEFAULT = True
+SCAN_ASSEMBLIES_DEFAULT = True
+SCAN_DRAWINGS_DEFAULT = True
+
+
+def _normalize_scan_type_flag(value: object, *, default: bool) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return default
+
+
+def load_scan_type_flags_from_settings() -> tuple[bool, bool, bool]:
+    """Read scan_parts / scan_assemblies / scan_drawings from app_settings.json."""
+    settings_path = _app_settings_path()
+    if not settings_path.is_file():
+        return (SCAN_PARTS_DEFAULT, SCAN_ASSEMBLIES_DEFAULT, SCAN_DRAWINGS_DEFAULT)
+    try:
+        data = json.loads(settings_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return (SCAN_PARTS_DEFAULT, SCAN_ASSEMBLIES_DEFAULT, SCAN_DRAWINGS_DEFAULT)
+    if not isinstance(data, dict):
+        return (SCAN_PARTS_DEFAULT, SCAN_ASSEMBLIES_DEFAULT, SCAN_DRAWINGS_DEFAULT)
+    scan_parts = _normalize_scan_type_flag(
+        data.get("scan_parts"), default=SCAN_PARTS_DEFAULT
+    )
+    scan_assemblies = _normalize_scan_type_flag(
+        data.get("scan_assemblies"), default=SCAN_ASSEMBLIES_DEFAULT
+    )
+    scan_drawings = _normalize_scan_type_flag(
+        data.get("scan_drawings"), default=SCAN_DRAWINGS_DEFAULT
+    )
+    if not (scan_parts or scan_assemblies or scan_drawings):
+        return (SCAN_PARTS_DEFAULT, SCAN_ASSEMBLIES_DEFAULT, SCAN_DRAWINGS_DEFAULT)
+    return scan_parts, scan_assemblies, scan_drawings
+
+
+def _model_type_in_scan_scope(
+    display: str,
+    *,
+    scan_parts: bool,
+    scan_assemblies: bool,
+    scan_drawings: bool,
+) -> bool:
+    """True when this model's extension is enabled in Scan settings."""
+    m = re.match(r"^.+\.(prt|asm|drw)$", (display or "").strip(), re.IGNORECASE)
+    if not m:
+        return True
+    ext = m.group(1).lower()
+    if ext == "prt":
+        return scan_parts
+    if ext == "asm":
+        return scan_assemblies
+    return scan_drawings
+
+
+def _resolved_scan_type_flags(
+    *,
+    scan_parts: bool | None = None,
+    scan_assemblies: bool | None = None,
+    scan_drawings: bool | None = None,
+) -> tuple[bool, bool, bool]:
+    from_settings = load_scan_type_flags_from_settings()
+    return (
+        from_settings[0] if scan_parts is None else scan_parts,
+        from_settings[1] if scan_assemblies is None else scan_assemblies,
+        from_settings[2] if scan_drawings is None else scan_drawings,
+    )
 
 
 
@@ -368,7 +441,14 @@ def _scanned_model_keys(master_root: ET.Element) -> set[str]:
     return keys
 
 
-def scan_skipped_models(working_dir: str, master_root: ET.Element) -> list[str]:
+def scan_skipped_models(
+    working_dir: str,
+    master_root: ET.Element,
+    *,
+    scan_parts: bool | None = None,
+    scan_assemblies: bool | None = None,
+    scan_drawings: bool | None = None,
+) -> list[str]:
     """
     Models in the working folder that did not fully make it into the batch scan.
 
@@ -376,7 +456,14 @@ def scan_skipped_models(working_dir: str, master_root: ET.Element) -> list[str]:
     ``master.xml`` entries. Family-table instances may have check XML but no separate
     ``.prt`` / ``.asm`` on disk; any model listed in ``master.xml`` was scanned and
     is not reported as skipped.
+
+    Model types turned off in Scan settings are omitted (not listed as failed).
     """
+    scan_parts, scan_assemblies, scan_drawings = _resolved_scan_type_flags(
+        scan_parts=scan_parts,
+        scan_assemblies=scan_assemblies,
+        scan_drawings=scan_drawings,
+    )
     wd = os.path.normpath(os.path.abspath(working_dir))
     scanned = _scanned_model_keys(master_root)
     xml_on_disk = _check_xml_basenames_in_folder(wd)
@@ -386,6 +473,13 @@ def scan_skipped_models(working_dir: str, master_root: ET.Element) -> list[str]:
 
     for display_cf in sorted(models_on_disk.keys(), key=lambda k: models_on_disk[k].casefold()):
         display = models_on_disk[display_cf]
+        if not _model_type_in_scan_scope(
+            display,
+            scan_parts=scan_parts,
+            scan_assemblies=scan_assemblies,
+            scan_drawings=scan_drawings,
+        ):
+            continue
         xml_base = _check_xml_basename_for_display(display)
         if not xml_base:
             continue
@@ -400,6 +494,13 @@ def scan_skipped_models(working_dir: str, master_root: ET.Element) -> list[str]:
             basename = os.path.basename(path)
             display = _display_from_check_xml_basename(basename)
             if not display:
+                continue
+            if not _model_type_in_scan_scope(
+                display,
+                scan_parts=scan_parts,
+                scan_assemblies=scan_assemblies,
+                scan_drawings=scan_drawings,
+            ):
                 continue
             display_cf = display.casefold()
             if display_cf in skipped or display_cf in scanned:
@@ -1928,7 +2029,7 @@ def _skipped_models_section(skipped_models: list[str]) -> str:
 
   <div class="mq-section">
 
-    <h2>Models skipped ({total})</h2>
+    <h2>Models failed ({total})</h2>
 
     <p class="mq-skipped-section-list">{list_html}</p>
 
