@@ -47,3 +47,6 @@ W:Invalid data type combination at left side of expression
 W:contains obsolete dimension
 
 E:entirely outside the model.
+
+E:The geometry which serves as the origin
+W:External ref. for feature/component not found
