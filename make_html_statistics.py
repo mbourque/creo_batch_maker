@@ -1542,6 +1542,10 @@ _MQ_STATS_CSS = """
 
 .mq-perf-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
 
+.mq-perf-table tbody tr { transition: background-color 0.15s ease; }
+
+.mq-perf-table tbody tr:hover td { background: #f1f5f9; }
+
 .mq-perf-table td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
 
 .mq-perf-table tr:last-child td { border-bottom: none; }

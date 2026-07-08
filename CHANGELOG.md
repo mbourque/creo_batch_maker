@@ -2,6 +2,54 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-08 — v1.11.100
+
+- **Thumbnails**: after a restart, each progress bar shows **100% finished** when that pass already ran and only known failures remain (including drawings that never produced a thumbnail). **Thumbnails >** then shows the failed-models dialog and retries those.
+
+## 2026-07-08 — v1.11.99
+
+- **Thumbnails → Failed (N)**: counts every model still missing a thumbnail across part, assembly, and drawing (not only the latest timeout log). Click **here** opens a combined review list. Models that finish a pass without output are added to that pass’s failure log so part failures stay visible after drawings run.
+
+## 2026-07-08 — v1.11.98
+
+- **Thumbnails**: when a pass finishes (chunks at 100%), the next pass is assembly or drawing — leftover part failures no longer restart the part pass or show the failed-models retry dialog before drawings run.
+
+## 2026-07-08 — v1.11.97
+
+- **Thumbnails**: each progress bar (part / assembly / drawing) is driven only by that pass’s files on disk — assembly and drawing show **100%** when their models are done, independent of part failures; a part re-run no longer clears later passes.
+
+## 2026-07-08 — v1.11.96
+
+- **Thumbnails**: assembly and drawing progress bars show **100%** when that pass is already complete on disk, even if the part pass still has failures; starting a part re-run no longer resets later passes that are already done.
+
+## 2026-07-08 — v1.11.95
+
+- **Thumbnails / Create Report**: **Thumbnail files found** when any in-scope model already has a thumbnail (same idea as ModelCHECK XML), not only when every model is done; progress bars show per-pass completion (e.g. 717 of 720) instead of 0% when outputs exist on disk.
+
+## 2026-07-08 — v1.11.94
+
+- **Thumbnails**: progress bars show 100% when thumbnail outputs already exist on disk (same as ModelCHECK after a prior run); **Create Report** thumbnail status uses the same per-model check.
+
+## 2026-07-08 — v1.11.93
+
+- **Create Report**: thumbnail status again checks only renamed ``*.part.jpg`` / ``*.assembly.jpg`` / ``*.drawing.jpg`` files; drawing thumbnails are required only when the JPEG 2D plot task is available from your Creo loadpoint.
+
+## 2026-07-08 — v1.11.92
+
+- **Create Report**: thumbnail status now detects plain ``.jpg`` and legacy ``.model.jpg`` outputs (same rules as the Thumbnails batch step), not only renamed ``*.part.jpg`` / ``*.assembly.jpg`` / ``*.drawing.jpg`` files.
+
+## 2026-07-08 — v1.11.91
+
+- **Report → Statistics**: table rows highlight on hover (same style as **Biggest problems**).
+
+## 2026-07-08 — v1.11.90
+
+- **Batch settings**: OK/Cancel buttons now use the same dialog styling as other modals (white text instead of gray).
+
+## 2026-07-08 — v1.11.89
+
+- **Scan settings**: OK/Cancel buttons now use consistent dialog styling (white text instead of gray).
+
 ## 2026-07-07 — v1.11.88
 
 - **Scan Templates**: template rows for model types turned off in **Scan settings** are hidden; existing templates for those types are cleared when settings change.
