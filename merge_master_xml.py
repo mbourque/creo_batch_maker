@@ -135,9 +135,12 @@ def write_master_xml(checks_dict, output_file, folder_path):
 
 def build_master_xml(working_directory=None, output_file=None):
     """
-    Scan ``working_directory`` for per-model check XML (``*.p.xml``,
-    ``*.a.xml``, ``*.d.xml``) and write a single ``master.xml`` (or
-    ``output_file``).
+    Scan ``working_directory`` (top level only) for per-model check XML
+    (``*.p.xml``, ``*.a.xml``, ``*.d.xml``) and write a single ``master.xml``
+    (or ``output_file``).
+
+    Does not recurse into subfolders such as ``templates\\`` (Scan Templates
+    outputs belong in the template-scan report section).
 
     Each ``<Path>`` in ``master.xml`` is ``scan_folder`` + model name, where
     ``scan_folder`` is the resolved absolute path of the directory you pass
@@ -154,11 +157,11 @@ def build_master_xml(working_directory=None, output_file=None):
     path_root = os.path.normpath(os.path.abspath(directory_to_scan))
     out = (output_file or "").strip() or "master.xml"
 
-    patterns = ["**/*.p.xml", "**/*.a.xml", "**/*.d.xml"]
+    patterns = ["*.p.xml", "*.a.xml", "*.d.xml"]
     files = [
         f
         for pattern in patterns
-        for f in glob.glob(os.path.join(directory_to_scan, pattern), recursive=True)
+        for f in glob.glob(os.path.join(directory_to_scan, pattern))
     ]
 
     checks_dict = {}

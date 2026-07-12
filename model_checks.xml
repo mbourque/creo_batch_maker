@@ -1687,10 +1687,9 @@ Suppressed features are appropriate if they are only used by particular instance
         <Category>Model Complexity</Category>
         <Description>Checks whether assembly-level features are properly defined, structured, and managed within the model according to company modeling standards. Assembly features include cuts, holes, merges, patterns, and other operations created at the assembly level that affect multiple components or control assembly-specific geometry. Improper or excessive use of assembly features can weaken model clarity, increase regeneration complexity, create unexpected behavior across components, and make assemblies harder to maintain or modify. This check helps ensure that assembly features are used appropriately and that design intent remains clear, stable, and consistent throughout the assembly structure. Assembly feature usage and related modeling standards are typically configured through Creo assembly settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the ASM_FEATURES settings in the check.mch configuration file.</Description>
         <ModelCheckName>ASM_FEATURES</ModelCheckName>
-        <ModelCheckOptions>YN Y Y N N Y</ModelCheckOptions>
+        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
-        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Bulk Items</Name>

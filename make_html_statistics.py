@@ -554,6 +554,52 @@ def _asm_subtree_assembly_count(graph: dict[str, list[str]], start_key: str) -> 
     return len(seen)
 
 
+def _find_file_element_by_model(
+    master_root: ET.Element,
+    model_name: str,
+) -> ET.Element | None:
+    """Return the ``File`` element whose ``Model`` matches ``model_name`` (basename, casefold)."""
+    want = os.path.basename((model_name or "").strip()).casefold()
+    if not want:
+        return None
+    for file_element in master_root.findall("File"):
+        model = (file_element.findtext("Model") or "").strip()
+        if os.path.basename(model).casefold() == want:
+            return file_element
+    return None
+
+
+def _top_level_assembly_feature_total(
+    master_root: ET.Element,
+    top_assembly: str,
+) -> int | None:
+    """
+    Component features in the top-level product (each part/sub-assembly occurrence).
+
+    Uses ``NUM_COMPONENTS`` on the top assembly (Creo total parts and sub-assemblies).
+    Falls back to ``ASM_BOM`` line count excluding the root assembly row.
+    """
+    top_file = _find_file_element_by_model(master_root, top_assembly)
+    if top_file is None:
+        return None
+    n = _parse_int_metric(_check_ans_text(top_file, "NUM_COMPONENTS"))
+    if n is not None:
+        return n
+    check = _find_check(top_file, "ASM_BOM")
+    if check is None:
+        return None
+    top_key = os.path.basename(top_assembly.strip()).casefold()
+    count = 0
+    for item in check.findall("item"):
+        name = (item.findtext("info1") or "").strip()
+        if not name:
+            continue
+        if os.path.basename(name).casefold() == top_key:
+            continue
+        count += 1
+    return count if count else None
+
+
 def find_top_level_assembly(master_root: ET.Element) -> str | None:
 
     """
@@ -651,6 +697,7 @@ PERFORMANCE_TABLE_ROWS: list[tuple[str, str | None]] = [
     ("Number of mechanism components", "_MECH_COMPONENTS"),
     ("Number of family table generics", "_FAMILY_GENERIC_PART_COUNT"),
     ("Number of family table instances", "_FAMILY_INSTANCE_COUNT"),
+    ("Total number of features in top level assembly", "_TOP_LEVEL_FEATURES"),
 ]
 
 
@@ -682,6 +729,8 @@ class PerformanceMetrics:
     scan_date: str = ""
     users: list[str] = field(default_factory=list)
     total_scanned_bytes: int = 0
+    top_level_assembly_name: str = ""
+    top_level_assembly_features: int | None = None
 
 
 def _parse_int_metric(text: str | None) -> int | None:
@@ -969,6 +1018,14 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
     metrics.family_generic_part_count = len(family_generics)
     metrics.family_instance_count = sum(len(row.instance_names) for row in family_generics)
     metrics.users = users
+
+    top_asm = find_top_level_assembly(master_root)
+    if top_asm:
+        metrics.top_level_assembly_name = top_asm
+        metrics.top_level_assembly_features = _top_level_assembly_feature_total(
+            master_root, top_asm
+        )
+
     return metrics
 
 
@@ -1018,6 +1075,11 @@ def performance_metrics_answers(metrics: PerformanceMetrics) -> dict[str, str]:
         "_TOTAL_SCANNED_SIZE": _format_total_scanned_size(metrics.total_scanned_bytes),
         "_FIXED_COMPONENTS": str(metrics.fixed_components),
         "_SUPPRESSED_COMPONENTS": str(metrics.suppressed_components),
+        "_TOP_LEVEL_FEATURES": (
+            str(metrics.top_level_assembly_features)
+            if metrics.top_level_assembly_features is not None
+            else "—"
+        ),
     }
     for row_key in PERFORMANCE_REPORT_ISSUE_ROW_CHECKS:
         answers[row_key] = str(metrics.report_issue_counts.get(row_key, 0))
@@ -1088,16 +1150,28 @@ def _resolve_performance_value(answers: dict[str, str], key: str | None) -> tupl
     if key == "_NON_SOLID_PARTS":
         val = answers.get(key)
         return (val if val is not None else "—", "BODY_INFO")
+    if key == "_TOP_LEVEL_FEATURES":
+        val = answers.get(key)
+        return (val if val is not None else "—", "NUM_COMPONENTS")
     val = answers.get(key)
     if val is None:
         return ("—", key)
     return (val, key)
 
 
+def _top_level_features_label(metrics: PerformanceMetrics) -> str:
+    name = (metrics.top_level_assembly_name or "").strip()
+    if name:
+        return f"Total number of features in {name}"
+    return "Total number of features in top level assembly"
+
+
 def build_performance_table_rows(metrics: PerformanceMetrics) -> list[tuple[str, str, str | None]]:
     answers = performance_metrics_answers(metrics)
     rows: list[tuple[str, str, str | None]] = []
     for label, key in PERFORMANCE_TABLE_ROWS:
+        if key == "_TOP_LEVEL_FEATURES":
+            label = _top_level_features_label(metrics)
         value, check = _resolve_performance_value(answers, key)
         rows.append((label, value, check if key and not key.startswith("_") else key))
     return rows

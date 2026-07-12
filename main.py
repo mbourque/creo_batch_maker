@@ -3305,11 +3305,19 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
     def _wizard_batch_runner_idle(self, watch: dict[str, object]) -> bool:
         """True when the batch runner script finished (process exited or run-complete flag)."""
         batch_dir = watch.get("batch_dir")
-        if isinstance(batch_dir, Path) and not bool(watch.get("scan_templates")):
+        if isinstance(batch_dir, Path):
             base = self._watch_batch_dxc_base(watch)
             if self._batch_run_complete_flag_path(batch_dir, base).is_file():
                 watch["runner_exit_polled"] = True
                 return True
+            # Scan Templates + Debug (-NoExit): chunks and template XML can be done
+            # while the PowerShell window is still open — treat as idle so Next > appears.
+            if bool(watch.get("scan_templates")) and self._wizard_scan_outputs_complete(
+                batch_dir
+            ):
+                if not self._batch_dxc_files_exist(batch_dir, True, base):
+                    watch["runner_exit_polled"] = True
+                    return True
         proc = self._batch_runner_process
         if proc is None:
             return bool(watch.get("runner_exit_polled"))
@@ -3992,19 +4000,18 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if self._wizard_scan_outputs_complete(batch_dir):
             watch.pop("runner_exited_at", None)
             return False
-        proc = self._batch_runner_process
-        if proc is not None:
-            code = proc.poll()
-            if code is not None:
-                exited_at = watch.get("runner_exited_at")
-                if exited_at is None:
-                    watch["runner_exited_at"] = time.time()
-                    return False
-                if time.time() - float(exited_at) < SCAN_BATCH_RUNNER_EXIT_GRACE_SEC:
-                    return False
-                watch["scan_failed"] = True
-                return True
-        return False
+        # Debug (-NoExit) keeps PowerShell open; prefer run-complete flag, then process exit.
+        runner_finished = self._wizard_batch_runner_idle(watch)
+        if not runner_finished:
+            return False
+        exited_at = watch.get("runner_exited_at")
+        if exited_at is None:
+            watch["runner_exited_at"] = time.time()
+            return False
+        if time.time() - float(exited_at) < SCAN_BATCH_RUNNER_EXIT_GRACE_SEC:
+            return False
+        watch["scan_failed"] = True
+        return True
 
     def _wizard_batch_outputs_ready(self, watch: dict[str, object]) -> bool:
         batch_dir = watch.get("batch_dir")
@@ -8911,6 +8918,13 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             r'Write-ChLog "---------- Batch summary ----------"',
             r'Write-ChLog ("Count of Files Success: " + $SuccessFileCount)',
             r'Write-ChLog ("Count of Files Timed Out: " + $TimedOutFileCount)',
+            "",
+            "try {",
+            f"    $runCompleteFlag = Join-Path -Path $WorkDir -ChildPath '{BATCH_DXC_BASE_SCAN_TEMPLATES}{BATCH_RUN_COMPLETE_FLAG_SUFFIX}'",
+            '    Set-Content -LiteralPath $runCompleteFlag -Value "1" -Encoding UTF8 -Force',
+            "} catch {",
+            r'    Write-ChLog ("Cleanup note: could not write run-complete flag: " + $_.Exception.Message)',
+            "}",
             "",
             r'Write-ChLog "Scan Templates runner finished."',
         ]

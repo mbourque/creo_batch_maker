@@ -59,7 +59,7 @@ MC_ENABLE        YNA            Y
 MODE_RUN         YN             Y       Y       N       N      
 
 # Automatically update errors in models when run in BATCH
-MODE_UPDATE      YN             Y       N       Y       Y      
+MODE_UPDATE      YN             N       N       Y       Y      
 
 # Enable/Disable ModelCHECK metrics in specific modes
 MC_METRICS	 YN             Y       Y	Y       Y
@@ -179,7 +179,7 @@ DESIGNATE_MU_STAMP  YN    N
 SAVE_MU  YN    N
 
 # Enable/Disable regenerating of model with ModelUPDATE
-MU_REGENERATE  YN    Y
+MU_REGENERATE  YN    N
 
 # Highlight Color (Red,Yellow,White,Blue,Grey,Magenta,Cyan,Green,Brown)
 

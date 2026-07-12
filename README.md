@@ -66,7 +66,7 @@ If `index.html` already exists, **Open Report** opens it in your browser.
 
 Upload part / assembly / drawing templates if you use them, then **Scan Templates >**.
 - Each template is batched one at a time (part, then assembly, then drawing when present).
-
+- **Next >** when template XML is ready (you do not need to close a Debug-mode PowerShell window left open with **-NoExit**).
 - **Skip** if you don’t need templates.
 - If the scan fails, fix the issue and run **Scan Templates >** again. Automatic mode pauses until you continue.
 
@@ -98,7 +98,7 @@ If the report already exists, **Open Report** opens it without rebuilding.
 Report **Filter view** is hidden when there are no warnings, errors, or information sections; **Show information** lists checks marked `<info_check>Y</info_check>` with meaningful `INFO` answers (empty or self-closing `<ans />`, `0`, `-1`, `NA`, `NO`, and `NOT FOUND` are omitted; hidden until that filter is selected; not included in score or issue counts; no flag or remove buttons).
 
 On **Duplicate Models** warnings, the report lists each duplicate under the count (`Preview the model : …`); click a model name to jump to that model’s row when it appears elsewhere in the report.
-In **Scan Information → Statistics**, the table starts with **Scan date**, **Last saved by**, **Models scanned**, and **Total size of scanned models** (sum of `FILE_SIZE` in MB or GB), then **Parts**, **Assemblies**, and **Drawings** counts, **Bulk parts** (unique `BULK_ITEMS` model names), and **Non solid parts** (parts whose `BODY_INFO` bodies all show **No Geometry**). Under **Models failed**, drag a name into Creo to open it (click does not open the file). Long lists use **More...** / **Collapse** like Family table detail. After **Scan Templates**, **Template Information** in the sidebar summarizes datums, views, parameters, layers, relations, symbols, sheet sizes, notes, length units, designated attributes, accuracy, and related details read from `templates\*.xml`.
+In **Scan Information → Statistics**, the table starts with **Scan date**, **Last saved by**, **Models scanned**, and **Total size of scanned models** (sum of `FILE_SIZE` in MB or GB), then **Parts**, **Assemblies**, and **Drawings** counts, **Bulk parts** (unique `BULK_ITEMS` model names), and **Non solid parts** (parts whose `BODY_INFO` bodies all show **No Geometry**). The last row is **Total number of features in** the top-level assembly name (`NUM_COMPONENTS` — each part/sub-assembly occurrence in that product). Counts come from ModelCHECK XML in the working folder only (not subfolders such as `templates\`). Under **Models failed**, drag a name into Creo to open it (click does not open the file). Long lists use **More...** / **Collapse** like Family table detail. After **Scan Templates**, **Template Information** in the sidebar summarizes datums, views, parameters, layers, relations, symbols, sheet sizes, notes, length units, designated attributes, accuracy, and related details read from `templates\*.xml`.
 
 ## Settings (Setup step only)
 

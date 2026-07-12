@@ -2,6 +2,38 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-12 — v1.11.108
+
+- **Statistics**: total features for the top-level assembly is now that assembly’s component count (`NUM_COMPONENTS`, e.g. 9480), not a sum of every part’s internal features.
+
+## 2026-07-12 — v1.11.107
+
+- **Statistics**: total features for the top-level assembly now counts each BOM occurrence (repeated parts/assemblies add their features every time), using `ASM_BOM`.
+
+## 2026-07-12 — v1.11.106
+
+- **Statistics**: total features for a single top-level product now sums resumed features from every part and assembly in the scan (not only models listed under `UNQ_COMPONENTS`).
+
+## 2026-07-12 — v1.11.105
+
+- **Statistics**: total features for the top-level assembly now sums resumed features across every unique part and sub-assembly in that product (not only the assembly file itself).
+
+## 2026-07-12 — v1.11.104
+
+- **Statistics**: last row shows total features in the top-level assembly (label includes the assembly name).
+
+## 2026-07-08 — v1.11.103
+
+- **Scan Templates + Debug mode**: **Next >** appears when the template scan finishes (XML present / run-complete flag), without closing the PowerShell runner window left open by **-NoExit**.
+
+## 2026-07-08 — v1.11.102
+
+- **Create Report**: ``master.xml`` is built only from ModelCHECK XML in the working folder itself (not subfolders such as ``templates\\``).
+
+## 2026-07-08 — v1.11.101
+
+- **Create Report**: ``master.xml`` no longer includes ModelCHECK XML from ``templates\\``, so Scan Templates models (e.g. drawing template) do not inflate Statistics or the model list.
+
 ## 2026-07-08 — v1.11.100
 
 - **Thumbnails**: after a restart, each progress bar shows **100% finished** when that pass already ran and only known failures remain (including drawings that never produced a thumbnail). **Thumbnails >** then shows the failed-models dialog and retries those.
