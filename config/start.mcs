@@ -34,7 +34,8 @@ PRT_VIEW	LEFT
 ! PRT_RELATION	MASS=mp_mass("")
 ! PRT_COMMENT	Ensures that volume parameter is set to mass property value
 ! PRT_RELATION	VOLUME=mp_volume("")
-! PRT_REL_UNWANTED <relation>
+PRT_REL_UNWANTED MASS=mp_mass("")
+PRT_REL_UNWANTED VOLUME=mp_volume("")
 
 ! PRT_UNITS_LENGTH	MM
 ! PRT_UNITS_MASS	KILOGRAM
@@ -72,7 +73,8 @@ ASM_VIEW	LEFT
 ! ASM_RELATION	MASS=mp_mass("")
 ! ASM_COMMENT	Ensures that volume parameter is set to mass property value
 ! ASM_RELATION	VOLUME=mp_volume("")
-! ASM_REL_UNWANTED <relation>
+ASM_REL_UNWANTED MASS=mp_mass("")
+ASM_REL_UNWANTED VOLUME=mp_volume("")
 
 # DRAWING INFORMATION
 DRW_FORMAT	a
@@ -93,11 +95,13 @@ DRW_NOTE_HEIGHT	0.2
 ! DRW_PARAMETER
 
 # View Scales Allowed (Does not seem to work)
-! STD_VIEW_SCALE_FILE	view_scale.txt
+STD_VIEW_SCALE_FILE	view_scale.txt
 
 # STANDARD LIST FILE NAMES
 STD_DRW_DTL_FILE	A	aaa.dtl
 STD_DRW_DTL_FILE	DEFAULT	bbb.dtl
+! STD_DRW_DTL_FILE	DEFAULT	detail.dtl
+
 
 STD_HOLE_DIAM_FILE	holes.txt
 STD_DRAFT_ANGLE_FILE	angles.txt
