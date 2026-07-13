@@ -11,7 +11,7 @@ dist/
 main.exe
 main.spec
 .gitignore
-package_cad_assessment_tool.bat
+# package_cad_assessment_tool.bat
 *.zip
 *.dxc
 models/
