@@ -1204,8 +1204,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._settings_path = _default_app_settings_path()
         # After Save As or Open: File → Save / Exit also update this path (same JSON as app_settings).
         self._paired_settings_json_path: Path | None = None
-        self._configs_dir = _app_bundle_dir() / "configs"
-        self._configs_templates_dir = self._configs_dir / "templates"
+        self._config_dir = _app_bundle_dir() / "config"
+        self._config_templates_dir = self._config_dir / "templates"
         self._chunk_size = CREO_BATCH_CHUNK_SIZE_DEFAULT
         self._output_timeout_sec = BATCH_OUTPUT_WAIT_TIMEOUT_DEFAULT
         self._xtop_gone_timeout_sec = BATCH_XTOP_GONE_TIMEOUT_SEC_DEFAULT
@@ -1306,7 +1306,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         )
 
     def _update_start_from_template_xml_if_present(self) -> tuple[bool, str, str]:
-        """Refresh configs\\start.mcs when template scan XML exists.
+        """Refresh config\\start.mcs when template scan XML exists.
 
         Returns (ok, error_message, status_note). status_note is updated or skipped.
         """
@@ -1329,7 +1329,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         part_path = part_xml if part_xml.is_file() and self._scan_parts else None
         asm_path = asm_xml if asm_xml.is_file() and self._scan_assemblies else None
         drw_path = drw_xml if drw_xml.is_file() and self._scan_drawings else None
-        mcs_path = _app_bundle_dir() / "configs" / "start.mcs"
+        mcs_path = _app_bundle_dir() / "config" / "start.mcs"
         try:
             update_start_from_xml.update_start(
                 mcs_path.resolve(),
@@ -1344,8 +1344,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         return True, "", updated
 
     def _clear_start_mcs(self) -> tuple[bool, str]:
-        """Reset bundled ``configs\\start.mcs`` template blocks (anchor lines only)."""
-        mcs_path = (_app_bundle_dir() / "configs" / "start.mcs").resolve()
+        """Reset bundled ``config\\start.mcs`` template blocks (anchor lines only)."""
+        mcs_path = (_app_bundle_dir() / "config" / "start.mcs").resolve()
         try:
             update_start_from_xml.clear_start_template_blocks(mcs_path)
         except (FileNotFoundError, OSError, ET.ParseError) as exc:
@@ -1368,7 +1368,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if not ok:
             messagebox.showwarning(
                 "Scan Templates",
-                "Could not update configs\\start.mcs from template XML:\n\n" + err,
+                "Could not update config\\start.mcs from template XML:\n\n" + err,
             )
 
     def _effective_ttd_filename(self, task_display: str) -> str:
@@ -1378,9 +1378,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
     def _modelcheck_config_dir_for_task(self, task_display: str) -> Path | None:
         if self._is_scan_templates_task(task_display):
-            return self._configs_templates_dir
+            return self._config_templates_dir
         if self._is_modelcheck_task(task_display):
-            return self._configs_dir
+            return self._config_dir
         return None
 
     def _batch_dir_for_task(self, working_dir: Path, task_display: str) -> Path:
@@ -4675,7 +4675,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             if not ok:
                 messagebox.showwarning(
                     "Scan Templates",
-                    "Could not reset configs\\start.mcs:\n\n" + err,
+                    "Could not reset config\\start.mcs:\n\n" + err,
                 )
                 return
             if self._warn_wizard_working_directory_missing_models():
@@ -7143,12 +7143,12 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             )
 
     def _on_open_settings_folder(self) -> None:
-        """Open the bundled configs folder in File Explorer for manual edits."""
-        target = self._configs_dir.resolve()
+        """Open the bundled config folder in File Explorer for manual edits."""
+        target = self._config_dir.resolve()
         if not target.is_dir():
             messagebox.showerror(
                 "Folder not found",
-                f"Expected configs folder next to the app:\n{target}",
+                f"Expected config folder next to the app:\n{target}",
             )
             return
         try:
@@ -7164,11 +7164,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if not rel:
             messagebox.showerror("Settings", f"No file mapping for:\n{option}")
             return
-        target = (self._configs_dir / rel).resolve()
+        target = (self._config_dir / rel).resolve()
         if not target.is_file():
             messagebox.showerror(
                 "File not found",
-                f"Expected sample config at:\n{target}\n\n(Relative to configs/ next to the app.)",
+                f"Expected sample config at:\n{target}\n\n(Relative to config/ next to the app.)",
             )
             return
         try:
@@ -7831,9 +7831,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         return sorted(files, key=lambda p: str(p).lower())
 
     def _scan_modelcheck_config_files(self, directory: Path) -> list[Path]:
-        """Files under a configs folder to embed as ``<ConfigFile>`` in a .dxc.
+        """Files under a config folder to embed as ``<ConfigFile>`` in a .dxc.
 
-        When ``directory`` is the main ``configs\\`` folder, skips ``configs\\templates\\``
+        When ``directory`` is the main ``config\\`` folder, skips ``config\\templates\\``
         (template-scan configs only — see ``_modelcheck_config_dir_for_task``).
         """
         templates_subdir: Path | None = None
@@ -9245,22 +9245,22 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if modelcheck_config_dir is not None and not modelcheck_config_dir.is_dir():
             if scan_templates:
                 messagebox.showerror(
-                    "Missing configs",
+                    "Missing config",
                     "Scan Templates requires the templates config folder next to the app:\n"
                     f"{modelcheck_config_dir}",
                 )
             else:
                 messagebox.showerror(
-                    "Missing configs",
-                    f"Modelcheck task requires the configs folder next to the app:\n{modelcheck_config_dir}",
+                    "Missing config",
+                    f"Modelcheck task requires the config folder next to the app:\n{modelcheck_config_dir}",
                 )
             return
         if use_jpeg_config:
-            jpeg_config_pro = self._configs_dir / "config.pro"
+            jpeg_config_pro = self._config_dir / "config.pro"
             if not jpeg_config_pro.is_file():
                 messagebox.showerror(
-                    "Missing configs",
-                    f"JPEG batch task requires config.pro in the configs folder next to the app:\n{jpeg_config_pro}",
+                    "Missing config",
+                    f"JPEG batch task requires config.pro in the config folder next to the app:\n{jpeg_config_pro}",
                 )
                 return
         if not loadpoint_raw:

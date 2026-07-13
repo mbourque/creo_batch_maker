@@ -2,6 +2,14 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-13 — v1.11.110
+
+- **README**: how to point interactive Creo at this app’s ModelCHECK config (`modelcheck_dir` / `modelcheck_enabled`).
+
+## 2026-07-13 — v1.11.109
+
+- **Config folder**: app paths and menus now use ``config\`` (was ``configs\``). Rename the folder on disk to match (e.g. ``git mv configs config``).
+
 ## 2026-07-12 — v1.11.108
 
 - **Statistics**: total features for the top-level assembly is now that assembly’s component count (`NUM_COMPONENTS`, e.g. 9480), not a sum of every part’s internal features.

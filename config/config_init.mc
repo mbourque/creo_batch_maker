@@ -53,7 +53,7 @@
 ! ----------------------------------------------------------
 
 # Enable ModelCHECK Y=enable, N=disable, A=Ask user
-MC_ENABLE        YNA            Y
+MC_ENABLE	YNA	Y	Y	Y	N
 
 # Enable/Disable ModelCHECK in specific modes
 MODE_RUN         YN             Y       Y       N       N      

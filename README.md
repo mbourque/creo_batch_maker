@@ -26,6 +26,14 @@ python .\main.py
 - **Windows** with a Creo loadpoint (`Parametric\bin\ptcdbatch.bat` must exist).
 - Choose a **working directory** with your `.prt`, `.asm`, and/or `.drw` files at the top level (not in subfolders).
 - The working directory path must **not contain spaces** for batch steps.
+- For **interactive Creo** to use this app’s ModelCHECK files (`config\`), add these lines to your Creo `config.pro` (use the folder that contains `config\`, not `config\` itself):
+
+```text
+modelcheck_dir C:\dev\creo_batch_maker
+modelcheck_enabled yes
+```
+
+  Change the path if you installed the app elsewhere (for example `C:\Tools\creo_batch_maker`).
 
 Settings are saved in `app_settings.json` when you start a batch or use **File → Save**. The `recent_scans` array (full folder paths, newest first) drives **File → Recent scans** — populated when you **Browse…** the working directory or start a batch. Edit it while the app is closed, then restart to test.
 
@@ -130,7 +138,7 @@ Open **Settings** from the menu:
 | **Recent scans**           | On **Setup** only: switch to a recently batched working folder (up to 10; hidden when the list is empty).   |
 
 
-**Configuration** opens ModelCHECK config files in Notepad (`configs\` folder), including **Start…** for `configs\start.mcs` and **View scales…** for `configs\view_scale.txt`.
+**Configuration** opens ModelCHECK config files in Notepad (`config\` folder), including **Start…** for `config\start.mcs` and **View scales…** for `config\view_scale.txt`.
 
 ## Tips
 

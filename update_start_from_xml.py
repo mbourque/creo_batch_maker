@@ -64,7 +64,7 @@ def _load_working_directory_from_settings() -> str | None:
 
 
 def _default_mcs_path() -> Path:
-    return _app_dir() / "configs" / "start.mcs"
+    return _app_dir() / "config" / "start.mcs"
 
 
 def _section_bounds(lines: list[str], start_marker: str, end_marker: str) -> tuple[int, int]:
