@@ -9,7 +9,7 @@ creo_batch_maker.code-workspace
 build/
 dist/
 main.exe
-main.spec
+# main.spec
 .gitignore
 # package_cad_assessment_tool.bat
 *.zip
