@@ -139,13 +139,13 @@ SKIP_MODELS	YN	N
 
 # Check models in assemblies regardless of whether they have changed since 
 # being retrieved or not 
-CHECK_ALL_MODELS	YN	Y 
+CHECK_ALL_MODELS	YN	N 
 
 # Interactive SAVE MODE - pre (Y) or post (N)?
 SAVE_MC_PRE	YN	N
 
 # ASSEMBLY batch mode - run TOP only (N) or ALL LEVELS (Y)
-ASM_BATCH_ALL	YN	Y
+ASM_BATCH_ALL	YN	N
 
 # Run MC on all drawing sheets (Y) or current only (N)
 DRW_SHEET_ALL	YN	Y	Y	Y	Y
@@ -155,7 +155,7 @@ DRW_SHEET_ALL	YN	Y	Y	Y	Y
 CNFG_SELECT_AUTO	YNA	Y
 
 # Enable/Disable MC_VDA for specific mode
-MC_VDA_RUN	YN	N	N	N	N
+MC_VDA_RUN	YN	Y	Y	N	N
 
 # Enable/Disable ModelUpdate 
 MU_ENABLED	YN	N

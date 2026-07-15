@@ -1850,9 +1850,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks for very small or tiny curve elements in the model that fall below acceptable geometric thresholds defined by company standards or VDA/quality guidelines. These tiny curve segments can indicate poor-quality geometry, imported data issues, over-detailed modeling, or unintended artifacts from operations such as trimming, blending, or surface intersection. Excessively small curve elements can negatively impact model performance, regeneration stability, downstream CAM operations, and data exchange robustness. This check helps identify and flag such small curve entities so the model can be cleaned, simplified, or repaired to improve geometric quality and manufacturability. Curve quality thresholds and VDA-related geometry limits are typically configured through ModelCHECK geometry and quality settings, while check behavior and reporting are controlled by the M1_TINY_ELMNT settings in the check.mch configuration file.</Description>
         <ModelCheckName>M1_TINY_ELMNT</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>Identical Element Curves</Name>
@@ -1860,9 +1860,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks for duplicate or identical curve elements within the model and reports instances where multiple geometric entities are effectively the same. Identical element curves can arise from redundant modeling operations, repeated imports, copy/paste geometry creation, or overlapping design intent that was not properly consolidated. These redundancies can increase model complexity, degrade performance, complicate downstream CAM or analysis workflows, and introduce confusion during design review or modification. This check helps identify duplicate curve geometry so the model can be cleaned, simplified, and optimized for better performance and maintainability. Geometry redundancy rules and VDA-related quality thresholds are typically configured through ModelCHECK geometry and quality settings, while check behavior and reporting are controlled by the M2_IDENTICAL_ELMNT settings in the check.mch configuration file.</Description>
         <ModelCheckName>M2_IDENTICAL_ELMNT</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>Positional Discontinuity Curves (Gaps)</Name>
@@ -1870,9 +1870,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks for positional continuity across connected surfaces or curves within a model. When enabled, ModelCHECK will verify that surfaces or curves are seamlessly connected at their boundaries without gaps or misalignments, ensuring a smooth and continuous transition between them. This helps maintain the geometric integrity and quality of the model.</Description>
         <ModelCheckName>M3A_POSITION_CONT</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>Positional Discontinuity Topologies</Name>
@@ -1880,9 +1880,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks for positional continuity across topological boundaries within a model. When enabled, ModelCHECK will verify that surfaces or curves are properly aligned at their topological boundaries, ensuring that there are no gaps or misalignments. This helps maintain the geometric integrity and ensures a smooth connection between adjacent surfaces or features.</Description>
         <ModelCheckName>M3A_POSITION_CONT_TOP</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>Curves Tangential Angle Discontinuity</Name>
@@ -1890,9 +1890,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks for tangential continuity across connected surfaces or curves within a model. When enabled, ModelCHECK will verify that the tangency between surfaces or curves is smooth and continuous at their boundaries, ensuring there are no abrupt changes in direction or angle, which is essential for maintaining the quality and smoothness of the model's geometry.</Description>
         <ModelCheckName>M3B_TANG_CONT</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>Tangential Angle Discontinuity Topologies</Name>
@@ -1900,9 +1900,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks for tangential continuity across topological boundaries within a model. When enabled, ModelCHECK will ensure that connected surfaces or curves maintain smooth tangency across their topological boundaries, preventing abrupt changes in direction or angle. This helps maintain the surface quality and smoothness in critical areas of the model.</Description>
         <ModelCheckName>M3B_TANG_CONT_TOP</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>Curves with Curvature Discontinuity</Name>
@@ -1910,9 +1910,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Number of curves with curvature discontinuity greater than some delta. Checks for curvature continuity across connected surfaces or curves within a model. When enabled, ModelCHECK will verify that the curvature transitions smoothly across boundaries without abrupt changes, ensuring that the connected surfaces or curves maintain a consistent curvature, which is important for the aesthetic and functional quality of the model.</Description>
         <ModelCheckName>M3C_CURV_CONT</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>Surface Boundaries with Curvature Discontinuity</Name>
@@ -1920,9 +1920,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks for curvature continuity across topological boundaries within a model. When enabled, ModelCHECK will verify that the curvature is smoothly continuous across these boundaries, ensuring that there are no abrupt changes in curvature, which is crucial for maintaining high-quality surface transitions and overall model integrity.</Description>
         <ModelCheckName>M3C_CURV_CONT_TOP</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>Number of Curves with Polynomial Degree</Name>
@@ -1930,9 +1930,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks the degree of polynomial used in defining curves or surfaces within a model. When enabled, ModelCHECK will verify that the polynomial degree is within the predefined acceptable range and report any deviations, ensuring that the curves or surfaces are appropriately defined for the intended design, analysis, or manufacturing processes.</Description>
         <ModelCheckName>M4_POLYN_DEG</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>Number of Wavy Curves</Name>
@@ -1940,9 +1940,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks for waviness in surfaces or curves within a model. When enabled, ModelCHECK will evaluate the smoothness of surfaces or curves, identifying and reporting any irregularities or deviations that cause waviness, ensuring that the model's surfaces are smooth and meet design quality standards.</Description>
         <ModelCheckName>M5_WAVINESS</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>Number of Curves with Small Distance between Knot Vectors</Name>
@@ -1950,9 +1950,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks the distance between knots in a spline or curve within a model. When enabled, ModelCHECK will verify that the spacing between knots meets predefined criteria and report any instances where the knot distance is too small, ensuring that the curve is smooth and free from issues that could affect the model's geometry or downstream processes.</Description>
         <ModelCheckName>M6_KNOT_DIST</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>Number of Curves that Self Intersect</Name>
@@ -1960,9 +1960,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks the distance of a feature or element from itself to ensure it meets predefined minimum criteria. When enabled, ModelCHECK will identify and report any features that are too close to themselves, such as self-intersecting surfaces or curves, helping to prevent geometric issues that could complicate manufacturing or analysis.</Description>
         <ModelCheckName>C7_SELF_DIST</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>Number of Drawing Text (Chars) that aren't IGES Compliant</Name>
@@ -1970,9 +1970,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks for text elements in a model that may not conform to IGES (Initial Graphics Exchange Specification) standards. When enabled, ModelCHECK will verify that the text in the model is compatible with IGES export requirements and report any issues, ensuring that the model can be correctly translated into IGES format without losing or misrepresenting text information.</Description>
         <ModelCheckName>D28_IGES_TEXT</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>Number of Face Segments with Small Edges</Name>
@@ -1980,9 +1980,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks for tiny segment edges within a model. When enabled, ModelCHECK will identify and report edges that are excessively short, below a predefined minimum length, helping to ensure that the model does not contain small, potentially problematic edges that could cause issues in manufacturing, analysis, or overall model quality.</Description>
         <ModelCheckName>SU8_TINY_SEG_EDGE</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>Number of Surfaces with Curvature less than Some Number</Name>
@@ -1990,9 +1990,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks for curvature radii that are too small within a model. When enabled, ModelCHECK will identify and report instances where the curvature radius is below a predefined minimum threshold, helping to ensure that the model does not contain extremely tight curves that could cause issues in manufacturing, analysis, or functionality.</Description>
         <ModelCheckName>SU9_TINY_CURV_RAD</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>Number of Surfaces where the Angle between Adjacent Surfaces is Outside Range</Name>
@@ -2000,9 +2000,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks the angle between edge curves at their junctions within a model. When enabled, ModelCHECK will verify that the angles between boundary curves meet predefined criteria and report any angles that are too sharp or do not conform to the design standards, helping to ensure smooth transitions and proper geometric relationships in the model.</Description>
         <ModelCheckName>SU10_BOUND_ANGLE</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>Number of Surfaces with Reversed Normals</Name>
@@ -2010,9 +2010,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks for reversals in surface normals within a model. When enabled, ModelCHECK will identify and report instances where surface normals are oriented in opposite or incorrect directions, helping to ensure that the surfaces are consistently oriented and that the model is free from issues that could affect manufacturing, analysis, or rendering.</Description>
         <ModelCheckName>SU11_NORM_REVERSAL</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>Number of Surfaces with Greater than X Patches</Name>
@@ -2020,9 +2020,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks the distribution of patches in a surface mesh to ensure they are evenly spaced. When enabled, ModelCHECK will verify that the distance between patches within a surface meets predefined criteria and report any inconsistencies, helping to ensure that the surface mesh is uniform and correctly defined.</Description>
         <ModelCheckName>SU12_PATCH_DIST</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>Surfaces with Unoccupied Patch Rows</Name>
@@ -2030,9 +2030,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks for unoccupied patch rows in a surface mesh within a model. When enabled, ModelCHECK will identify and report any rows in the surface patch grid that lack patches or are not fully occupied, ensuring that the surface mesh is complete and properly defined. This helps maintain the integrity and accuracy of the surface geometry in the model.</Description>
         <ModelCheckName>SU13_UNOC_PATCH_ROW</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>Surfaces that have Boundary Curves that Extend Greater than X from the Extremity of the Surface</Name>
@@ -2040,9 +2040,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks the proximity of a boundary curve to its associated surface within a model. When enabled, ModelCHECK will verify that the boundary curve is correctly positioned relative to the surface and report any deviations that exceed predefined criteria. This ensures that the boundary curves are accurately aligned with the surfaces, maintaining the intended design integrity.</Description>
         <ModelCheckName>F15_SURF_DIST</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>All Surfaces have Similar Orientation</Name>
@@ -2050,9 +2050,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks for similar orientation of curves or paths within a model. When enabled, ModelCHECK will verify that paths or curves have a consistent orientation relative to each other and report any inconsistencies, ensuring that the model's geometry follows the intended design directions and is free from orientation issues that could impact functionality or aesthetics.</Description>
         <ModelCheckName>F16_SIM_ORIENT</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>Number of Faces with More than X Segments per Face</Name>
@@ -2060,9 +2060,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks the number of segments in a boundary curve within a model. When enabled, ModelCHECK will verify that the number of segments in the curve meets predefined criteria and report any instances where the segmentation is either too high or too low, helping to ensure smooth and accurate boundary definitions in the model.</Description>
         <ModelCheckName>F17_NUM_SEG</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>Number of Edges with at Least 3 Faces</Name>
@@ -2070,9 +2070,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks the number of faces connected to an edge within a model. When enabled, ModelCHECK will verify that the number of faces sharing an edge meets the predefined criteria and report any instances where this number is unusual or problematic. This helps ensure the model's geometry is correct and avoids potential issues in manufacturing or structural analysis.</Description>
         <ModelCheckName>T18_NUM_FACE</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>Number of Normals Improperly Oriented</Name>
@@ -2080,9 +2080,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks the orientation of surface normals to ensure they are consistent and correctly aligned within a model. When enabled, ModelCHECK will verify that similar surfaces have their normals oriented in the same direction and report any inconsistencies. This helps prevent issues related to surface orientation that could affect manufacturing, analysis, or the overall quality of the model.</Description>
         <ModelCheckName>T19_NORMAL_ORIENT</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
         <Name>Number of Knife Edges</Name>
@@ -2110,8 +2110,8 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks the distance between vertices and adjacent faces within a model. When enabled, ModelCHECK will verify that the distance between vertices and their neighboring faces meets the predefined criteria, and it will report any instances where the distance is too small or not as expected. This helps ensure proper geometric relationships within the model, avoiding potential issues in manufacturing or analysis.</Description>
         <ModelCheckName>SO22_DIST_VERT_FACE</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
+        <display>Y</display>
+        <enabled>Y</enabled>
         <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
@@ -2120,8 +2120,8 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Identifies and reports any deletion of history within a model. When enabled, ModelCHECK will check for instances where feature history has been removed or altered, ensuring that the model's historical data is intact and that any deletions are intentional and compliant with design practices. This helps maintain the integrity of the model's construction history, which is crucial for understanding and modifying the design later on.</Description>
         <ModelCheckName>SO23_HIST_DELETE</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
+        <display>Y</display>
+        <enabled>Y</enabled>
         <hideFromReport>N</hideFromReport>
     </Check>
     <Check>
@@ -2154,8 +2154,8 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks for part models that contain multiple solid bodies (merged or non-merged) and reports their presence according to company modeling standards. Multi-body parts can occur when geometry is combined through merges, imports, Boolean operations, or when separate solid regions are intentionally maintained within a single part file. While multi-body modeling can be valid in certain advanced design or manufacturing scenarios, uncontrolled or unintended use can increase model complexity, create ambiguity in design intent, complicate mass properties, interfere with manufacturing workflows, and introduce issues in downstream processes such as CAM programming, simulation, and data management. This check helps ensure that the use of multiple solid bodies is intentional, properly controlled, and aligned with company design and modeling guidelines. Multi-body modeling rules and part structure standards are typically configured through Creo part modeling practices and ModelCHECK configuration files, while check behavior and reporting are controlled by the SO26_MULT_BODY settings in the check.mch configuration file.</Description>
         <ModelCheckName>SO26_MULT_BODY</ModelCheckName>
         <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
+        <display>Y</display>
+        <enabled>Y</enabled>
         <info_check>Y</info_check>
         <hideFromReport>N</hideFromReport>
     </Check>
@@ -2165,9 +2165,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks for part models that contain multiple solid bodies and reports instances where more than one independent solid exists within a single part file. Multi-solid parts can result from Boolean operations, merges, imports, or intentional design strategies where separate solids are maintained within one model. While this approach can be valid in specific cases, uncontrolled or unintended multi-solid modeling can increase model complexity, create ambiguity in design intent, complicate mass property calculations, and introduce difficulties in downstream processes such as manufacturing planning, CAM programming, simulation, and data management. This check helps ensure that part models conform to company standards that may require a single solid body per part unless explicitly justified. Multi-solid modeling rules and part structure requirements are typically configured through Creo part modeling practices and ModelCHECK configuration files, while check behavior and reporting are controlled by the SO27_MULT_SOLID settings in the check.mch configuration file.</Description>
         <ModelCheckName>SO27_MULT_SOLID</ModelCheckName>
         <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
 
     <Check>
@@ -2343,9 +2343,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Checks the distance between boundaries in a model to ensure they meet predefined criteria. When enabled, ModelCHECK will measure the proximity of boundaries and report any that are too close or too far apart, helping to ensure that the model's boundaries are correctly spaced according to design requirements.</Description>
         <ModelCheckName>F14_BOUND_DIST</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
 
     <Check>
@@ -2354,9 +2354,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Identifies and reports tiny facets in a model. When enabled, ModelCHECK will check for extremely small facet elements that could cause issues in rendering, analysis, or manufacturing, and report them, helping to ensure that the model's surface quality is maintained and free from problematic tiny facets.</Description>
         <ModelCheckName>M1_TINY_ELMNT_FAC</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
 
     <Check>
@@ -2365,9 +2365,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Description>Identifies and reports tiny surface elements in a model. When enabled, ModelCHECK will check for extremely small surface elements that could cause issues in manufacturing or analysis and report them, helping to ensure that the model is free from problematic tiny surfaces that could affect its performance.</Description>
         <ModelCheckName>M1_TINY_ELMNT_SRF</ModelCheckName>
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
-        <display>N</display>
-        <enabled>N</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <hideFromReport>N</hideFromReport>
     </Check>
 
     <Check>
@@ -2401,7 +2401,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
-        <hideFromReport>Y</hideFromReport>
+        <hideFromReport>N</hideFromReport>
     </Check>
 
     <Check>

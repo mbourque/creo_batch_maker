@@ -673,6 +673,7 @@ PERFORMANCE_REPORT_ISSUE_ROW_CHECKS: dict[str, str] = {
 
 PERFORMANCE_TABLE_ROWS: list[tuple[str, str | None]] = [
     ("Scan date", "_SCAN_DATE"),
+    ("Model checks", "_MODEL_CHECKS"),
     ("Last saved by", "_USERS"),
     ("Models scanned", "_FILES_SCANNED"),
     ("Total size of scanned models", "_TOTAL_SCANNED_SIZE"),
@@ -727,6 +728,7 @@ class PerformanceMetrics:
     assembly_count: int = 0
     drawing_count: int = 0
     scan_date: str = ""
+    model_checks_mch: str = ""
     users: list[str] = field(default_factory=list)
     total_scanned_bytes: int = 0
     top_level_assembly_name: str = ""
@@ -1051,9 +1053,25 @@ def _scan_date_for_report(master_path: str = "") -> str:
     return _format_scan_date(dt)
 
 
+def _model_checks_mch_from_condition_mcc() -> str:
+    """``.mch`` basename currently set in ``config\\condition.mcc`` (Settings → Checks…)."""
+    path = _app_dir() / "config" / "condition.mcc"
+    if not path.is_file():
+        return ""
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    match = re.search(r"\(([^()\s]+\.mch)\)", text, re.IGNORECASE)
+    if not match:
+        return ""
+    return match.group(1)
+
+
 def performance_metrics_answers(metrics: PerformanceMetrics) -> dict[str, str]:
     answers: dict[str, str] = {
         "_SCAN_DATE": metrics.scan_date or "—",
+        "_MODEL_CHECKS": metrics.model_checks_mch or "—",
         "_USERS": ", ".join(metrics.users) if metrics.users else "—",
         "_FILES_SCANNED": str(metrics.files_scanned),
         "_PART_COUNT": str(metrics.part_count),
@@ -1100,6 +1118,7 @@ def _resolve_performance_value(answers: dict[str, str], key: str | None) -> tupl
         return (val if val is not None else "—", "FAMILY_INFO")
     if key in (
         "_SCAN_DATE",
+        "_MODEL_CHECKS",
         "_USERS",
         "_FILES_SCANNED",
         "_PART_COUNT",
@@ -1234,6 +1253,7 @@ def write_performance_report_file(master_xml_path: str, output_path: str | None 
     root = ET.parse(master_xml_path).getroot()
     metrics = scan_performance_metrics(root)
     metrics.scan_date = _scan_date_for_report(master_xml_path)
+    metrics.model_checks_mch = _model_checks_mch_from_condition_mcc()
     if metrics.files_seen == 0:
         raise ValueError("No model entries found in master.xml")
     out_path = output_path or os.path.join(os.path.dirname(master_xml_path), "performance_report.html")
@@ -2449,6 +2469,7 @@ def generate_statistics_fragment(
     stats = scan_batch_statistics(master_root, master_path=master_path)
     stats.performance_metrics = scan_performance_metrics(master_root)
     stats.performance_metrics.scan_date = _scan_date_for_report(master_path)
+    stats.performance_metrics.model_checks_mch = _model_checks_mch_from_condition_mcc()
     stats.skipped_models = scan_skipped_models(working_dir, master_root)
     stats.templates_scanned = scan_templates_scanned(working_dir)
     if stats.top_level_assembly:
@@ -2474,6 +2495,8 @@ def write_statistics_html_file(master_xml_path: str, output_path: str) -> str:
 
     stats = scan_batch_statistics(root, master_path=master_xml_path)
     stats.performance_metrics = scan_performance_metrics(root)
+    stats.performance_metrics.scan_date = _scan_date_for_report(master_xml_path)
+    stats.performance_metrics.model_checks_mch = _model_checks_mch_from_condition_mcc()
     stats.skipped_models = scan_skipped_models(working_dir, root)
     stats.templates_scanned = scan_templates_scanned(working_dir)
     if stats.top_level_assembly:

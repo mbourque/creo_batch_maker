@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-15 — v1.11.112
+
+- **Statistics**: **Model checks** row after **Scan date** shows the `.mch` file from `config\condition.mcc`.
+
 ## 2026-07-15 — v1.11.111
 
 - **Settings → Checks…**: choose a `.mch` from `config\` and update every checks-file name in `config\condition.mcc`.
