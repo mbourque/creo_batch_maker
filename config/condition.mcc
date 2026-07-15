@@ -1,5 +1,5 @@
 # SET CONFIG FILE
 
-IF (UNITS_LENGTH EQ MM) config=(checks.mch)(start.mcs)(mm.mcn)(status.mcq)
-IF (UNITS_LENGTH EQ INCH) config=(checks.mch)(start.mcs)(inch.mcn)(status.mcq)
-ELSE config=(checks.mch)(start.mcs)(inch.mcn)(status.mcq)
+IF (UNITS_LENGTH EQ MM) config=(all_checks.mch)(start.mcs)(mm.mcn)(status.mcq)
+IF (UNITS_LENGTH EQ INCH) config=(all_checks.mch)(start.mcs)(inch.mcn)(status.mcq)
+ELSE config=(all_checks.mch)(start.mcs)(inch.mcn)(status.mcq)

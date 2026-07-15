@@ -669,9 +669,10 @@ Since an issue may propagate through the associative chain of references between
         <Category>Consistency</Category>
         <Description>Checks and reports information related to materials assigned to the model, including material names, material properties, density definitions, and associated manufacturing or engineering metadata. Properly managed material information is critical for accurate mass properties, simulation results, manufacturing processes, BOM generation, cost estimation, and downstream integration with Windchill, ERP, and inspection systems. Missing, incorrect, or inconsistent material assignments can lead to inaccurate calculations, manufacturing errors, poor analysis results, and downstream documentation problems. This check helps ensure that materials are properly assigned and comply with company-approved standards and material libraries. Approved material names and related material standards are typically configured in the start.mcs file using MATERIAL_NAME entries and related material configuration settings, while check behavior and reporting are controlled by the MATERIAL_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>MATERIAL_INFO</ModelCheckName>
-        <ModelCheckOptions>YNEW E E N N Y</ModelCheckOptions>
+        <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Memory Space Usage</Name>
@@ -710,9 +711,10 @@ Since an issue may propagate through the associative chain of references between
         <Category>Consistency</Category>
         <Description>Checks whether model names comply with company-defined naming standards and approved naming patterns. Consistent model naming improves organization, traceability, searchability, and communication across design, manufacturing, and data management systems. Invalid or inconsistent names can lead to duplicate models, revision confusion, and downstream errors in drawings, BOMs, Windchill, and ERP systems. Naming validation rules are typically configured in the start.mcs file using PRT_MODEL_NAME and ASM_MODEL_NAME entries, while check behavior and reporting are controlled by the MODEL_NAME settings in the check.mch configuration file.</Description>
         <ModelCheckName>MODEL_NAME</ModelCheckName>
-        <ModelCheckOptions>YNEW W W N W Y</ModelCheckOptions>
+        <ModelCheckOptions>YNEW Y Y N W Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Model Name Structure</Name>

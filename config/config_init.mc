@@ -62,7 +62,7 @@ MODE_RUN	YN	Y	Y	N	N
 MODE_UPDATE	YN	N	N	N	N      
 
 # Enable/Disable ModelCHECK metrics in specific modes
-MC_METRICS	YN	Y	Y	Y	Y
+MC_METRICS	YN	N	N	Y	Y
 
 # Directory ModelCHECK will write reports on NT
 #DIR_REPORT_NT	$TEMP/mc_reports

@@ -5772,6 +5772,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             label="Batch settings...",
             command=self._on_batch_settings,
         )
+        general_settings_menu.add_command(
+            label="Checks...",
+            command=self._on_checks_settings,
+        )
         general_settings_menu.add_checkbutton(
             label="Automatic mode",
             variable=self._automatic_mode_var,
@@ -7080,6 +7084,153 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._run_modal_toplevel_wait(
             dialog,
             focus_widget=first_entry,
+            repaints=(ok_btn, cancel_btn),
+        )
+
+    def _condition_mcc_path(self) -> Path:
+        return (self._config_dir / "condition.mcc").resolve()
+
+    def _list_config_mch_files(self) -> list[str]:
+        """``.mch`` basenames in ``config\\`` only (not ``config\\templates\\``)."""
+        config_dir = self._config_dir.resolve()
+        if not config_dir.is_dir():
+            return []
+        names = [
+            p.name
+            for p in config_dir.glob("*.mch")
+            if p.is_file()
+        ]
+        return sorted(names, key=lambda n: n.casefold())
+
+    def _current_mch_from_condition_mcc(self) -> str | None:
+        path = self._condition_mcc_path()
+        if not path.is_file():
+            return None
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return None
+        match = re.search(r"\(([^()\s]+\.mch)\)", text, re.IGNORECASE)
+        if not match:
+            return None
+        return match.group(1)
+
+    def _set_condition_mcc_checks_file(self, mch_name: str) -> str | None:
+        """Replace every ``(….mch)`` in ``config\\condition.mcc``. Returns error or None."""
+        name = (mch_name or "").strip()
+        if not name.lower().endswith(".mch"):
+            return "Choose a ModelCHECK .mch file."
+        if any(sep in name for sep in ("/", "\\", "..")):
+            return "Invalid checks file name."
+        mch_path = (self._config_dir / name).resolve()
+        try:
+            mch_path.relative_to(self._config_dir.resolve())
+        except ValueError:
+            return "Checks file must be in the config folder."
+        if not mch_path.is_file():
+            return f"Checks file not found:\n{mch_path}"
+        path = self._condition_mcc_path()
+        if not path.is_file():
+            return f"Missing condition file:\n{path}"
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            return f"Could not read condition.mcc:\n{exc}"
+        replacement = f"({name})"
+        new_text, count = re.subn(
+            r"\([^()\s]+\.mch\)",
+            replacement,
+            text,
+            flags=re.IGNORECASE,
+        )
+        if count == 0:
+            return (
+                "No .mch entries found in condition.mcc.\n"
+                "Expected lines like:\n"
+                "  config=(checks.mch)(start.mcs)…"
+            )
+        if new_text == text:
+            return None
+        try:
+            path.write_text(new_text, encoding="utf-8", newline="\n")
+        except OSError as exc:
+            return f"Could not write condition.mcc:\n{exc}"
+        return None
+
+    def _on_checks_settings(self) -> None:
+        mch_files = self._list_config_mch_files()
+        if not mch_files:
+            messagebox.showerror(
+                "Checks",
+                f"No .mch files found in the config folder:\n{self._config_dir.resolve()}",
+            )
+            return
+        condition_path = self._condition_mcc_path()
+        if not condition_path.is_file():
+            messagebox.showerror(
+                "Checks",
+                f"Missing condition file:\n{condition_path}",
+            )
+            return
+
+        current = self._current_mch_from_condition_mcc()
+        initial = current if current in mch_files else (
+            "checks.mch" if "checks.mch" in mch_files else mch_files[0]
+        )
+
+        dialog = self._create_modal_toplevel("Checks")
+        body = ctk.CTkFrame(dialog, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=20, pady=(16, 8))
+
+        ctk.CTkLabel(
+            body,
+            text="ModelCHECK checks file",
+            font=ctk.CTkFont(size=14, weight="bold"),
+        ).pack(anchor="w")
+        ctk.CTkLabel(
+            body,
+            text="Choose which .mch from the config folder ModelCHECK should use. "
+            "This updates every .mch name in config\\condition.mcc (not config\\templates).",
+            justify="left",
+            wraplength=480,
+            text_color="#555555",
+        ).pack(anchor="w", pady=(4, 16))
+
+        choice_var = tk.StringVar(value=initial)
+        ctk.CTkOptionMenu(
+            body,
+            variable=choice_var,
+            values=mch_files,
+            width=320,
+        ).pack(anchor="w")
+
+        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_row.pack(anchor="e", padx=20, pady=(16, 16))
+
+        def close_dialog() -> None:
+            dialog.destroy()
+
+        def on_ok() -> None:
+            err = self._set_condition_mcc_checks_file(choice_var.get())
+            if err:
+                messagebox.showerror("Checks", err, parent=dialog)
+                return
+            close_dialog()
+
+        ok_btn = self._mk_dialog_button(
+            btn_row, text="OK", width=80, primary=True, command=on_ok
+        )
+        ok_btn.pack(side="right", padx=(12, 0))
+        cancel_btn = self._mk_dialog_button(
+            btn_row, text="Cancel", width=80, primary=False, command=close_dialog
+        )
+        cancel_btn.pack(side="right")
+
+        dialog.bind("<Escape>", lambda _e: close_dialog())
+        dialog.protocol("WM_DELETE_WINDOW", close_dialog)
+        self._run_modal_toplevel_wait(
+            dialog,
+            focus_widget=ok_btn,
             repaints=(ok_btn, cancel_btn),
         )
 

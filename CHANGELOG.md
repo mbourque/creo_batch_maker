@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-15 — v1.11.111
+
+- **Settings → Checks…**: choose a `.mch` from `config\` and update every checks-file name in `config\condition.mcc`.
+
 ## 2026-07-13 — v1.11.110
 
 - **README**: how to point interactive Creo at this app’s ModelCHECK config (`modelcheck_dir` / `modelcheck_enabled`).
