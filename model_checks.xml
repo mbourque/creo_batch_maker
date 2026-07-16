@@ -2225,9 +2225,10 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Category>Model Integrity</Category>
         <Description>Checks for components in the assembly that are defined as flexible and verifies that their flexible behavior is correctly configured and functioning according to company modeling and design intent standards. Flexible components can change shape or configuration depending on their placement context within an assembly, allowing a single model to adapt to multiple conditions such as variable geometry, mechanisms, or configurable subassemblies. While flexibility can be powerful for design reuse and kinematic behavior, incorrect or unintended flexible definitions can lead to unpredictable geometry changes, constraint instability, regeneration issues, and inconsistencies in downstream manufacturing, simulation, and BOM reporting. This check helps ensure that flexible components are intentionally used and properly controlled so their behavior remains consistent with design requirements. Flexibility rules and assembly behavior settings are typically managed through Creo assembly configuration options and ModelCHECK configuration files, while check behavior and reporting are controlled by the FLEX_COMPONENTS settings in the check.mch configuration file.</Description>
         <ModelCheckName>FLEX_COMPONENTS</ModelCheckName>
-        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <ModelCheckOptions>YNEW Y Y N Y Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
+        <info_check>Y</info_check>
     </Check>
 
     <Check>
@@ -2235,9 +2236,10 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <Category>Model Integrity</Category>
         <Description>Checks for mechanical components in an assembly and verifies that they are properly defined, configured, and compliant with predefined modeling and design standards. Mechanical components typically include parts involved in motion, load transfer, kinematic behavior, or mechanism simulation such as gears, linkages, springs, cams, fasteners, and motion-driving elements. Incorrect or inconsistent definition of mechanism components can lead to assembly errors, incorrect motion behavior, constraint failures, regeneration issues, and inaccurate simulation or analysis results. This check helps ensure that mechanical components are correctly identified, properly defined, and function as intended within the assembly structure. Mechanism definition rules and assembly behavior standards are typically managed through Creo mechanism design settings and ModelCHECK configuration files, while check behavior and reporting are controlled by the MECH_COMPONENTS settings in the check.mch configuration file.</Description>
         <ModelCheckName>MECH_COMPONENTS</ModelCheckName>
-        <ModelCheckOptions>YNEW W W N Y Y</ModelCheckOptions>
+        <ModelCheckOptions>YNEW Y Y N Y Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>
+        <info_check>Y</info_check>
     </Check>
 
     <Check>
