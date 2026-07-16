@@ -2715,5 +2715,93 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
         <enabled>Y</enabled>
     </Check>
 
+    <Check>
+        <Name>Model Dimensions Shown</Name>
+        <Category>MBD Readiness</Category>
+        <Description>Checks whether model dimensions are shown in the drawing rather than recreated as independent drawing dimensions.</Description>
+        <ModelCheckName>DIM_MODEL_SHOWN</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y N N N</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <info_check>Y</info_check>
+    </Check>
+
+    <Check>
+        <Name>Shown Dimension Creation</Name>
+        <Category>MBD Readiness</Category>
+        <Description>Checks the creation and use of shown model dimensions to encourage dimensions that remain associated with the model design intent.</Description>
+        <ModelCheckName>DIM_SHOWN_CREAT</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N N</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <info_check>N</info_check>
+    </Check>
+
+    <Check>
+        <Name>Draft Dimensions</Name>
+        <Category>MBD Readiness</Category>
+        <Description>Reports draft or drawing-created dimensions that are not inherited from the 3D model.</Description>
+        <ModelCheckName>DRAFT_DIMENSIONS</ModelCheckName>
+        <ModelCheckOptions>YNEW E E N N N</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <info_check>N</info_check>
+    </Check>
+
+    <Check>
+        <Name>Driven Dimensions</Name>
+        <Category>MBD Readiness</Category>
+        <Description>Reports driven dimensions, which reflect existing geometry but do not control the geometry or feature definition.</Description>
+        <ModelCheckName>DRIVEN_DIMENSIONS</ModelCheckName>
+        <ModelCheckOptions>YNEW Y Y N N N</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <info_check>Y</info_check>
+    </Check>
+
+    <Check>
+        <Name>Empty Layers</Name>
+        <Category>Consistency</Category>
+        <Description>Reports layers that exist in the model or drawing but contain no items.</Description>
+        <ModelCheckName>EMPTY_LAYERS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W W W N</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <info_check>N</info_check>
+    </Check>
+
+    <Check>
+        <Name>Erased Dimensions</Name>
+        <Category>MBD Readiness</Category>
+        <Description>Reports drawing dimensions that have been erased from their views and may leave required design information undocumented.</Description>
+        <ModelCheckName>ERASED_DIMENSIONS</ModelCheckName>
+        <ModelCheckOptions>YNEW W W N N N</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <info_check>N</info_check>
+    </Check>
+
+    <Check>
+        <Name>Sheet Metal Overlap Information</Name>
+        <Category>Geometry Quality</Category>
+        <Description>Reports overlapping sheet metal geometry that may cause invalid flat patterns, manufacturing conflicts, or self-intersection.</Description>
+        <ModelCheckName>SHTMTL_OVERLAP_INFO</ModelCheckName>
+        <ModelCheckOptions>YNEW W W W W N</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <info_check>N</info_check>
+    </Check>
+
+    <Check>
+        <Name>Sheet Metal Rule Check</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks the sheet metal model against the active sheet metal design rules and reports rule violations.</Description>
+        <ModelCheckName>SHTMTL_RULE_CHECK</ModelCheckName>
+        <ModelCheckOptions>YNEW W W W W Y</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+        <info_check>N</info_check>
+    </Check>
+
 
 </ModelChecks>

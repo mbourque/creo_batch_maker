@@ -224,7 +224,7 @@ MCREGEN_VERIFY_FT_INSTS	YN	Y
 MC_MBD_IGNORE_DRIVING_DIMS	YN	N
 
 # Get version information from model metadata.
-MC_GET_VERSION_FROM_META_DATA	YN	Y
+MC_GET_VERSION_FROM_META_DATA	YN	N
 
 # Report errors in merged components found in top-level assemblies.
 MC_MRG_COMP_ERR_IN_TOP_ASM	YN	Y
@@ -237,3 +237,15 @@ MC_REPORT_MASTER_MATERIAL	YN	Y
 
 # Recompute mass properties before performing mass-related checks.
 MU_MASS_RECOMPUTE	YN	N
+
+# Specifies whether to report the circular references for Top level, All Levels, or Sel Components options. These options are available on the Menu Manager when you run ModelCheck. Only applicable in assembly.
+MC_REPORT_CRC_ALL_LEVEL	YN	N
+
+# In ModelCHECK Regeneration mode, specifies whether to regenerate the top level assembly or to force regeneration of all the features of an assembly.
+MC_REGEN_TOP_ASM_ONLY	YN	N
+
+# Specifies whether to report the models or bodies with material not defined and density set to 1.0 for DEF_DENSITY check.
+MC_SUPPORT_LEGACY_DEF_DENSITY	YN	Y
+
+# If set to Y, family table instances are checked during ModelCHECK Regeneration mode, ModelCHECK parameters are propagated to all instances. The default is N.
+MC_VERIFY_INST_POST	YN	Y
