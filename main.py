@@ -42,6 +42,21 @@ _CREO_MODEL_EXT_PATTERNS: dict[str, str] = {
     "drw": r".*\.drw(\.\d+)?$",
 }
 _CREO_MODEL_EXTENSIONS_ALL = ("prt", "asm", "drw")
+# Windows FindFirstFile-style globs — avoid listing every file in a large working folder.
+_CREO_MODEL_GLOBS: dict[str, tuple[str, ...]] = {
+    "prt": ("*.prt", "*.prt.*"),
+    "asm": ("*.asm", "*.asm.*"),
+    "drw": ("*.drw", "*.drw.*"),
+}
+_MODELCHECK_OUTPUT_GLOBS: tuple[str, ...] = (
+    "*.p.xml",
+    "*.a.xml",
+    "*.d.xml",
+    "*.p.html",
+    "*.a.html",
+    "*.d.html",
+)
+_JPEG_OUTPUT_GLOBS: tuple[str, ...] = ("*.jpg",)
 _START_TEMPLATE_KINDS: tuple[tuple[str, str], ...] = (
     ("prt", "Part..."),
     ("asm", "Assembly..."),
@@ -406,10 +421,78 @@ def _modelcheck_expected_output_basenames(model_path: Path) -> list[str]:
     return [f"{stem}.{letter}.xml", f"{stem}.{letter}.html"]
 
 
-def _working_dir_has_output_basename(working_dir: Path, basename: str) -> bool:
+def _glob_toplevel_file_names(
+    directory: Path, globs: tuple[str, ...]
+) -> tuple[str, ...]:
+    """Top-level file names matching ``globs`` only (not a full directory listing)."""
+    names: list[str] = []
+    seen: set[str] = set()
+    for pattern in globs:
+        try:
+            for path in directory.glob(pattern):
+                try:
+                    if not path.is_file():
+                        continue
+                except OSError:
+                    continue
+                name = path.name
+                if name in seen:
+                    continue
+                seen.add(name)
+                names.append(name)
+        except OSError:
+            continue
+    return tuple(names)
+
+
+def _creo_model_globs(extensions: tuple[str, ...]) -> tuple[str, ...]:
+    out: list[str] = []
+    for ext in extensions:
+        out.extend(_CREO_MODEL_GLOBS.get(ext, ()))
+    return tuple(out)
+
+
+def _task_output_globs(task_kind: str) -> tuple[str, ...]:
+    if task_kind == "modelcheck":
+        return _MODELCHECK_OUTPUT_GLOBS
+    if task_kind in ("jpeg3d_part", "jpeg3d_asm", "jpeg2d", "jpeg3d"):
+        return _JPEG_OUTPUT_GLOBS
+    return ()
+
+
+def _directory_has_matching_file(
+    directory: Path,
+    pattern: re.Pattern[str],
+    *,
+    globs: tuple[str, ...] | None = None,
+) -> bool:
+    """True when any top-level file matches ``pattern`` (stops at the first hit)."""
+    if globs:
+        for name in _glob_toplevel_file_names(directory, globs):
+            if pattern.match(name):
+                return True
+        return False
+    try:
+        with os.scandir(directory) as it:
+            for entry in it:
+                if entry.is_file(follow_symlinks=False) and pattern.match(entry.name):
+                    return True
+    except OSError:
+        return False
+    return False
+
+
+def _working_dir_has_output_basename(
+    working_dir: Path,
+    basename: str,
+    *,
+    names_cf: frozenset[str] | None = None,
+) -> bool:
     """True when ``basename`` exists as a top-level file (case-insensitive name match)."""
     if not basename:
         return False
+    if names_cf is not None:
+        return basename.casefold() in names_cf
     if (working_dir / basename).is_file():
         return True
     # Windows paths are case-insensitive; avoid scanning huge folders per model.
@@ -725,53 +808,90 @@ def _jpeg_model_extension(model_name: str) -> str | None:
     return m_ext.group(1).lower() if m_ext else None
 
 
-def _jpeg_part_output_exists(working_dir: Path, model_name: str) -> bool:
+def _jpeg_output_candidates(model_name: str, task_kind: str) -> tuple[str, ...]:
+    """Expected thumbnail basenames for a model/task (plain + renamed)."""
     stem = _jpeg_thumbnail_stem(model_name)
     if stem is None:
-        return False
-    if (working_dir / f"{stem}.jpg").is_file():
-        return True
-    if (working_dir / f"{stem}{_THUMBNAIL_PART_SUFFIX}").is_file():
-        return True
-    return (working_dir / f"{stem}{_THUMBNAIL_MODEL_SUFFIX}").is_file()
-
-
-def _jpeg_assembly_output_exists(working_dir: Path, model_name: str) -> bool:
-    stem = _jpeg_thumbnail_stem(model_name)
-    if stem is None:
-        return False
-    if (working_dir / f"{stem}.jpg").is_file():
-        return True
-    if (working_dir / f"{stem}{_THUMBNAIL_ASSEMBLY_SUFFIX}").is_file():
-        return True
-    return (working_dir / f"{stem}{_THUMBNAIL_MODEL_SUFFIX}").is_file()
-
-
-def _jpeg_drawing_output_exists(working_dir: Path, model_name: str) -> bool:
-    stem = _jpeg_thumbnail_stem(model_name)
-    if stem is None:
-        return False
-    if (working_dir / f"{stem}.jpg").is_file():
-        return True
-    return (working_dir / f"{stem}{_THUMBNAIL_DRAWING_SUFFIX}").is_file()
-
-
-def _jpeg_thumbnail_output_exists(
-    working_dir: Path, model_name: str, task_kind: str
-) -> bool:
-    """True when the expected renamed thumbnail for this model/task exists."""
+        return ()
     if task_kind == "jpeg3d_part":
-        return _jpeg_part_output_exists(working_dir, model_name)
+        return (
+            f"{stem}.jpg",
+            f"{stem}{_THUMBNAIL_PART_SUFFIX}",
+            f"{stem}{_THUMBNAIL_MODEL_SUFFIX}",
+        )
     if task_kind == "jpeg3d_asm":
-        return _jpeg_assembly_output_exists(working_dir, model_name)
+        return (
+            f"{stem}.jpg",
+            f"{stem}{_THUMBNAIL_ASSEMBLY_SUFFIX}",
+            f"{stem}{_THUMBNAIL_MODEL_SUFFIX}",
+        )
     if task_kind == "jpeg2d":
-        return _jpeg_drawing_output_exists(working_dir, model_name)
+        return (f"{stem}.jpg", f"{stem}{_THUMBNAIL_DRAWING_SUFFIX}")
     if task_kind == "jpeg3d":
         ext = _jpeg_model_extension(model_name)
         if ext == "prt":
-            return _jpeg_part_output_exists(working_dir, model_name)
+            return _jpeg_output_candidates(model_name, "jpeg3d_part")
         if ext == "asm":
-            return _jpeg_assembly_output_exists(working_dir, model_name)
+            return _jpeg_output_candidates(model_name, "jpeg3d_asm")
+    return ()
+
+
+def _jpeg_part_output_exists(
+    working_dir: Path,
+    model_name: str,
+    *,
+    names_cf: frozenset[str] | None = None,
+) -> bool:
+    for name in _jpeg_output_candidates(model_name, "jpeg3d_part"):
+        if _working_dir_has_output_basename(working_dir, name, names_cf=names_cf):
+            return True
+    return False
+
+
+def _jpeg_assembly_output_exists(
+    working_dir: Path,
+    model_name: str,
+    *,
+    names_cf: frozenset[str] | None = None,
+) -> bool:
+    for name in _jpeg_output_candidates(model_name, "jpeg3d_asm"):
+        if _working_dir_has_output_basename(working_dir, name, names_cf=names_cf):
+            return True
+    return False
+
+
+def _jpeg_drawing_output_exists(
+    working_dir: Path,
+    model_name: str,
+    *,
+    names_cf: frozenset[str] | None = None,
+) -> bool:
+    for name in _jpeg_output_candidates(model_name, "jpeg2d"):
+        if _working_dir_has_output_basename(working_dir, name, names_cf=names_cf):
+            return True
+    return False
+
+
+def _jpeg_thumbnail_output_exists(
+    working_dir: Path,
+    model_name: str,
+    task_kind: str,
+    *,
+    names_cf: frozenset[str] | None = None,
+) -> bool:
+    """True when the expected renamed thumbnail for this model/task exists."""
+    if task_kind == "jpeg3d_part":
+        return _jpeg_part_output_exists(working_dir, model_name, names_cf=names_cf)
+    if task_kind == "jpeg3d_asm":
+        return _jpeg_assembly_output_exists(working_dir, model_name, names_cf=names_cf)
+    if task_kind == "jpeg2d":
+        return _jpeg_drawing_output_exists(working_dir, model_name, names_cf=names_cf)
+    if task_kind == "jpeg3d":
+        ext = _jpeg_model_extension(model_name)
+        if ext == "prt":
+            return _jpeg_part_output_exists(working_dir, model_name, names_cf=names_cf)
+        if ext == "asm":
+            return _jpeg_assembly_output_exists(working_dir, model_name, names_cf=names_cf)
     return False
 
 
@@ -1250,6 +1370,13 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._wizard_batch_watch: dict[str, object] | None = None
         self._wizard_batch_watch_job: str | None = None
         self._wizard_batch_go_snapshot: dict[str, object] | None = None
+        # Top-level listings keyed by resolved folder path (working dir, templates, …).
+        self._wd_file_listing_cache: dict[str, tuple[tuple[str, ...], frozenset[str]]] = {}
+        self._wd_file_listing_lock = threading.Lock()
+        self._wizard_batch_status_job: str | None = None
+        self._wizard_batch_status_cache: dict[str, object] | None = None
+        self._wizard_batch_status_gen = 0
+        self._suppress_task_var_refresh = False
         self._batch_runner_process: subprocess.Popen | None = None
         self._last_create_report_available = False
         self._modal_dialog_depth = 0
@@ -1438,6 +1565,60 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         """True when the Creo loadpoint provides the JPEG 2D plot task (drawing thumbnails)."""
         return bool(self._task_display_for_ttd_filename(JPEG_2D_PLOT_TTD))
 
+    def _invalidate_working_dir_file_cache(self) -> None:
+        """Drop cached working-folder listings (call after GO, rename, or folder change)."""
+        with self._wd_file_listing_lock:
+            self._wd_file_listing_cache.clear()
+        self._wizard_batch_status_cache = None
+        self._wizard_batch_status_gen += 1
+
+    def _working_dir_cache_key(self, working_dir: Path) -> str:
+        try:
+            return str(working_dir.expanduser().resolve())
+        except OSError:
+            return str(working_dir)
+
+    def _working_dir_model_names(
+        self, working_dir: Path, extensions: tuple[str, ...]
+    ) -> tuple[str, ...]:
+        """Top-level Creo model names for ``extensions`` only (glob, not full folder list)."""
+        ext_key = ",".join(extensions)
+        key = f"{self._working_dir_cache_key(working_dir)}|m|{ext_key}"
+        with self._wd_file_listing_lock:
+            cached = self._wd_file_listing_cache.get(key)
+            if cached is not None:
+                return cached[0]
+        globs = _creo_model_globs(extensions)
+        raw = _glob_toplevel_file_names(working_dir, globs)
+        regexes = [
+            re.compile(_CREO_MODEL_EXT_PATTERNS[ext], re.IGNORECASE)
+            for ext in extensions
+            if ext in _CREO_MODEL_EXT_PATTERNS
+        ]
+        names = tuple(
+            name for name in raw if any(rx.match(name) for rx in regexes)
+        )
+        names_cf = frozenset(n.casefold() for n in names)
+        with self._wd_file_listing_lock:
+            self._wd_file_listing_cache[key] = (names, names_cf)
+        return names
+
+    def _working_dir_output_names_cf(
+        self, working_dir: Path, task_kind: str
+    ) -> frozenset[str]:
+        """Basenames of expected outputs for ``task_kind`` only (glob, not full folder list)."""
+        key = f"{self._working_dir_cache_key(working_dir)}|o|{task_kind}"
+        with self._wd_file_listing_lock:
+            cached = self._wd_file_listing_cache.get(key)
+            if cached is not None:
+                return cached[1]
+        globs = _task_output_globs(task_kind)
+        names = _glob_toplevel_file_names(working_dir, globs) if globs else ()
+        names_cf = frozenset(n.casefold() for n in names)
+        with self._wd_file_listing_lock:
+            self._wd_file_listing_cache[key] = (names, names_cf)
+        return names_cf
+
     def _working_directory_has_jpg_files(self, working_dir_str: str | None = None) -> bool:
         """True when at least one in-scope model has a thumbnail output on disk."""
         return self._working_directory_has_thumbnail_files(working_dir_str)
@@ -1606,12 +1787,22 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return None
         if not self._wizard_thumbnails_phase_applicable(phase_key, wd_str):
             return None
-        total, pending_count = self._wizard_thumbnails_phase_model_counts(wd, phase_key)
+        extensions = self._wizard_thumbnails_phase_scan_extensions(phase_key)
+        if not extensions:
+            return None
+        latest = self._scan_models_non_recursive(wd, extensions=extensions)
+        paths = self._get_latest_model_files(latest)
+        total = len(paths)
         if total <= 0:
             return None
+        pending = self._filter_models_missing_task_output(
+            paths,
+            wd,
+            self._wizard_thumbnails_phase_runner_task_kind(phase_key),
+        )
+        pending_count = len(pending)
         if pending_count <= 0:
             return 1.0, f"{short} finished."
-        pending = self._wizard_thumbnails_phase_pending_paths(wd, phase_key)
         # Pass already ran: remaining models are only recorded failures → show 100%.
         # Thumbnails > will show the failed-models dialog and retry them.
         if self._wizard_thumbnails_phase_pending_are_known_failures(
@@ -2220,6 +2411,28 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return "3D thumbnails"
         return task_kind
 
+    def _model_still_missing_task_output(
+        self,
+        working_dir: Path,
+        model_name: str,
+        task_kind: str,
+        *,
+        names_cf: frozenset[str] | None = None,
+    ) -> bool:
+        model_path = working_dir / model_name
+        if task_kind == "modelcheck":
+            for out in _modelcheck_expected_output_basenames(model_path):
+                if not _working_dir_has_output_basename(
+                    working_dir, out, names_cf=names_cf
+                ):
+                    return True
+            return False
+        if task_kind in ("jpeg3d_part", "jpeg3d_asm", "jpeg2d", "jpeg3d"):
+            return not _jpeg_thumbnail_output_exists(
+                working_dir, model_name, task_kind, names_cf=names_cf
+            )
+        return True
+
     def _filter_models_missing_task_output(
         self,
         latest_files: list[Path],
@@ -2227,10 +2440,18 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         task_kind: str,
     ) -> list[Path]:
         """Models in the working folder that still lack this step's expected output."""
+        if not latest_files:
+            return []
+        names_cf = self._working_dir_output_names_cf(working_dir, task_kind)
         return [
             p
             for p in latest_files
-            if self._model_still_missing_task_output(working_dir, p.name, task_kind)
+            if self._model_still_missing_task_output(
+                working_dir,
+                p.name,
+                task_kind,
+                names_cf=names_cf,
+            )
         ]
 
     def _batch_paths_by_model_base(self, latest_files: list[Path]) -> dict[str, Path]:
@@ -2251,6 +2472,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if not logged:
             return []
         batch_by_base = self._batch_paths_by_model_base(latest_files)
+        names_cf = self._working_dir_output_names_cf(working_dir, task_kind)
         candidates: list[str] = []
         seen: set[str] = set()
         for logged_name in logged:
@@ -2259,40 +2481,15 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 continue
             batch_path = batch_by_base[base]
             if not self._model_still_missing_task_output(
-                working_dir, batch_path.name, task_kind
+                working_dir,
+                batch_path.name,
+                task_kind,
+                names_cf=names_cf,
             ):
                 continue
             seen.add(base)
             candidates.append(_creo_model_base_name(logged_name))
         return candidates
-
-    @staticmethod
-    def _model_still_missing_task_output(
-        working_dir: Path, model_name: str, task_kind: str
-    ) -> bool:
-        model_path = working_dir / model_name
-        if not model_path.is_file():
-            base = _creo_model_base_name(model_name)
-            try:
-                entries = list(working_dir.iterdir())
-            except OSError:
-                return False
-            for entry in entries:
-                if not entry.is_file():
-                    continue
-                if _creo_model_base_name(entry.name).casefold() == base.casefold():
-                    model_path = entry
-                    break
-            else:
-                return False
-        if task_kind == "modelcheck":
-            for out in _modelcheck_expected_output_basenames(model_path):
-                if not _working_dir_has_output_basename(working_dir, out):
-                    return True
-            return False
-        if task_kind in ("jpeg3d_part", "jpeg3d_asm", "jpeg2d", "jpeg3d"):
-            return not _jpeg_thumbnail_output_exists(working_dir, model_name, task_kind)
-        return True
 
     def _ask_failed_batch_go_choice(self, message: str) -> FailedBatchGoChoice | None:
         anchor = self
@@ -2780,23 +2977,84 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             self._cancel_wizard_batch_output_watch()
         if step == WIZARD_STEP_SCAN and prev > WIZARD_STEP_SCAN:
             self._prepare_wizard_scan_step_for_rescan()
+        sync_thumbs = False
         if step == WIZARD_STEP_JPEG_3D and prev != WIZARD_STEP_JPEG_3D:
             self._wizard_thumbnails_part_phase_done = False
             self._wizard_thumbnails_assembly_phase_done = False
             self._wizard_thumbnails_drawing_phase_done = False
             self._wizard_thumbnails_go_phase = None
-            self._sync_wizard_thumbnails_phase_done_from_disk()
+            sync_thumbs = True
         if step == WIZARD_STEP_REPORT and prev != WIZARD_STEP_REPORT:
             self._wizard_report_auto_create_done = False
         self._wizard_step = step
+        # Cheap task label on enter — do not scan for next pending thumbnail phase here.
         if step == WIZARD_STEP_JPEG_3D:
-            task_display = self._wizard_thumbnails_task_display_to_run()
+            task_display = self._wizard_jpeg_3d_display()
         else:
             task_display = self._wizard_task_display_for_step(step)
-        if task_display:
-            self.task.set(task_display)
+        self._suppress_task_var_refresh = True
+        try:
+            if task_display:
+                self.task.set(task_display)
+        finally:
+            self._suppress_task_var_refresh = False
         self._refresh_configuration_menu()
         self._refresh_wizard_ui()
+        if sync_thumbs:
+            self._schedule_sync_wizard_thumbnails_phase_done_from_disk()
+
+    def _schedule_sync_wizard_thumbnails_phase_done_from_disk(self) -> None:
+        """Mark finished thumbnail passes off the UI thread (large folders)."""
+        wd_str = (self.working_directory.get() or "").strip()
+        if not wd_str:
+            return
+        try:
+            wd = Path(wd_str).expanduser()
+            if not wd.is_dir():
+                return
+        except OSError:
+            return
+
+        def work() -> None:
+            try:
+                part = False
+                asm = False
+                drawing = False
+                if self._wizard_thumbnails_phase_applicable(
+                    _WIZARD_THUMBNAILS_PHASE_PART, wd_str
+                ):
+                    part = not self._wizard_thumbnails_phase_has_pending(
+                        wd, _WIZARD_THUMBNAILS_PHASE_PART
+                    )
+                if self._wizard_thumbnails_phase_applicable(
+                    _WIZARD_THUMBNAILS_PHASE_ASSEMBLY, wd_str
+                ):
+                    asm = not self._wizard_thumbnails_phase_has_pending(
+                        wd, _WIZARD_THUMBNAILS_PHASE_ASSEMBLY
+                    )
+                if self._wizard_thumbnails_phase_applicable(
+                    _WIZARD_THUMBNAILS_PHASE_2D, wd_str
+                ):
+                    drawing = not self._wizard_thumbnails_phase_has_pending(
+                        wd, _WIZARD_THUMBNAILS_PHASE_2D
+                    )
+            except OSError:
+                return
+
+            def apply() -> None:
+                if self._wizard_step != WIZARD_STEP_JPEG_3D:
+                    return
+                self._wizard_thumbnails_part_phase_done = part
+                self._wizard_thumbnails_assembly_phase_done = asm
+                self._wizard_thumbnails_drawing_phase_done = drawing
+                self._refresh_wizard_footer()
+
+            try:
+                self.after(0, apply)
+            except tk.TclError:
+                pass
+
+        threading.Thread(target=work, daemon=True).start()
 
     def _wizard_batch_go_snapshot_for_step(self, step: int) -> dict[str, object] | None:
         snap = self._wizard_batch_go_snapshot
@@ -2974,6 +3232,21 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 return False
         return True
 
+    def _wizard_batch_compute_outputs_complete(self, step: int) -> bool:
+        """True when ModelCHECK/Thumbnails required outputs exist (may scan once)."""
+        if step == WIZARD_STEP_JPEG_3D:
+            if self._wizard_step_has_pending_outputs(step):
+                return False
+            return self._working_directory_thumbnails_complete()
+        if step == WIZARD_STEP_MODELCHECK:
+            if self._wizard_step_has_pending_outputs(step):
+                return False
+            watch = self._wizard_batch_watch
+            if watch is not None and watch.get("step") == step:
+                return self._wizard_batch_outputs_ready(watch)
+            return True
+        return False
+
     def _wizard_batch_ready_for_next(self, step: int) -> bool:
         """True when this step's required outputs are complete and Next should show."""
         if self._wizard_step_has_remaining_dxc(step):
@@ -2986,39 +3259,60 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 return self._wizard_batch_outputs_ready(watch)
             return False
         if step in (WIZARD_STEP_MODELCHECK, WIZARD_STEP_JPEG_3D):
-            if self._wizard_step_has_pending_outputs(step):
+            wd = (self.working_directory.get() or "").strip()
+            cache = self._wizard_batch_status_cache
+            if (
+                isinstance(cache, dict)
+                and cache.get("step") == step
+                and cache.get("wd") == wd
+                and "outputs_complete" in cache
+            ):
+                return bool(cache.get("outputs_complete"))
+            # Skip/idle: do not census every UI refresh. After a finished run, scan once and cache.
+            if not (
+                self._wizard_batch_runner_finished_for_step(step)
+                or self._wizard_step_outcome.get(step) == "done"
+            ):
                 return False
-            if step == WIZARD_STEP_JPEG_3D:
-                return self._working_directory_thumbnails_complete()
-            watch = self._wizard_batch_watch
-            if watch is not None and watch.get("step") == step:
-                return self._wizard_batch_outputs_ready(watch)
-            return True
+            complete = self._wizard_batch_compute_outputs_complete(step)
+            if not isinstance(cache, dict) or cache.get("step") != step or cache.get("wd") != wd:
+                cache = {"step": step, "wd": wd}
+            cache["outputs_complete"] = complete
+            self._wizard_batch_status_cache = cache
+            return complete
         return self._wizard_batch_step_already_complete(step)
 
     def _wizard_thumbnails_will_chain_after_batch(self, watch: dict[str, object]) -> bool:
         """True when the batch watcher will rename JPEGs and start the next thumbnail pass."""
+        cached = watch.get("_will_chain")
+        if isinstance(cached, bool):
+            return cached
         if watch.get("step") != WIZARD_STEP_JPEG_3D:
+            watch["_will_chain"] = False
             return False
         if not self._wizard_batch_outputs_ready(watch):
             return False
         phase = watch.get("thumbnails_phase", _WIZARD_THUMBNAILS_PHASE_PART)
         wd_str = (self.working_directory.get() or "").strip()
         if not wd_str:
+            watch["_will_chain"] = False
             return False
         try:
             wd = Path(wd_str).expanduser().resolve()
         except OSError:
+            watch["_will_chain"] = False
             return False
+        result = False
         if phase == _WIZARD_THUMBNAILS_PHASE_PART:
             if self._wizard_thumbnails_phase_has_pending(wd, _WIZARD_THUMBNAILS_PHASE_ASSEMBLY):
-                return True
-            if self._wizard_thumbnails_phase_has_pending(wd, _WIZARD_THUMBNAILS_PHASE_2D):
-                return True
+                result = True
+            elif self._wizard_thumbnails_phase_has_pending(wd, _WIZARD_THUMBNAILS_PHASE_2D):
+                result = True
         elif phase == _WIZARD_THUMBNAILS_PHASE_ASSEMBLY:
             if self._wizard_thumbnails_phase_has_pending(wd, _WIZARD_THUMBNAILS_PHASE_2D):
-                return True
-        return False
+                result = True
+        watch["_will_chain"] = result
+        return result
 
     def _wizard_thumbnails_batch_settling(self, watch: dict[str, object]) -> bool:
         """True after a thumbnail batch finishes but before rename / next pass / Next >."""
@@ -3026,13 +3320,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return False
         if not self._wizard_batch_outputs_ready(watch):
             return False
-        if self._working_directory_thumbnails_complete():
-            return False
-        if self._wizard_thumbnails_will_chain_after_batch(watch):
-            return True
-        if self._wizard_step_has_pending_outputs(WIZARD_STEP_JPEG_3D):
-            return False
-        return True
+        # Hold the UI until post-ready rename/chain runs — no per-tick folder census.
+        return bool(watch.get("batch_finish_painted")) and not bool(
+            watch.get("batch_post_ready_done")
+        )
 
     def _wizard_footer_next_enabled(self) -> bool:
         """True when the footer Next / step GO button would be enabled."""
@@ -3510,10 +3801,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             watch = self._ensure_wizard_batch_watch(step)
         if watch is not None and watch.get("step") == step:
             if self._wizard_batch_waiting_on_step(step):
-                info = self._wizard_batch_progress_info(watch)
-                if info is not None:
-                    return info
-            elif self._wizard_batch_outputs_ready(watch):
+                # While Waiting… use chunk/.dxc progress only — never a full model census.
+                return self._wizard_batch_progress_info(watch)
+            if self._wizard_batch_outputs_ready(watch):
                 info = self._wizard_batch_progress_info(watch)
                 if info is not None:
                     return info
@@ -3691,9 +3981,24 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if not self._wizard_step_shows_batch_progress(step):
             return
         watch = self._wizard_batch_watch
-        needs_part = self._wizard_thumbnails_phase_has_models(_WIZARD_THUMBNAILS_PHASE_PART)
-        needs_asm = self._wizard_thumbnails_phase_has_models(_WIZARD_THUMBNAILS_PHASE_ASSEMBLY)
-        needs_drawing = self._wizard_thumbnails_phase_has_models(_WIZARD_THUMBNAILS_PHASE_2D)
+        waiting = self._wizard_batch_waiting_on_step(step)
+        # Prefer GO/watch row flags so Waiting… ticks never re-scan for "has models".
+        if watch is not None and watch.get("step") == step and (
+            "thumbnails_show_part" in watch
+            or "thumbnails_show_asm" in watch
+            or "thumbnails_show_drawing" in watch
+        ):
+            needs_part = bool(watch.get("thumbnails_show_part"))
+            needs_asm = bool(watch.get("thumbnails_show_asm"))
+            needs_drawing = bool(watch.get("thumbnails_show_drawing"))
+        else:
+            needs_part = self._wizard_thumbnails_phase_has_models(_WIZARD_THUMBNAILS_PHASE_PART)
+            needs_asm = self._wizard_thumbnails_phase_has_models(
+                _WIZARD_THUMBNAILS_PHASE_ASSEMBLY
+            )
+            needs_drawing = self._wizard_thumbnails_phase_has_models(
+                _WIZARD_THUMBNAILS_PHASE_2D
+            )
         progress_info_once = (
             self._wizard_batch_progress_info(watch)
             if watch is not None and watch.get("had_dxc")
@@ -3722,11 +4027,23 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 and watch.get("step") == step
                 and phase == phase_key
             )
-            waiting = active_this_phase and self._wizard_batch_waiting_on_step(step)
-            if active_this_phase and (waiting or progress_info_once is not None):
+            waiting_this = active_this_phase and waiting
+            if active_this_phase and (waiting_this or progress_info_once is not None):
                 info = progress_info_once
-                if info is None and waiting:
+                if info is None and waiting_this:
                     info = (0.0, f"{short} running…")
+            elif waiting:
+                # Inactive rows during a run: session flags only — no disk census.
+                if phase_key == _WIZARD_THUMBNAILS_PHASE_PART:
+                    done = self._wizard_thumbnails_part_phase_done
+                elif phase_key == _WIZARD_THUMBNAILS_PHASE_ASSEMBLY:
+                    done = self._wizard_thumbnails_assembly_phase_done
+                else:
+                    done = self._wizard_thumbnails_drawing_phase_done
+                if done:
+                    info = (1.0, f"{short} finished.")
+                else:
+                    info = (0.0, f"{short} — waiting to start")
             else:
                 info = self._wizard_thumbnails_phase_disk_progress(phase_key, title)
             if info is None:
@@ -3769,7 +4086,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
         batch_dir, _ = self._wizard_batch_dxc_context_for_step(step)
         self._refresh_wizard_batch_automatic_label(step)
-        if not self._wizard_batch_waiting_on_step(step):
+        if not waiting:
             self._refresh_wizard_batch_failed_label(step, batch_dir)
 
     def _wizard_automatic_mode_progress_note(self, step: int) -> str:
@@ -3858,6 +4175,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
         if phase in (_WIZARD_THUMBNAILS_PHASE_PART, _WIZARD_THUMBNAILS_PHASE_ASSEMBLY, _WIZARD_THUMBNAILS_PHASE_2D):
             errors = _rename_plain_jpgs_in_directory(wd, middle=middle)
+            self._invalidate_working_dir_file_cache()
             if errors:
                 messagebox.showwarning(
                     "Thumbnails",
@@ -4175,6 +4493,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         if watch.get("batch_post_ready_done"):
             return
         watch["batch_post_ready_done"] = True
+        self._invalidate_working_dir_file_cache()
         thumbnails_continuing = False
         step = watch.get("step")
         if step == WIZARD_STEP_JPEG_3D:
@@ -5084,57 +5403,172 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             self._refresh_wizard_step_batch_progress(step)
         if self._wizard_batch_waiting_on_step(step):
             return
-        task_display = self._wizard_task_display_for_step(step)
         wd = (self.working_directory.get() or "").strip()
-        if not wd:
-            label.configure(text="Set the working directory on the Setup step.", text_color="#666666")
+        cache = self._wizard_batch_status_cache
+        if (
+            isinstance(cache, dict)
+            and cache.get("step") == step
+            and cache.get("wd") == wd
+            and isinstance(cache.get("text"), str)
+        ):
+            label.configure(
+                text=str(cache["text"]),
+                text_color=str(cache.get("color") or "#666666"),
+            )
+            batch_dir, _ = self._wizard_batch_dir_for_step(step)
+            if batch_dir is not None:
+                self._refresh_wizard_batch_failed_label(step, batch_dir)
             return
+        label.configure(text="Checking models…", text_color="#666666")
+        job = self._wizard_batch_status_job
+        if job is not None:
+            try:
+                self.after_cancel(job)
+            except tk.TclError:
+                pass
+            self._wizard_batch_status_job = None
+        self._wizard_batch_status_gen += 1
+        gen = self._wizard_batch_status_gen
+        task_display = self._wizard_task_display_for_step(step)
+        threading.Thread(
+            target=self._wizard_batch_status_worker,
+            args=(step, wd, task_display, gen),
+            daemon=True,
+        ).start()
+
+    def _wizard_batch_status_worker(
+        self, step: int, wd: str, task_display: str, gen: int
+    ) -> None:
+        """Scan models off the UI thread; marshal result back with ``after``."""
+        result: dict[str, object]
         try:
-            working_dir = Path(wd).expanduser()
-            if not working_dir.is_dir() and not working_dir.parent.is_dir():
-                label.configure(text="Working directory is not ready.", text_color="#666666")
-                return
-            if working_dir.is_dir():
-                if step == WIZARD_STEP_JPEG_3D:
-                    latest_files = self._wizard_thumbnails_latest_models(working_dir)
-                    pending_files = self._wizard_step_pending_models(step)
-                else:
-                    latest_files = self._latest_models_for_task(working_dir, task_display)
-                    task_kind = self._runner_task_kind(task_display)
-                    pending_files = self._filter_models_missing_task_output(
-                        latest_files, working_dir, task_kind
-                    )
-                lines: list[str] = []
-                lines.append(
-                    self._format_batch_model_count_message(
-                        latest_files, pending_files, task_display
-                    )
-                )
-                ok = bool(latest_files)
-                if step == WIZARD_STEP_MODELCHECK:
-                    has_xml = self._working_directory_has_modelcheck_xml(wd)
-                    lines.append(
-                        "ModelCHECK XML found." if has_xml else "ModelCHECK XML not found yet."
-                    )
-                    ok = ok or has_xml or bool(pending_files)
-                elif step == WIZARD_STEP_JPEG_3D:
-                    has_thumbs = self._working_directory_has_thumbnail_files(wd)
-                    lines.append(
-                        "Thumbnail files found." if has_thumbs else "Thumbnail files not found yet."
-                    )
-                    ok = ok or has_thumbs or bool(pending_files)
-                label.configure(
-                    text="\n".join(lines),
-                    text_color="#2E7D32" if ok else "#666666",
-                )
-                self._refresh_wizard_batch_failed_label(step, working_dir)
+            if not wd:
+                result = {
+                    "text": "Set the working directory on the Setup step.",
+                    "color": "#666666",
+                    "outputs_complete": False,
+                    "working_dir": None,
+                }
             else:
-                label.configure(
-                    text="Working folder will be created when you run this step.",
-                    text_color="#111111",
-                )
+                working_dir = Path(wd).expanduser()
+                if not working_dir.is_dir() and not working_dir.parent.is_dir():
+                    result = {
+                        "text": "Working directory is not ready.",
+                        "color": "#666666",
+                        "outputs_complete": False,
+                        "working_dir": None,
+                    }
+                elif working_dir.is_dir():
+                    if step == WIZARD_STEP_JPEG_3D:
+                        latest_files = self._wizard_thumbnails_latest_models(working_dir)
+                        pending_files = self._wizard_step_pending_models(step)
+                    else:
+                        latest_files = self._latest_models_for_task(
+                            working_dir, task_display
+                        )
+                        task_kind = self._runner_task_kind(task_display)
+                        pending_files = self._filter_models_missing_task_output(
+                            latest_files, working_dir, task_kind
+                        )
+                    lines: list[str] = [
+                        self._format_batch_model_count_message(
+                            latest_files, pending_files, task_display
+                        )
+                    ]
+                    ok = bool(latest_files)
+                    if step == WIZARD_STEP_MODELCHECK:
+                        has_xml = self._working_directory_has_modelcheck_xml(wd)
+                        lines.append(
+                            "ModelCHECK XML found."
+                            if has_xml
+                            else "ModelCHECK XML not found yet."
+                        )
+                        ok = ok or has_xml or bool(pending_files)
+                    elif step == WIZARD_STEP_JPEG_3D:
+                        has_thumbs = self._working_directory_has_thumbnail_files(wd)
+                        lines.append(
+                            "Thumbnail files found."
+                            if has_thumbs
+                            else "Thumbnail files not found yet."
+                        )
+                        ok = ok or has_thumbs or bool(pending_files)
+                    outputs_complete = not bool(pending_files) and (
+                        step != WIZARD_STEP_JPEG_3D
+                        or self._working_directory_thumbnails_complete(wd)
+                    )
+                    result = {
+                        "text": "\n".join(lines),
+                        "color": "#2E7D32" if ok else "#666666",
+                        "outputs_complete": outputs_complete,
+                        "working_dir": working_dir,
+                    }
+                else:
+                    result = {
+                        "text": "Working folder will be created when you run this step.",
+                        "color": "#111111",
+                        "outputs_complete": False,
+                        "working_dir": None,
+                    }
         except OSError:
-            label.configure(text="Could not scan the working directory.", text_color="#666666")
+            result = {
+                "text": "Could not scan the working directory.",
+                "color": "#666666",
+                "outputs_complete": False,
+                "working_dir": None,
+            }
+        try:
+            self.after(
+                0,
+                lambda s=step, w=wd, g=gen, r=result: self._apply_wizard_batch_status_result(
+                    s, w, g, r
+                ),
+            )
+        except tk.TclError:
+            pass
+
+    def _apply_wizard_batch_status_result(
+        self,
+        step: int,
+        wd: str,
+        gen: int,
+        result: dict[str, object],
+    ) -> None:
+        if gen != self._wizard_batch_status_gen or self._wizard_step != step:
+            return
+        label = getattr(self, "wizard_batch_status_label", None)
+        if label is None:
+            return
+        if self._wizard_batch_waiting_on_step(step):
+            return
+        text = str(result.get("text") or "")
+        color = str(result.get("color") or "#666666")
+        label.configure(text=text, text_color=color)
+        self._wizard_batch_status_cache = {
+            "step": step,
+            "wd": wd,
+            "text": text,
+            "color": color,
+            "outputs_complete": bool(result.get("outputs_complete")),
+        }
+        working_dir = result.get("working_dir")
+        if isinstance(working_dir, Path):
+            self._refresh_wizard_batch_failed_label(step, working_dir)
+        self._refresh_wizard_footer()
+
+    def _refresh_wizard_batch_status_heavy(self, step: int) -> None:
+        """Compatibility entry: schedule the same background status scan."""
+        self._wizard_batch_status_job = None
+        if self._wizard_step != step:
+            return
+        wd = (self.working_directory.get() or "").strip()
+        self._wizard_batch_status_gen += 1
+        gen = self._wizard_batch_status_gen
+        task_display = self._wizard_task_display_for_step(step)
+        threading.Thread(
+            target=self._wizard_batch_status_worker,
+            args=(step, wd, task_display, gen),
+            daemon=True,
+        ).start()
 
     def _refresh_wizard_report_status(self) -> None:
         label = getattr(self, "wizard_report_status_label", None)
@@ -5647,6 +6081,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         def _on_working_directory_or_loadpoint_changed(*_args: object) -> None:
             if self._suppress_settings_autosave:
                 return
+            self._invalidate_working_dir_file_cache()
             self._refresh_task_options()
             self._persist_working_directory_and_loadpoint()
             if self._wizard_step == WIZARD_STEP_SCAN:
@@ -5654,6 +6089,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             self._refresh_wizard_footer()
 
         def _on_task_var_changed(*_args: object) -> None:
+            if self._suppress_task_var_refresh:
+                return
             self._refresh_wizard_ui()
 
         self.working_directory.trace_add("write", _on_working_directory_or_loadpoint_changed)
@@ -6545,6 +6982,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._cancel_wizard_batch_output_watch()
         self._close_batch_runner_window()
         self._cancel_automatic_wizard_chain()
+        self._invalidate_working_dir_file_cache()
         errors: list[str] = []
         errors.extend(_remove_batch_timeout_logs_in_directory(working_dir))
         errors.extend(_remove_batch_status_files_in_directory(working_dir))
@@ -7894,18 +8332,18 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
     def _scan_models_non_recursive(
         self, directory: Path, *, extensions: tuple[str, ...] = _CREO_MODEL_EXTENSIONS_ALL
     ) -> dict[Path, list[str]]:
-        patterns = [_CREO_MODEL_EXT_PATTERNS[ext] for ext in extensions if ext in _CREO_MODEL_EXT_PATTERNS]
         files: dict[Path, list[str]] = defaultdict(list)
-        for entry in directory.iterdir():
-            if not entry.is_file():
-                continue
-            for pattern in patterns:
-                if re.match(pattern, entry.name, re.IGNORECASE):
-                    files[directory].append(entry.name)
-                    break
+        try:
+            names = self._working_dir_model_names(directory, extensions)
+        except OSError:
+            names = ()
+        for entry_name in names:
+            files[directory].append(entry_name)
         return files
 
-    def _get_latest_model_files(self, files_dict: dict[Path, list[str]]) -> list[Path]:
+    def _get_latest_model_files(
+        self, files_dict: dict[Path, list[str]], *, sort_by_size: bool = False
+    ) -> list[Path]:
         latest_files: list[Path] = []
         for root, versions in files_dict.items():
             base_files: dict[str, list[str]] = defaultdict(list)
@@ -7923,11 +8361,13 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     )
                 latest_files.append(root / latest_file)
 
-        def model_sort_key(path: Path) -> tuple[int, str]:
+        def model_sort_key(path: Path) -> tuple:
             lower_name = path.name.lower()
             match = re.search(r"\.(prt|drw|asm)(?:\.\d+)?$", lower_name)
             ext = match.group(1) if match else ""
             rank = {"prt": 0, "drw": 1, "asm": 2}.get(ext, 3)
+            if not sort_by_size:
+                return (rank, lower_name)
             try:
                 size = path.stat().st_size
             except OSError:
@@ -7948,10 +8388,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             d = Path(s).expanduser()
             if not d.is_dir():
                 return False
-            for entry in d.iterdir():
-                if entry.is_file() and pattern.match(entry.name):
-                    return True
-            return False
+            return _directory_has_matching_file(
+                d, pattern, globs=_creo_model_globs(extensions)
+            )
         except OSError:
             return False
 
@@ -7964,10 +8403,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             d = Path(s).expanduser()
             if not d.is_dir():
                 return False
-            for entry in d.iterdir():
-                if not entry.is_file():
-                    continue
-                low = entry.name.lower()
+            for name in _glob_toplevel_file_names(
+                d, ("*.p.xml", "*.a.xml", "*.d.xml")
+            ):
+                low = name.lower()
                 if low.endswith((".p.xml", ".a.xml", ".d.xml")):
                     return True
             return False
@@ -9321,6 +9760,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             )
             return
 
+        self._invalidate_working_dir_file_cache()
         working_dir_raw = (self.working_directory.get() or "").strip()
         loadpoint_raw = (self.creo_loadpoint.get() or "").strip().rstrip("\\/")
         task_display_raw = (self.task.get() or "").strip()
@@ -9495,7 +9935,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     )
             models_dir.mkdir(parents=True, exist_ok=True)
             scanned = self._scan_models_non_recursive(models_dir, extensions=scan_extensions)
-            latest_files = self._get_latest_model_files(scanned)
+            latest_files = self._get_latest_model_files(scanned, sort_by_size=True)
             chunk_size_override: int | None = None
             batch_task_kind: str | None = None
             if scan_templates:

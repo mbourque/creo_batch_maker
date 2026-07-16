@@ -2,6 +2,18 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-16 — v1.11.115
+
+- **Large working folders**: status/pending scans now look up only relevant types (`.prt`/`.asm`/`.drw` and expected XML/HTML/JPG outputs) instead of listing every file when the folder also has prior-scan clutter.
+
+## 2026-07-16 — v1.11.114
+
+- **Skip / step change**: ModelCHECK and Thumbnails status (“N of M models…”) scans in the background so Skip no longer freezes the UI on large working folders.
+
+## 2026-07-16 — v1.11.113
+
+- **ModelCHECK / Thumbnails**: while a batch is Waiting…, the UI no longer rescans the whole working folder every progress tick (Stop/Pause and Skip stay responsive on large jobs).
+
 ## 2026-07-15 — v1.11.112
 
 - **Statistics**: **Model checks** row after **Scan date** shows the `.mch` file from `config\condition.mcc`.
