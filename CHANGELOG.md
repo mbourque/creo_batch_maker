@@ -2,6 +2,26 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-17 — v1.11.120
+
+- **Create Report**: **Processing, please wait…** appears immediately; building ``master.xml`` runs in the background (no long freeze before the overlay).
+
+## 2026-07-17 — v1.11.119
+
+- **Statistics → Scan duration**: finds earliest/latest ModelCHECK XML times in one folder pass (skips non-XML names without stating them).
+
+## 2026-07-17 — v1.11.118
+
+- **Create Report**: shows a **Processing, please wait…** dialog with an animated bar while the report builds, then closes when finished.
+
+## 2026-07-17 — v1.11.117
+
+- **Statistics**: row order is **Working directory**, **Models scanned**, **Scan duration**, **Total size of scanned models**, then **Last saved by**.
+
+## 2026-07-17 — v1.11.116
+
+- **Statistics**: **Working directory** and **Scan duration** rows after **Model checks** (duration from first to last ModelCHECK XML in that folder).
+
 ## 2026-07-16 — v1.11.115
 
 - **Large working folders**: status/pending scans now look up only relevant types (`.prt`/`.asm`/`.drw` and expected XML/HTML/JPG outputs) instead of listing every file when the folder also has prior-scan clutter.

@@ -1381,6 +1381,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._last_create_report_available = False
         self._modal_dialog_depth = 0
         self._report_job_running = False
+        self._report_processing_dialog: ctk.CTkToplevel | None = None
+        self._report_processing_anim_job: str | None = None
         self._post_map_refresh_done = False
         self._suppress_settings_autosave = False
         self._settings_config_relative: dict[str, str] = {
@@ -8403,12 +8405,17 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             d = Path(s).expanduser()
             if not d.is_dir():
                 return False
-            for name in _glob_toplevel_file_names(
-                d, ("*.p.xml", "*.a.xml", "*.d.xml")
-            ):
-                low = name.lower()
-                if low.endswith((".p.xml", ".a.xml", ".d.xml")):
-                    return True
+            # Stop at the first match — do not collect every *.p/a/d.xml name.
+            for pattern in ("*.p.xml", "*.a.xml", "*.d.xml"):
+                try:
+                    for path in d.glob(pattern):
+                        try:
+                            if path.is_file():
+                                return True
+                        except OSError:
+                            continue
+                except OSError:
+                    continue
             return False
         except OSError:
             return False
@@ -10127,8 +10134,183 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             self.configure(cursor="wait" if busy else "")
         except tk.TclError:
             pass
+        if busy:
+            self._show_report_processing_indicator()
+        else:
+            self._hide_report_processing_indicator()
         self._refresh_wizard_footer()
         self._refresh_menu_bar_state()
+
+    def _show_report_processing_indicator(self) -> None:
+        """Frameless 'Processing, please wait…' dialog with animated candy-stripe bar."""
+        self._hide_report_processing_indicator()
+        dialog = ctk.CTkToplevel(self)
+        dialog.withdraw()
+        dialog.overrideredirect(True)
+        dialog.resizable(False, False)
+        dialog.configure(fg_color="#FFFFFF")
+        try:
+            dialog.transient(self)
+        except tk.TclError:
+            pass
+        dialog.protocol("WM_DELETE_WINDOW", lambda: None)
+
+        outer = ctk.CTkFrame(
+            dialog,
+            fg_color="#FFFFFF",
+            corner_radius=6,
+            border_width=1,
+            border_color="#B0B0B0",
+        )
+        outer.pack(fill="both", expand=True)
+
+        ctk.CTkLabel(
+            outer,
+            text="Processing, please wait...",
+            font=ctk.CTkFont(size=13),
+            text_color="#222222",
+            anchor="w",
+        ).pack(anchor="w", padx=22, pady=(18, 12))
+
+        bar_w, bar_h = 300, 18
+        canvas = tk.Canvas(
+            outer,
+            width=bar_w,
+            height=bar_h,
+            highlightthickness=0,
+            bd=0,
+            bg="#FFFFFF",
+        )
+        canvas.pack(padx=22, pady=(0, 20))
+
+        phase = {"value": 0}
+        stripe = 12
+        blue = "#8EC8E8"
+        white = "#FFFFFF"
+        border = "#6BA3C8"
+
+        def paint() -> None:
+            canvas.delete("all")
+            # Pill clip via rounded background + stripes inside.
+            canvas.create_rectangle(
+                1, 1, bar_w - 2, bar_h - 2, outline=border, width=1, fill=blue
+            )
+            off = phase["value"] % (stripe * 2)
+            x = -bar_h - stripe + off
+            i = 0
+            while x < bar_w + bar_h:
+                if i % 2 == 0:
+                    # Diagonal white band (parallelogram).
+                    canvas.create_polygon(
+                        x,
+                        1,
+                        x + stripe,
+                        1,
+                        x + stripe + bar_h - 2,
+                        bar_h - 1,
+                        x + bar_h - 2,
+                        bar_h - 1,
+                        fill=white,
+                        outline=white,
+                    )
+                x += stripe
+                i += 1
+            # Soft edge mask: redraw rounded-ish ends with white corners.
+            canvas.create_oval(-6, -2, bar_h + 2, bar_h + 2, fill="#FFFFFF", outline="#FFFFFF")
+            canvas.create_oval(
+                bar_w - bar_h - 2,
+                -2,
+                bar_w + 6,
+                bar_h + 2,
+                fill="#FFFFFF",
+                outline="#FFFFFF",
+            )
+            canvas.create_arc(
+                1,
+                1,
+                bar_h,
+                bar_h - 1,
+                start=90,
+                extent=180,
+                style="arc",
+                outline=border,
+                width=1,
+            )
+            canvas.create_arc(
+                bar_w - bar_h,
+                1,
+                bar_w - 1,
+                bar_h - 1,
+                start=270,
+                extent=180,
+                style="arc",
+                outline=border,
+                width=1,
+            )
+
+        def tick() -> None:
+            self._report_processing_anim_job = None
+            try:
+                if not dialog.winfo_exists():
+                    return
+            except tk.TclError:
+                return
+            phase["value"] = (phase["value"] + 2) % (stripe * 2)
+            paint()
+            try:
+                self._report_processing_anim_job = dialog.after(40, tick)
+            except tk.TclError:
+                pass
+
+        paint()
+        self._report_processing_dialog = dialog
+        self._modal_dialog_depth += 1
+        try:
+            dialog.update_idletasks()
+            _schedule_center_toplevel_on_parent(dialog, self)
+            dialog.deiconify()
+            dialog.lift()
+            dialog.attributes("-topmost", True)
+            dialog.grab_set()
+            dialog.attributes("-topmost", False)
+        except tk.TclError:
+            pass
+        try:
+            self._report_processing_anim_job = dialog.after(40, tick)
+        except tk.TclError:
+            pass
+        try:
+            dialog.update_idletasks()
+            dialog.update()
+        except tk.TclError:
+            pass
+
+    def _hide_report_processing_indicator(self) -> None:
+        job = self._report_processing_anim_job
+        if job is not None:
+            dialog = self._report_processing_dialog
+            try:
+                if dialog is not None and dialog.winfo_exists():
+                    dialog.after_cancel(job)
+                else:
+                    self.after_cancel(job)
+            except (tk.TclError, ValueError):
+                pass
+            self._report_processing_anim_job = None
+        dialog = self._report_processing_dialog
+        self._report_processing_dialog = None
+        if dialog is None:
+            return
+        try:
+            if dialog.winfo_exists():
+                try:
+                    dialog.grab_release()
+                except tk.TclError:
+                    pass
+                dialog.destroy()
+                self._modal_dialog_depth = max(0, self._modal_dialog_depth - 1)
+        except tk.TclError:
+            pass
 
     def _bring_app_forward(self) -> None:
         try:
@@ -10151,6 +10333,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     "Report Failed",
                     f"Could not patch ModelCHECK HTML.\n\n{error}",
                 )
+            elif kind == "master":
+                messagebox.showerror("Report Failed", str(error))
             elif kind == "notfound":
                 messagebox.showerror("Report Failed", str(error))
             elif kind == "os":
@@ -10205,14 +10389,27 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return
         self._cancel_automatic_wizard_chain()
         self._set_report_busy(True)
+        # Paint the overlay before any heavy work (master.xml used to run on the UI thread).
+        try:
+            self.update_idletasks()
+            self.update()
+        except tk.TclError:
+            pass
         settings_path = _default_app_settings_path()
         wd = str(working_dir)
 
         def work() -> None:
             result: dict[str, object] = {"written": None, "error": None, "kind": None}
             try:
-                patch.run(settings_path=settings_path, quiet=True)
-                result["written"] = build_errors_warnings_report.build_errors_warnings_html(wd)
+                ok, build_err = self._build_master_xml_silent(working_dir)
+                if not ok:
+                    result["error"] = build_err or "Could not build master.xml."
+                    result["kind"] = "master"
+                else:
+                    patch.run(settings_path=settings_path, quiet=True)
+                    result["written"] = build_errors_warnings_report.build_errors_warnings_html(
+                        wd
+                    )
             except patch.PatchError as exc:
                 result["error"] = str(exc)
                 result["kind"] = "patch"
@@ -10238,16 +10435,6 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             self._warn_if_working_directory_invalid()
             return
         working_dir = Path(wd).expanduser().resolve()
-        if not self._working_directory_has_modelcheck_xml(wd):
-            messagebox.showwarning(
-                "Missing ModelCHECK XML",
-                "No ModelCHECK result XML (*.p.xml, *.a.xml, *.d.xml) was found in the working directory.",
-            )
-            return
-        ok, build_err = self._build_master_xml_silent(working_dir)
-        if not ok:
-            messagebox.showerror("Report Failed", build_err or "Could not build master.xml.")
-            return
         bundle = _app_bundle_dir()
         model_checks = bundle / "model_checks.xml"
         template = bundle / "report_template.html.j2"
@@ -10265,6 +10452,12 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 f"Place report_template.html.j2 in the same folder as the application executable:\n\n"
                 f"  {_app_bundle_dir() / 'report_template.html.j2'}\n\n"
                 f"Executable:\n  {Path(sys.executable).resolve()}",
+            )
+            return
+        if not self._working_directory_has_modelcheck_xml(wd):
+            messagebox.showwarning(
+                "Missing ModelCHECK XML",
+                "No ModelCHECK result XML (*.p.xml, *.a.xml, *.d.xml) was found in the working directory.",
             )
             return
         self._persist_working_directory_and_loadpoint()

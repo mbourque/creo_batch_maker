@@ -674,9 +674,11 @@ PERFORMANCE_REPORT_ISSUE_ROW_CHECKS: dict[str, str] = {
 PERFORMANCE_TABLE_ROWS: list[tuple[str, str | None]] = [
     ("Scan date", "_SCAN_DATE"),
     ("Model checks", "_MODEL_CHECKS"),
-    ("Last saved by", "_USERS"),
+    ("Working directory", "_WORKING_DIRECTORY"),
     ("Models scanned", "_FILES_SCANNED"),
+    ("Scan duration", "_SCAN_DURATION"),
     ("Total size of scanned models", "_TOTAL_SCANNED_SIZE"),
+    ("Last saved by", "_USERS"),
     ("Parts", "_PART_COUNT"),
     ("Assemblies", "_ASSEMBLY_COUNT"),
     ("Drawings", "_DRAWING_COUNT"),
@@ -729,6 +731,8 @@ class PerformanceMetrics:
     drawing_count: int = 0
     scan_date: str = ""
     model_checks_mch: str = ""
+    working_directory: str = ""
+    scan_duration: str = ""
     users: list[str] = field(default_factory=list)
     total_scanned_bytes: int = 0
     top_level_assembly_name: str = ""
@@ -1038,6 +1042,21 @@ def _format_scan_date(dt: datetime) -> str:
     return f"{dt.strftime('%A %B')} {dt.day}, {dt.year} {hour12}:{dt.minute:02d}{ampm}"
 
 
+def _format_scan_duration(seconds: float) -> str:
+    """e.g. 8hrs 23min, 45min, 12sec."""
+    total = max(0, int(round(seconds)))
+    if total < 60:
+        return "1sec" if total <= 1 else f"{total}sec"
+    hours, rem = divmod(total, 3600)
+    minutes = rem // 60
+    if hours >= 1:
+        hr = "1hr" if hours == 1 else f"{hours}hrs"
+        if minutes:
+            return f"{hr} {minutes}min"
+        return hr
+    return "1min" if minutes == 1 else f"{minutes}min"
+
+
 def _scan_date_for_report(master_path: str = "") -> str:
     """Prefer master.xml write time (scan merge); otherwise report build time."""
     dt: datetime | None = None
@@ -1051,6 +1070,54 @@ def _scan_date_for_report(master_path: str = "") -> str:
     if dt is None:
         dt = datetime.now()
     return _format_scan_date(dt)
+
+
+def _scan_duration_from_modelcheck_xml(working_dir: str) -> str:
+    """Span from earliest to latest top-level ModelCHECK ``*.p/a/d.xml`` write time.
+
+    One ``scandir`` of the working folder: non-XML names are skipped without ``stat``;
+    only matching XML files contribute min/max mtime (not a full 31k-file inventory).
+    """
+    if not working_dir:
+        return ""
+    try:
+        root = Path(working_dir).expanduser()
+        if not root.is_dir():
+            return ""
+    except OSError:
+        return ""
+    earliest: float | None = None
+    latest: float | None = None
+    count = 0
+    try:
+        with os.scandir(root) as it:
+            for entry in it:
+                low = entry.name.lower()
+                if not (
+                    low.endswith(".p.xml")
+                    or low.endswith(".a.xml")
+                    or low.endswith(".d.xml")
+                ):
+                    continue
+                try:
+                    if not entry.is_file(follow_symlinks=False):
+                        continue
+                    mtime = entry.stat(follow_symlinks=False).st_mtime
+                except OSError:
+                    continue
+                count += 1
+                if earliest is None or mtime < earliest:
+                    earliest = mtime
+                if latest is None or mtime > latest:
+                    latest = mtime
+    except OSError:
+        return ""
+    if count < 2 or earliest is None or latest is None:
+        return ""
+    span = latest - earliest
+    if span < 1:
+        return ""
+    return _format_scan_duration(span)
 
 
 def _model_checks_mch_from_condition_mcc() -> str:
@@ -1072,6 +1139,8 @@ def performance_metrics_answers(metrics: PerformanceMetrics) -> dict[str, str]:
     answers: dict[str, str] = {
         "_SCAN_DATE": metrics.scan_date or "—",
         "_MODEL_CHECKS": metrics.model_checks_mch or "—",
+        "_WORKING_DIRECTORY": metrics.working_directory or "—",
+        "_SCAN_DURATION": metrics.scan_duration or "—",
         "_USERS": ", ".join(metrics.users) if metrics.users else "—",
         "_FILES_SCANNED": str(metrics.files_scanned),
         "_PART_COUNT": str(metrics.part_count),
@@ -1119,6 +1188,8 @@ def _resolve_performance_value(answers: dict[str, str], key: str | None) -> tupl
     if key in (
         "_SCAN_DATE",
         "_MODEL_CHECKS",
+        "_WORKING_DIRECTORY",
+        "_SCAN_DURATION",
         "_USERS",
         "_FILES_SCANNED",
         "_PART_COUNT",
@@ -1212,7 +1283,11 @@ def generate_performance_table_html(
         else:
             val_html = _esc(value)
             title_attr = ""
-            val_class = "mq-perf-plain" if label == "Last saved by" else "mq-perf-val"
+            val_class = (
+                "mq-perf-plain"
+                if label in ("Last saved by", "Working directory")
+                else "mq-perf-val"
+            )
         body_rows.append(
             f"<tr><td class=\"mq-perf-label\">{label_esc}</td>"
             f"<td class=\"{val_class}\"{title_attr}>{val_html}</td></tr>"
@@ -1247,13 +1322,35 @@ def generate_performance_report_page(metrics: PerformanceMetrics) -> str:
     )
 
 
+def _apply_performance_report_meta(
+    metrics: PerformanceMetrics,
+    *,
+    working_dir: str = "",
+    master_path: str = "",
+) -> None:
+    """Fill Scan date / Model checks / Working directory / Scan duration for the table."""
+    wd = (working_dir or "").strip()
+    if not wd and master_path:
+        try:
+            wd = str(Path(master_path).expanduser().resolve().parent)
+        except OSError:
+            wd = str(Path(master_path).parent)
+    metrics.scan_date = _scan_date_for_report(master_path)
+    metrics.model_checks_mch = _model_checks_mch_from_condition_mcc()
+    metrics.working_directory = wd
+    metrics.scan_duration = _scan_duration_from_modelcheck_xml(wd)
+
+
 def write_performance_report_file(master_xml_path: str, output_path: str | None = None) -> str:
     """Write ``performance_report.html`` beside ``master.xml`` from batch performance metrics."""
     master_xml_path = os.path.abspath(master_xml_path)
     root = ET.parse(master_xml_path).getroot()
     metrics = scan_performance_metrics(root)
-    metrics.scan_date = _scan_date_for_report(master_xml_path)
-    metrics.model_checks_mch = _model_checks_mch_from_condition_mcc()
+    _apply_performance_report_meta(
+        metrics,
+        working_dir=os.path.dirname(master_xml_path) or "",
+        master_path=master_xml_path,
+    )
     if metrics.files_seen == 0:
         raise ValueError("No model entries found in master.xml")
     out_path = output_path or os.path.join(os.path.dirname(master_xml_path), "performance_report.html")
@@ -2468,8 +2565,11 @@ def generate_statistics_fragment(
     """Build statistics HTML from an already-parsed ``master.xml`` root."""
     stats = scan_batch_statistics(master_root, master_path=master_path)
     stats.performance_metrics = scan_performance_metrics(master_root)
-    stats.performance_metrics.scan_date = _scan_date_for_report(master_path)
-    stats.performance_metrics.model_checks_mch = _model_checks_mch_from_condition_mcc()
+    _apply_performance_report_meta(
+        stats.performance_metrics,
+        working_dir=working_dir,
+        master_path=master_path,
+    )
     stats.skipped_models = scan_skipped_models(working_dir, master_root)
     stats.templates_scanned = scan_templates_scanned(working_dir)
     if stats.top_level_assembly:
@@ -2495,8 +2595,11 @@ def write_statistics_html_file(master_xml_path: str, output_path: str) -> str:
 
     stats = scan_batch_statistics(root, master_path=master_xml_path)
     stats.performance_metrics = scan_performance_metrics(root)
-    stats.performance_metrics.scan_date = _scan_date_for_report(master_xml_path)
-    stats.performance_metrics.model_checks_mch = _model_checks_mch_from_condition_mcc()
+    _apply_performance_report_meta(
+        stats.performance_metrics,
+        working_dir=working_dir,
+        master_path=master_xml_path,
+    )
     stats.skipped_models = scan_skipped_models(working_dir, root)
     stats.templates_scanned = scan_templates_scanned(working_dir)
     if stats.top_level_assembly:
