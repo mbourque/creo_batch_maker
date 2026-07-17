@@ -139,7 +139,7 @@ Open **Settings** from the menu:
 | **Recent scans**           | On **Setup** only: switch to a recently batched working folder (up to 10; hidden when the list is empty).   |
 
 
-**Configuration** opens ModelCHECK config files in Notepad (`config\` folder), including **Start…** for `config\start.mcs` and **View scales…** for `config\view_scale.txt`.
+**Configuration** opens ModelCHECK config files in Notepad from ``config\`` only (never ``config\templates\``). **Model Checks…** opens the active ``.mch`` chosen in **Settings → Checks…**. Also includes **Start…** for `config\start.mcs` and **View scales…** for `config\view_scale.txt`.
 
 ## Tips
 

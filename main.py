@@ -1386,7 +1386,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._post_map_refresh_done = False
         self._suppress_settings_autosave = False
         self._settings_config_relative: dict[str, str] = {
-            "Model Checks...": "templates/checks.mch",
+            # Model Checks… opens the active .mch from condition.mcc (see _on_settings_config_item).
             "Config.pro...": "config.pro",
             "Angles...": "angles.txt",
             "GMC...": "config.gmc",
@@ -7751,9 +7751,50 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             )
 
     def _on_settings_config_item(self, option: str) -> None:
+        if option == "Model Checks...":
+            mch_name = self._current_mch_from_condition_mcc()
+            if not mch_name:
+                messagebox.showerror(
+                    "Model Checks",
+                    "Could not find an active .mch name in config\\condition.mcc.\n\n"
+                    "Use Settings → Checks… to choose a checks file.",
+                )
+                return
+            target = (self._config_dir / mch_name).resolve()
+            try:
+                target.relative_to(self._config_dir.resolve())
+            except ValueError:
+                messagebox.showerror(
+                    "Model Checks",
+                    f"Checks file must be in the config folder:\n{self._config_dir}",
+                )
+                return
+            if not target.is_file():
+                messagebox.showerror(
+                    "File not found",
+                    f"Active checks file from condition.mcc was not found:\n{target}\n\n"
+                    "Use Settings → Checks… to choose a checks file in config\\.",
+                )
+                return
+            try:
+                self._open_file_in_notepad(target)
+            except OSError as exc:
+                messagebox.showerror(
+                    "Open failed",
+                    f"Could not open in Notepad:\n{target}\n\n{exc}",
+                )
+            return
+
         rel = self._settings_config_relative.get(option)
         if not rel:
             messagebox.showerror("Settings", f"No file mapping for:\n{option}")
+            return
+        # Configuration menu opens files under config\ only — never config\templates\.
+        if "templates" in Path(rel).parts:
+            messagebox.showerror(
+                "Configuration",
+                "Configuration files must be in the config folder (not templates).",
+            )
             return
         target = (self._config_dir / rel).resolve()
         if not target.is_file():

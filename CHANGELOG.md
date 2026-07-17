@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-17 — v1.11.128
+
+- **Configuration → Model Checks…**: opens the active ``.mch`` from **Settings → Checks…** / ``config\condition.mcc`` (not ``config\templates\``).
+
 ## 2026-07-17 — v1.11.127
 
 - **CAD Assessment Summary**: **Models scanned** is in Scan Summary (above total size); **Duplicate models** is last under Dataset Overview.
