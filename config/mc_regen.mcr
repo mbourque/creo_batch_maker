@@ -19,7 +19,7 @@ E:WARNING: CUT is entirely outside the model
 E:WARNING: PROTRUSION is entirely inside the model
 E:currently frozen
 E:WARNING: Model geometry for drawing is missing
-E:The geometry which serves as the origin of the detailed view
+E:The geometry which serves as the origin
 E:Feature references are missing
 E:Cannot intersect part
 E:ASSEMBLY CUT is entirely outside the model
@@ -48,5 +48,4 @@ W:contains obsolete dimension
 
 E:entirely outside the model.
 
-E:The geometry which serves as the origin
 W:External ref. for feature/component not found
