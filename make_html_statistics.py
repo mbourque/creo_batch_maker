@@ -681,8 +681,8 @@ PERFORMANCE_TABLE_SECTIONS: list[tuple[str, list[tuple[str, str | None]]]] = [
         "Scan Summary",
         [
             ("Scan date", "_SCAN_DATE"),
-            ("Model checks", "_MODEL_CHECKS"),
             ("Working directory", "_WORKING_DIRECTORY"),
+            ("Model checks", "_MODEL_CHECKS"),
             ("Scan duration", "_SCAN_DURATION"),
             ("Total size of scanned models", "_TOTAL_SCANNED_SIZE"),
         ],

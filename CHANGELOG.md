@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-17 — v1.11.125
+
+- **CAD Assessment Summary**: **Model checks** now appears under **Working directory** in the Scan Summary group.
+
 ## 2026-07-17 — v1.11.124
 
 - **Models failed**: no longer lists Scan Templates models from ``templates\\`` (only the working-folder top level is checked).
