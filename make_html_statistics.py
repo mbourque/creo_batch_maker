@@ -682,19 +682,19 @@ PERFORMANCE_TABLE_SECTIONS: list[tuple[str, list[tuple[str, str | None]]]] = [
         [
             ("Scan date", "_SCAN_DATE"),
             ("Working directory", "_WORKING_DIRECTORY"),
+            ("Models scanned", "_FILES_SCANNED"),
+            ("Total size of scanned models", "_TOTAL_SCANNED_SIZE"),
             ("Model checks", "_MODEL_CHECKS"),
             ("Scan duration", "_SCAN_DURATION"),
-            ("Total size of scanned models", "_TOTAL_SCANNED_SIZE"),
         ],
     ),
     (
         "Dataset Overview",
         [
-            ("Models scanned", "_FILES_SCANNED"),
-            ("Duplicate models", "_DUPLICATE_MODELS"),
             ("Parts", "_PART_COUNT"),
             ("Assemblies", "_ASSEMBLY_COUNT"),
             ("Drawings", "_DRAWING_COUNT"),
+            ("Duplicate models", "_DUPLICATE_MODELS"),
         ],
     ),
     (

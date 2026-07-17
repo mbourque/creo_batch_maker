@@ -2,6 +2,14 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-17 — v1.11.127
+
+- **CAD Assessment Summary**: **Models scanned** is in Scan Summary (above total size); **Duplicate models** is last under Dataset Overview.
+
+## 2026-07-17 — v1.11.126
+
+- **CAD Assessment Summary**: Scan Summary order is **Working directory**, **Total size of scanned models**, **Model checks**, then **Scan duration** last.
+
 ## 2026-07-17 — v1.11.125
 
 - **CAD Assessment Summary**: **Model checks** now appears under **Working directory** in the Scan Summary group.
