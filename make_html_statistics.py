@@ -688,7 +688,6 @@ PERFORMANCE_TABLE_SECTIONS: list[tuple[str, list[tuple[str, str | None]]]] = [
         "Dataset Overview",
         [
             ("Models scanned", "_FILES_SCANNED"),
-            ("Number of unique models", "UNQ_COMPONENTS"),
             ("Duplicate models", "_DUPLICATE_MODELS"),
             ("Parts", "_PART_COUNT"),
             ("Assemblies", "_ASSEMBLY_COUNT"),
@@ -709,6 +708,7 @@ PERFORMANCE_TABLE_SECTIONS: list[tuple[str, list[tuple[str, str | None]]]] = [
         "Assembly Structure",
         [
             ("Total components in all assemblies", "NUM_COMPONENTS"),
+            ("Number of unique components", "UNQ_COMPONENTS"),
             ("Number of components in master representation", "_MASTER_REP_COUNT"),
             ("Maximum assembly depth", "_MAX_ASSEMBLY_DEPTH"),
         ],

@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-17 — v1.11.123
+
+- **CAD Assessment Summary**: **Number of unique models** is now **Number of unique components** under **Assembly Structure**.
+
 ## 2026-07-17 — v1.11.122
 
 - **CAD Assessment Summary**: **Model checks** reads ``config\condition.mcc`` beside ``main.exe`` in the packaged app (was missing in the EXE build).
