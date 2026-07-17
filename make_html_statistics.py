@@ -57,7 +57,9 @@ from update_start_from_xml import collect_template_scan_report_blocks
 
 
 def _app_dir() -> Path:
-
+    """Sidecar files live beside main.exe (dev: beside this script), not under PyInstaller _MEI temp."""
+    if getattr(sys, "frozen", False) or getattr(sys, "_MEIPASS", None):
+        return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent
 
 

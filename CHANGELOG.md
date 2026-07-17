@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-17 — v1.11.122
+
+- **CAD Assessment Summary**: **Model checks** reads ``config\condition.mcc`` beside ``main.exe`` in the packaged app (was missing in the EXE build).
+
 ## 2026-07-17 — v1.11.121
 
 - **Scan Information**: **Statistics** is now **CAD Assessment Summary**, with grouped rows for scan summary, dataset overview, model types, assembly health, metadata, and notable findings.
