@@ -426,9 +426,10 @@ def _latest_logical_models_on_disk(working_dir: str) -> dict[str, str]:
 
 
 def _check_xml_basenames_in_folder(working_dir: str) -> set[str]:
+    """Top-level ModelCHECK XML basenames only (not ``templates\\`` or other subfolders)."""
     basenames: set[str] = set()
-    for pattern in ("**/*.p.xml", "**/*.a.xml", "**/*.d.xml"):
-        for path in glob.glob(os.path.join(working_dir, pattern), recursive=True):
+    for pattern in ("*.p.xml", "*.a.xml", "*.d.xml"):
+        for path in glob.glob(os.path.join(working_dir, pattern)):
             basenames.add(os.path.basename(path).casefold())
     return basenames
 
@@ -455,9 +456,10 @@ def scan_skipped_models(
     Models in the working folder that did not fully make it into the batch scan.
 
     Compares latest-rev top-level ``name.ext`` models with matching check XML and
-    ``master.xml`` entries. Family-table instances may have check XML but no separate
-    ``.prt`` / ``.asm`` on disk; any model listed in ``master.xml`` was scanned and
-    is not reported as skipped.
+    ``master.xml`` entries (working-folder top level only — not ``templates\\``).
+    Family-table instances may have check XML but no separate ``.prt`` / ``.asm``
+    on disk; any model listed in ``master.xml`` was scanned and is not reported
+    as skipped.
 
     Model types turned off in Scan settings are omitted (not listed as failed).
     """
@@ -491,8 +493,9 @@ def scan_skipped_models(
         if display_cf not in scanned:
             skipped[display_cf] = display
 
-    for pattern in ("**/*.p.xml", "**/*.a.xml", "**/*.d.xml"):
-        for path in glob.glob(os.path.join(wd, pattern), recursive=True):
+    # Orphan check XML at the working-folder top level only (never templates\\).
+    for pattern in ("*.p.xml", "*.a.xml", "*.d.xml"):
+        for path in glob.glob(os.path.join(wd, pattern)):
             basename = os.path.basename(path)
             display = _display_from_check_xml_basename(basename)
             if not display:
