@@ -73,6 +73,8 @@ If `index.html` already exists, **Open Report** opens it in your browser.
 ### Scan Templates (optional)
 
 Upload part / assembly / drawing templates if you use them, then **Scan Templates >**.
+- When a drawing template row is shown, you can also browse a **Drawing DTL** (`.dtl`); it is saved as `config\detail.dtl`. Uploaded part / assembly / drawing templates and that DTL toggle matching lines in `config\start.mcs`.
+- After a successful scan, `config\start.mcs` is updated with template parameters, layers, datums, views, length/mass units, and drawing symbols.
 - Each template is batched one at a time (part, then assembly, then drawing when present).
 - **Next >** when template XML is ready (you do not need to close a Debug-mode PowerShell window left open with **-NoExit**).
 - **Skip** if you don’t need templates.

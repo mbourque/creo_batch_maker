@@ -2,6 +2,42 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-17 — v1.11.138
+
+- **Scan Templates**: writes `PRT_UNITS_MASS` / `ASM_UNITS_MASS` in `config\start.mcs` from template XML `UNITS_MASS` (e.g. KILOGRAM).
+
+## 2026-07-17 — v1.11.137
+
+- **Scan Templates**: writes `PRT_UNITS_LENGTH` / `ASM_UNITS_LENGTH` in `config\start.mcs` from the same template XML Length units check used in Template Information.
+
+## 2026-07-17 — v1.11.136
+
+- **Scan Templates**: updates `PRT_DATUM` / `PRT_VIEW` and `ASM_DATUM` / `ASM_VIEW` in `config\start.mcs` from the template XML (plus drawing lines under the correct anchors).
+
+## 2026-07-17 — v1.11.135
+
+- **Scan Templates**: `config\start.mcs` section markers and drawing anchors fixed so template scan can update part, assembly, and drawing blocks correctly.
+
+## 2026-07-17 — v1.11.134
+
+- **Scan Templates**: `PRT_TEMPLATE` / `ASM_TEMPLATE` / `DRW_TEMPLATE` in `config\start.mcs` are enabled only when that template file is set; otherwise commented.
+
+## 2026-07-17 — v1.11.133
+
+- **Scan Templates**: choosing a Drawing DTL enables `STD_DRW_DTL_FILE DEFAULT detail.dtl` in `config\start.mcs`; clearing it comments that line again.
+
+## 2026-07-17 — v1.11.132
+
+- **Scan Templates**: when a drawing template is shown, browse a **Drawing DTL** (`.dtl`) to save as `config\detail.dtl`.
+
+## 2026-07-17 — v1.11.131
+
+- **Template Information**: each value is shown as its own rounded tag (e.g. Plane: FRONT, RIGHT, TOP), not one background behind the whole line.
+
+## 2026-07-17 — v1.11.130
+
+- **Template Information**: value lines use a light rounded background (same tone as table row hover) so they are easier to scan.
+
 ## 2026-07-17 — v1.11.129
 
 - **Configuration**: removed **Designers…** from the menu.

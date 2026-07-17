@@ -72,6 +72,7 @@ _START_TEMPLATE_XML_NAMES: dict[str, str] = {
     "asm": "assembly_template.a.xml",
     "drw": "drawing_template.d.xml",
 }
+_DRAWING_DTL_DEST_NAME = "detail.dtl"
 _TEMPLATE_KIND_LABELS: dict[str, str] = {
     "prt": "part",
     "asm": "assembly",
@@ -1313,6 +1314,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._wizard_thumbnails_go_phase: str | None = None
         self._wizard_thumbnails_go_phase_owned_by_on_go = False
         self._pending_template_sources: dict[str, Path] = {}
+        self._drawing_dtl_source_name: str | None = None
         self.resizable(False, False)
 
         ctk.set_appearance_mode("light")
@@ -1492,6 +1494,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
     def _apply_start_after_template_scan(self) -> None:
         """Merge template scan XML into start.mcs when Scan Templates batch completes."""
         ok, err, _note = self._update_start_from_template_xml_if_present()
+        self._sync_start_mcs_for_templates()
         if not ok:
             messagebox.showwarning(
                 "Scan Templates",
@@ -2794,6 +2797,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 changed = True
         if changed:
             self._update_start_from_template_xml_if_present()
+            self._sync_start_mcs_for_templates()
 
     def _template_dest_path(self, kind: str) -> Path | None:
         dest_dir = self._start_templates_dir()
@@ -2853,6 +2857,77 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return self._working_directory_has_creo_models(extensions=("drw",))
         return True
 
+    def _drawing_dtl_dest_path(self) -> Path:
+        return self._config_dir / _DRAWING_DTL_DEST_NAME
+
+    def _drawing_dtl_is_set(self) -> bool:
+        return self._drawing_dtl_dest_path().is_file()
+
+    def _sync_start_mcs_optional_line(
+        self,
+        *,
+        line_re: re.Pattern[str],
+        active_line: str,
+        enabled: bool,
+    ) -> bool:
+        """Set one start.mcs line active or ``! ``-commented. Returns True if file changed."""
+        mcs_path = self._config_dir / "start.mcs"
+        if not mcs_path.is_file():
+            return False
+        want = active_line if enabled else f"! {active_line}"
+        try:
+            text = mcs_path.read_text(encoding="utf-8")
+        except OSError:
+            return False
+        lines = text.splitlines(keepends=True)
+        changed = False
+        for i, line in enumerate(lines):
+            body = line.rstrip("\r\n")
+            ending = line[len(body) :]
+            if not line_re.match(body):
+                continue
+            if body != want:
+                lines[i] = want + ending
+                changed = True
+            break
+        else:
+            return False
+        if not changed:
+            return False
+        try:
+            mcs_path.write_text("".join(lines), encoding="utf-8", newline="")
+        except OSError as exc:
+            messagebox.showwarning(
+                "Scan Templates",
+                f"Could not update config\\start.mcs:\n\n{exc}",
+            )
+            return False
+        return True
+
+    def _sync_start_mcs_for_templates(self) -> None:
+        """Comment/uncomment DTL and PRT/ASM/DRW_TEMPLATE lines from current template state."""
+        self._sync_start_mcs_optional_line(
+            line_re=re.compile(
+                r"^(!\s*)?STD_DRW_DTL_FILE\s+DEFAULT\s+detail\.dtl\s*$",
+                flags=re.IGNORECASE,
+            ),
+            active_line="STD_DRW_DTL_FILE\tDEFAULT\tdetail.dtl",
+            enabled=self._drawing_dtl_is_set(),
+        )
+        for kind, keyword, rel in (
+            ("prt", "PRT_TEMPLATE", "templates/part_template.prt"),
+            ("asm", "ASM_TEMPLATE", "templates/assembly_template.asm"),
+            ("drw", "DRW_TEMPLATE", "templates/drawing_template.drw"),
+        ):
+            self._sync_start_mcs_optional_line(
+                line_re=re.compile(
+                    rf"^(!\s*)?{keyword}\s+{re.escape(rel)}\s*$",
+                    flags=re.IGNORECASE,
+                ),
+                active_line=f"{keyword} {rel}",
+                enabled=self._template_is_set(kind),
+            )
+
     def _refresh_wizard_template_row_visibility(self) -> None:
         rows = getattr(self, "_wizard_template_rows", None)
         if not rows:
@@ -2861,10 +2936,15 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             row = rows.get(kind)
             if row is not None:
                 row.pack_forget()
+        dtl_row = getattr(self, "wizard_drawing_dtl_row", None)
+        if dtl_row is not None:
+            dtl_row.pack_forget()
         for kind in ("prt", "asm", "drw"):
             row = rows.get(kind)
             if row is not None and self._wizard_template_kind_visible(kind):
                 row.pack(fill="x", pady=3)
+                if kind == "drw" and dtl_row is not None:
+                    dtl_row.pack(fill="x", pady=3)
 
     def _template_stem_and_letter(self, kind: str) -> tuple[str, str] | None:
         dest_name = _START_TEMPLATE_DEST_NAMES.get(kind)
@@ -2930,6 +3010,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             except OSError as exc:
                 errors.append(f"{path}\n{exc}")
         self._update_start_from_template_xml_if_present()
+        self._sync_start_mcs_for_templates()
         self._refresh_task_options()
         self._refresh_wizard_template_status()
         self._refresh_wizard_footer()
@@ -2960,11 +3041,13 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return
         templates_dir = Path(wd).expanduser() / "templates"
         if not templates_dir.is_dir():
+            self._sync_start_mcs_for_templates()
             return
         try:
             shutil.rmtree(templates_dir)
         except OSError:
             pass
+        self._sync_start_mcs_for_templates()
 
     def _prepare_wizard_scan_step_for_rescan(self) -> None:
         """Allow Scan Templates > again after the user returns from a later wizard step."""
@@ -5177,6 +5260,60 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._refresh_wizard_template_status()
         self._refresh_wizard_footer()
 
+    def _on_wizard_browse_drawing_dtl(self) -> None:
+        if self._wizard_batch_waiting_on_step(WIZARD_STEP_SCAN):
+            return
+        if not self._wizard_template_kind_visible("drw"):
+            return
+        wd = (self.working_directory.get() or "").strip()
+        initial = wd if wd and Path(wd).is_dir() else str(self._config_dir)
+        selected = fd.askopenfilename(
+            title="Drawing DTL file",
+            initialdir=initial,
+            filetypes=[
+                ("Drawing DTL files", "*.dtl"),
+                ("All files", "*.*"),
+            ],
+        )
+        if not selected:
+            return
+        source = Path(selected)
+        if not source.is_file():
+            messagebox.showerror("Drawing DTL", f"File not found:\n{source}")
+            return
+        if source.suffix.casefold() != ".dtl":
+            messagebox.showerror("Drawing DTL", "Select a .dtl file.")
+            return
+        dest = self._drawing_dtl_dest_path()
+        try:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(source.read_bytes())
+        except OSError as exc:
+            messagebox.showerror(
+                "Drawing DTL",
+                f"Could not write:\n{dest.resolve()}\n\n{exc}",
+            )
+            return
+        self._drawing_dtl_source_name = source.name
+        self._sync_start_mcs_for_templates()
+        self._refresh_wizard_template_status()
+
+    def _on_wizard_clear_drawing_dtl(self) -> None:
+        if self._wizard_batch_waiting_on_step(WIZARD_STEP_SCAN):
+            return
+        dest = self._drawing_dtl_dest_path()
+        self._drawing_dtl_source_name = None
+        if dest.is_file():
+            try:
+                dest.unlink()
+            except OSError as exc:
+                messagebox.showwarning(
+                    "Drawing DTL",
+                    f"Could not remove:\n{dest.resolve()}\n\n{exc}",
+                )
+        self._sync_start_mcs_for_templates()
+        self._refresh_wizard_template_status()
+
     def _refresh_wizard_ui(self) -> None:
         self._refresh_wizard_stepper()
         self._refresh_wizard_step_panels()
@@ -5305,11 +5442,23 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 clear_btn.configure(state="disabled" if waiting else "normal")
             else:
                 clear_btn.pack_forget()
+        dtl_browse = getattr(self, "wizard_drawing_dtl_browse_btn", None)
+        dtl_clear = getattr(self, "wizard_drawing_dtl_clear_btn", None)
+        if self._wizard_template_kind_visible("drw"):
+            if dtl_browse is not None:
+                dtl_browse.configure(state="disabled" if waiting else "normal")
+            if dtl_clear is not None:
+                if self._drawing_dtl_is_set():
+                    dtl_clear.pack(side="right", padx=(0, 4))
+                    dtl_clear.configure(state="disabled" if waiting else "normal")
+                else:
+                    dtl_clear.pack_forget()
 
     def _refresh_wizard_template_status(self) -> None:
         labels = getattr(self, "_wizard_template_status_labels", None)
         if not labels:
             return
+        self._sync_start_mcs_for_templates()
         self._refresh_wizard_template_row_visibility()
         if not self._wizard_batch_waiting_on_step(WIZARD_STEP_SCAN):
             for kind, label in labels.items():
@@ -5326,6 +5475,13 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                     )
                 else:
                     label.configure(text="Not set", text_color="#666666")
+            dtl_label = getattr(self, "wizard_drawing_dtl_status_label", None)
+            if dtl_label is not None and self._wizard_template_kind_visible("drw"):
+                if self._drawing_dtl_is_set():
+                    shown = self._drawing_dtl_source_name or _DRAWING_DTL_DEST_NAME
+                    dtl_label.configure(text=f"Set ({shown})", text_color="#2E7D32")
+                else:
+                    dtl_label.configure(text="Not set", text_color="#666666")
             count = self._templates_upload_count()
             summary = getattr(self, "wizard_scan_summary_label", None)
             if summary is not None:
@@ -5814,6 +5970,53 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             )
             status.pack(side="left", fill="x", expand=True, padx=(0, 8))
             self._wizard_template_status_labels[kind] = status
+
+        self.wizard_drawing_dtl_row = ctk.CTkFrame(self.wizard_scan_frame, fg_color="transparent")
+        ctk.CTkLabel(
+            self.wizard_drawing_dtl_row,
+            text="Drawing DTL file",
+            width=140,
+            anchor="w",
+            font=ctk.CTkFont(size=12),
+            text_color="#111111",
+        ).pack(side="left")
+        self.wizard_drawing_dtl_browse_btn = ctk.CTkButton(
+            self.wizard_drawing_dtl_row,
+            text="Browse...",
+            width=88,
+            height=26,
+            corner_radius=6,
+            border_width=0,
+            fg_color="#3B8ED0",
+            text_color="#FFFFFF",
+            hover_color="#367DB6",
+            font=ctk.CTkFont(size=13),
+            command=self._on_wizard_browse_drawing_dtl,
+        )
+        self.wizard_drawing_dtl_browse_btn.pack(side="right")
+        self.wizard_drawing_dtl_clear_btn = ctk.CTkButton(
+            self.wizard_drawing_dtl_row,
+            text="×",
+            width=24,
+            height=26,
+            corner_radius=6,
+            border_width=1,
+            fg_color="#ECECEC",
+            border_color="#8F98A3",
+            text_color="#666666",
+            hover_color="#DDDDDD",
+            font=ctk.CTkFont(size=16),
+            command=self._on_wizard_clear_drawing_dtl,
+        )
+        self.wizard_drawing_dtl_status_label = ctk.CTkLabel(
+            self.wizard_drawing_dtl_row,
+            text="Not set",
+            anchor="w",
+            font=ctk.CTkFont(size=12),
+            text_color="#666666",
+        )
+        self.wizard_drawing_dtl_status_label.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        self._sync_start_mcs_for_templates()
 
         self.wizard_scan_progress_frame = ctk.CTkFrame(self.wizard_scan_frame, fg_color="transparent")
         self.wizard_scan_progress_label = ctk.CTkLabel(
@@ -9841,6 +10044,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             if not ok:
                 messagebox.showerror("Templates", err)
                 return
+            self._sync_start_mcs_for_templates()
             wd = working_dir_raw.strip()
             if _working_directory_exists_as_dir(wd):
                 make_html_statistics.clear_template_scan_session(wd)

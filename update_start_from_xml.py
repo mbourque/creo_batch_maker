@@ -4,10 +4,16 @@ Updates ``start.mcs`` from template ModelCHECK XML under ``<working_dir>\\templa
 part (``part_template.p.xml``), assembly (``assembly_template.a.xml``), and drawing
 (``drawing_template.d.xml``).
 
-Insertion anchors ``! PRT_PARAMETER``, ``! PRT_LAYER``, ``! ASM_PARAMETER``,
-``! ASM_LAYER``, ``! DRW_PARAMETER``, ``! DRW_LAYER``, and ``! DRW_SYMBOL`` are kept. Each block
+Insertion anchors ``! PRT_PARAMETER``, ``! PRT_LAYER``, ``! PRT_DATUM``, ``! PRT_VIEW``,
+``! PRT_UNITS_LENGTH``, ``! PRT_UNITS_MASS``, ``! ASM_PARAMETER``, ``! ASM_LAYER``, ``! ASM_DATUM``, ``! ASM_VIEW``,
+``! ASM_UNITS_LENGTH``, ``! ASM_UNITS_MASS``, ``! DRW_PARAMETER``, ``! DRW_LAYER``, and ``! DRW_SYMBOL`` are kept. Each block
 is written as: anchor, generated lines, then a blank line after the last item. Parameters from
-``PARAM_INFO``; layers from ``EXTRA_LAYERS``; drawing symbols from ``SYMBOL_INFO`` (unique ``info1``).
+``PARAM_INFO``; layers from ``EXTRA_LAYERS``; drawing symbols from ``SYMBOL_INFO`` (unique ``info1``);
+datums from ``DTM_PLANE_INFO`` / ``DTM_CSYS_INFO`` / ``DTM_AXES_INFO`` / ``DTM_POINT_INFO`` as
+``PRT_DATUM_PLANE`` (etc.); views from ``VIEW_INFO``; length units from ``UNITS_LENGTH`` (same source
+as Template Information Length units; MCS value MM/INCH); mass units from ``UNITS_MASS``.
+Sections: part until ``ASSEMBLY MODE START``, assembly until ``DRAWING INFORMATION``,
+drawing until ``# View Scales Allowed``.
 
 Usage:
     python update_start_from_xml.py
@@ -29,11 +35,35 @@ from pathlib import Path
 _LAYER_SUFFIX_RE = re.compile(r"\s+\[(?:no items|\d+ items?)\]$", re.IGNORECASE)
 _PRT_PARAM_MARKER_RE = re.compile(r"^!\s*PRT_PARAMETER\s*$", re.IGNORECASE)
 _PRT_LAYER_MARKER_RE = re.compile(r"^!\s*PRT_LAYER\s*$", re.IGNORECASE)
+_PRT_DATUM_MARKER_RE = re.compile(r"^!\s*PRT_DATUM\s*$", re.IGNORECASE)
+_PRT_VIEW_MARKER_RE = re.compile(r"^!\s*PRT_VIEW\s*$", re.IGNORECASE)
+_PRT_UNITS_LENGTH_MARKER_RE = re.compile(r"^!\s*PRT_UNITS_LENGTH\s*$", re.IGNORECASE)
+_PRT_UNITS_MASS_MARKER_RE = re.compile(r"^!\s*PRT_UNITS_MASS\s*$", re.IGNORECASE)
 _ASM_PARAM_MARKER_RE = re.compile(r"^!\s*ASM_PARAMETER\s*$", re.IGNORECASE)
 _ASM_LAYER_MARKER_RE = re.compile(r"^!\s*ASM_LAYER\s*$", re.IGNORECASE)
+_ASM_DATUM_MARKER_RE = re.compile(r"^!\s*ASM_DATUM\s*$", re.IGNORECASE)
+_ASM_VIEW_MARKER_RE = re.compile(r"^!\s*ASM_VIEW\s*$", re.IGNORECASE)
+_ASM_UNITS_LENGTH_MARKER_RE = re.compile(r"^!\s*ASM_UNITS_LENGTH\s*$", re.IGNORECASE)
+_ASM_UNITS_MASS_MARKER_RE = re.compile(r"^!\s*ASM_UNITS_MASS\s*$", re.IGNORECASE)
 _DRW_PARAM_MARKER_RE = re.compile(r"^!\s*DRW_PARAMETER\s*$", re.IGNORECASE)
 _DRW_LAYER_MARKER_RE = re.compile(r"^!\s*DRW_LAYER\s*$", re.IGNORECASE)
 _DRW_SYMBOL_MARKER_RE = re.compile(r"^!\s*DRW_SYMBOL\s*$", re.IGNORECASE)
+
+_PRT_DATUM_LINE_RE = re.compile(
+    r"^PRT_DATUM_(PLANE|CSYS|AXIS|POINT|CURVE)(\s+|$)",
+    re.IGNORECASE,
+)
+_ASM_DATUM_LINE_RE = re.compile(
+    r"^ASM_DATUM_(PLANE|CSYS|AXIS|POINT|CURVE)(\s+|$)",
+    re.IGNORECASE,
+)
+
+_DTM_CHECK_TO_SUFFIX: tuple[tuple[str, str], ...] = (
+    ("DTM_PLANE_INFO", "PLANE"),
+    ("DTM_CSYS_INFO", "CSYS"),
+    ("DTM_AXES_INFO", "AXIS"),
+    ("DTM_POINT_INFO", "POINT"),
+)
 
 PART_TEMPLATE_XML = "part_template.p.xml"
 ASM_TEMPLATE_XML = "assembly_template.a.xml"
@@ -73,7 +103,8 @@ def _section_bounds(lines: list[str], start_marker: str, end_marker: str) -> tup
     for i, line in enumerate(lines):
         if start_marker in line:
             start = i
-        if end_marker in line:
+    for i, line in enumerate(lines):
+        if i > start and end_marker in line:
             end = i
             break
     return start, end
@@ -88,7 +119,8 @@ def _assembly_section_bounds(lines: list[str]) -> tuple[int, int]:
 
 
 def _drawing_section_bounds(lines: list[str]) -> tuple[int, int]:
-    return _section_bounds(lines, "DRAWING INFORMATION", "# SHEETMETAL BEND TABLE NAME LIST")
+    # End before view scales / standard lists (not sheetmetal, which lives in the part section).
+    return _section_bounds(lines, "DRAWING INFORMATION", "# View Scales Allowed")
 
 
 def _is_prt_parameter_line(line: str) -> bool:
@@ -119,6 +151,60 @@ def _is_prt_layer_marker(line: str) -> bool:
     return bool(_PRT_LAYER_MARKER_RE.match(line.strip()))
 
 
+def _is_prt_datum_marker(line: str) -> bool:
+    return bool(_PRT_DATUM_MARKER_RE.match(line.strip()))
+
+
+def _is_prt_view_marker(line: str) -> bool:
+    return bool(_PRT_VIEW_MARKER_RE.match(line.strip()))
+
+
+def _is_prt_datum_line(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped or stripped.startswith("!"):
+        return False
+    return bool(_PRT_DATUM_LINE_RE.match(stripped))
+
+
+def _is_prt_view_line(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped or stripped.startswith("!"):
+        return False
+    if stripped == "PRT_VIEW":
+        return True
+    return stripped.startswith("PRT_VIEW ") and not stripped.startswith("PRT_VIEW_")
+
+
+def _is_prt_units_length_marker(line: str) -> bool:
+    return bool(_PRT_UNITS_LENGTH_MARKER_RE.match(line.strip()))
+
+
+def _is_prt_units_length_line(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped or stripped.startswith("!"):
+        return False
+    if stripped == "PRT_UNITS_LENGTH":
+        return True
+    return stripped.startswith("PRT_UNITS_LENGTH ") and not stripped.startswith(
+        "PRT_UNITS_LENGTH_"
+    )
+
+
+def _is_prt_units_mass_marker(line: str) -> bool:
+    return bool(_PRT_UNITS_MASS_MARKER_RE.match(line.strip()))
+
+
+def _is_prt_units_mass_line(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped or stripped.startswith("!"):
+        return False
+    if stripped == "PRT_UNITS_MASS":
+        return True
+    return stripped.startswith("PRT_UNITS_MASS ") and not stripped.startswith(
+        "PRT_UNITS_MASS_"
+    )
+
+
 def _is_asm_parameter_line(line: str) -> bool:
     stripped = line.strip()
     if not stripped or stripped.startswith("!"):
@@ -145,6 +231,60 @@ def _is_asm_parameter_marker(line: str) -> bool:
 
 def _is_asm_layer_marker(line: str) -> bool:
     return bool(_ASM_LAYER_MARKER_RE.match(line.strip()))
+
+
+def _is_asm_datum_marker(line: str) -> bool:
+    return bool(_ASM_DATUM_MARKER_RE.match(line.strip()))
+
+
+def _is_asm_view_marker(line: str) -> bool:
+    return bool(_ASM_VIEW_MARKER_RE.match(line.strip()))
+
+
+def _is_asm_datum_line(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped or stripped.startswith("!"):
+        return False
+    return bool(_ASM_DATUM_LINE_RE.match(stripped))
+
+
+def _is_asm_view_line(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped or stripped.startswith("!"):
+        return False
+    if stripped == "ASM_VIEW":
+        return True
+    return stripped.startswith("ASM_VIEW ") and not stripped.startswith("ASM_VIEW_")
+
+
+def _is_asm_units_length_marker(line: str) -> bool:
+    return bool(_ASM_UNITS_LENGTH_MARKER_RE.match(line.strip()))
+
+
+def _is_asm_units_length_line(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped or stripped.startswith("!"):
+        return False
+    if stripped == "ASM_UNITS_LENGTH":
+        return True
+    return stripped.startswith("ASM_UNITS_LENGTH ") and not stripped.startswith(
+        "ASM_UNITS_LENGTH_"
+    )
+
+
+def _is_asm_units_mass_marker(line: str) -> bool:
+    return bool(_ASM_UNITS_MASS_MARKER_RE.match(line.strip()))
+
+
+def _is_asm_units_mass_line(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped or stripped.startswith("!"):
+        return False
+    if stripped == "ASM_UNITS_MASS":
+        return True
+    return stripped.startswith("ASM_UNITS_MASS ") and not stripped.startswith(
+        "ASM_UNITS_MASS_"
+    )
 
 
 def _is_drw_parameter_line(line: str) -> bool:
@@ -248,12 +388,37 @@ def parse_template_xml(xml_path: Path) -> tuple[list[str], list[str]]:
     return param_names, layer_names
 
 
+def _datum_mcs_lines(root: ET.Element, *, mode: str) -> list[str]:
+    """Build PRT_DATUM_* / ASM_DATUM_* MCS lines from template XML datum checks."""
+    prefix = "PRT" if mode == "prt" else "ASM"
+    lines: list[str] = []
+    for check_name, suffix in _DTM_CHECK_TO_SUFFIX:
+        keyword = f"{prefix}_DATUM_{suffix}"
+        for name in _unique_preserve_order(_check_items(_find_check(root, check_name))):
+            lines.append(_format_mcs_line(keyword, name))
+    return lines
+
+
+def _view_names_from_xml(root: ET.Element) -> list[str]:
+    return _unique_preserve_order(_check_items(_find_check(root, "VIEW_INFO")))
+
+
 def parse_part_xml(xml_path: Path) -> tuple[list[str], list[str]]:
     return parse_template_xml(xml_path)
 
 
+def parse_part_datums_views(xml_path: Path) -> tuple[list[str], list[str]]:
+    root = ET.parse(xml_path).getroot()
+    return _datum_mcs_lines(root, mode="prt"), _view_names_from_xml(root)
+
+
 def parse_asm_xml(xml_path: Path) -> tuple[list[str], list[str]]:
     return parse_template_xml(xml_path)
+
+
+def parse_asm_datums_views(xml_path: Path) -> tuple[list[str], list[str]]:
+    root = ET.parse(xml_path).getroot()
+    return _datum_mcs_lines(root, mode="asm"), _view_names_from_xml(root)
 
 
 def parse_drw_xml(xml_path: Path) -> tuple[list[str], list[str], list[str]]:
@@ -321,11 +486,48 @@ def _direct_ans(check: ET.Element | None) -> str | None:
 
 
 def _normalize_units_length(raw: str) -> str:
+    """Display form for Template Information (Length units → mm / in)."""
     text = raw.strip()
     if not text:
         return ""
     key = text.upper()
     return {"MM": "mm", "INCH": "in", "IN": "in"}.get(key, text)
+
+
+def _units_length_mcs_value(root: ET.Element) -> str | None:
+    """MCS token for PRT_UNITS_LENGTH / ASM_UNITS_LENGTH from the same UNITS_LENGTH check.
+
+    Uses ``_direct_ans`` like Template Information Length units; writes MM/INCH for start.mcs
+    (condition.mcc), not the report display form (mm/in).
+    """
+    ans = _direct_ans(_find_check(root, "UNITS_LENGTH"))
+    if not ans:
+        return None
+    key = ans.strip().upper()
+    if key in ("MM", "INCH"):
+        return key
+    if key == "IN":
+        return "INCH"
+    display = ans.strip()
+    return {"mm": "MM", "in": "INCH"}.get(display, ans.strip())
+
+
+def _units_length_from_xml(xml_path: Path) -> str | None:
+    root = ET.parse(xml_path).getroot()
+    return _units_length_mcs_value(root)
+
+
+def _units_mass_mcs_value(root: ET.Element) -> str | None:
+    """MCS token for PRT_UNITS_MASS / ASM_UNITS_MASS from UNITS_MASS ``<ans>``."""
+    ans = _direct_ans(_find_check(root, "UNITS_MASS"))
+    if not ans:
+        return None
+    return ans.strip()
+
+
+def _units_mass_from_xml(xml_path: Path) -> str | None:
+    root = ET.parse(xml_path).getroot()
+    return _units_mass_mcs_value(root)
 
 
 def _report_category_named_items(
@@ -490,10 +692,16 @@ def templates_dir_has_scan_xml(templates_dir: Path) -> bool:
 def _fallback_param_insert(part_lines: list[str]) -> int:
     last_view = -1
     for i, line in enumerate(part_lines):
-        if line.strip().startswith("PRT_VIEW"):
+        if line.strip().startswith("PRT_VIEW") or _is_prt_view_marker(line):
             last_view = i
     if last_view >= 0:
-        return last_view + 1
+        # After view marker block: skip following PRT_VIEW content lines
+        j = last_view + 1
+        while j < len(part_lines) and (
+            not part_lines[j].strip() or _is_prt_view_line(part_lines[j])
+        ):
+            j += 1
+        return j
     for i, line in enumerate(part_lines):
         if "PART MODE START" in line:
             return i + 1
@@ -508,13 +716,72 @@ def _fallback_layer_insert(part_lines: list[str]) -> int:
     return len(part_lines)
 
 
+def _fallback_prt_datum_insert(part_lines: list[str]) -> int:
+    for i, line in enumerate(part_lines):
+        if "PART MODE START" in line:
+            return i + 1
+    return 0
+
+
+def _fallback_prt_view_insert(part_lines: list[str]) -> int:
+    for i, line in enumerate(part_lines):
+        if _is_prt_datum_marker(line) or _is_prt_datum_line(line):
+            continue
+        if _is_prt_parameter_marker(line) or _is_prt_parameter_line(line):
+            return i
+    last_datum = -1
+    for i, line in enumerate(part_lines):
+        if _is_prt_datum_marker(line) or _is_prt_datum_line(line):
+            last_datum = i
+    if last_datum >= 0:
+        return last_datum + 1
+    return _fallback_prt_datum_insert(part_lines)
+
+
+def _prt_datum_block_end(part_lines: list[str], start: int) -> int:
+    for i in range(start, len(part_lines)):
+        line = part_lines[i]
+        if _is_prt_view_marker(line) or _is_prt_parameter_marker(line) or _is_prt_layer_marker(line):
+            return i
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("!"):
+            return i
+        if _is_prt_datum_line(line):
+            continue
+        return i
+    return len(part_lines)
+
+
+def _prt_view_block_end(part_lines: list[str], start: int) -> int:
+    for i in range(start, len(part_lines)):
+        line = part_lines[i]
+        if _is_prt_parameter_marker(line) or _is_prt_layer_marker(line):
+            return i
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("!"):
+            return i
+        if _is_prt_view_line(line):
+            continue
+        return i
+    return len(part_lines)
+
+
 def _fallback_asm_param_insert(asm_lines: list[str]) -> int:
     last_view = -1
     for i, line in enumerate(asm_lines):
-        if line.strip().startswith("ASM_VIEW"):
+        if line.strip().startswith("ASM_VIEW") or _is_asm_view_marker(line):
             last_view = i
     if last_view >= 0:
-        return last_view + 1
+        j = last_view + 1
+        while j < len(asm_lines) and (
+            not asm_lines[j].strip() or _is_asm_view_line(asm_lines[j])
+        ):
+            j += 1
+        return j
     for i, line in enumerate(asm_lines):
         if "ASSEMBLY MODE START" in line:
             return i + 1
@@ -529,6 +796,207 @@ def _fallback_asm_layer_insert(asm_lines: list[str]) -> int:
         ):
             return i
     return len(asm_lines)
+
+
+def _fallback_asm_datum_insert(asm_lines: list[str]) -> int:
+    for i, line in enumerate(asm_lines):
+        if "ASSEMBLY MODE START" in line:
+            return i + 1
+    return 0
+
+
+def _fallback_asm_view_insert(asm_lines: list[str]) -> int:
+    for i, line in enumerate(asm_lines):
+        if _is_asm_parameter_marker(line) or _is_asm_parameter_line(line):
+            return i
+    last_datum = -1
+    for i, line in enumerate(asm_lines):
+        if _is_asm_datum_marker(line) or _is_asm_datum_line(line):
+            last_datum = i
+    if last_datum >= 0:
+        return last_datum + 1
+    return _fallback_asm_datum_insert(asm_lines)
+
+
+def _asm_datum_block_end(asm_lines: list[str], start: int) -> int:
+    for i in range(start, len(asm_lines)):
+        line = asm_lines[i]
+        if _is_asm_view_marker(line) or _is_asm_parameter_marker(line) or _is_asm_layer_marker(line):
+            return i
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("!"):
+            return i
+        if _is_asm_datum_line(line):
+            continue
+        return i
+    return len(asm_lines)
+
+
+def _asm_view_block_end(asm_lines: list[str], start: int) -> int:
+    for i in range(start, len(asm_lines)):
+        line = asm_lines[i]
+        if _is_asm_parameter_marker(line) or _is_asm_layer_marker(line):
+            return i
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("!"):
+            return i
+        if _is_asm_view_line(line):
+            continue
+        return i
+    return len(asm_lines)
+
+
+def _coerce_units_anchor(
+    section_lines: list[str],
+    *,
+    keyword: str,
+    is_marker,
+) -> list[str]:
+    """Turn ``! PRT_UNITS_LENGTH\\tMM`` into bare ``! PRT_UNITS_LENGTH`` marker."""
+    legacy_re = re.compile(rf"^!\s*{re.escape(keyword)}\b", re.IGNORECASE)
+    bare = f"! {keyword}"
+    for i, line in enumerate(section_lines):
+        body = line.rstrip("\r\n")
+        if is_marker(body):
+            return section_lines
+        if legacy_re.match(body.strip()):
+            ending = line[len(body) :]
+            section_lines = list(section_lines)
+            section_lines[i] = bare + ending
+            return section_lines
+    return section_lines
+
+
+def _units_block_end(lines: list[str], start: int, *, is_content_line) -> int:
+    for i in range(start, len(lines)):
+        line = lines[i]
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("!"):
+            return i
+        if is_content_line(line):
+            continue
+        return i
+    return len(lines)
+
+
+def _fallback_prt_units_length_insert(part_lines: list[str]) -> int:
+    for i, line in enumerate(part_lines):
+        if (
+            _is_prt_units_mass_marker(line)
+            or line.strip().startswith("PRT_UNITS_MASS")
+            or "MATERIAL_NAME" in line
+        ):
+            return i
+    return len(part_lines)
+
+
+def _fallback_prt_units_mass_insert(part_lines: list[str]) -> int:
+    for i, line in enumerate(part_lines):
+        if "MATERIAL_NAME" in line:
+            return i
+    return len(part_lines)
+
+
+def _fallback_asm_units_length_insert(asm_lines: list[str]) -> int:
+    for i, line in enumerate(asm_lines):
+        if (
+            _is_asm_units_mass_marker(line)
+            or line.strip().startswith("ASM_UNITS_MASS")
+            or line.strip().startswith("ASM_MODEL_NAME")
+            or line.strip().startswith("ASM_TOL_TYPE")
+        ):
+            return i
+    return len(asm_lines)
+
+
+def _fallback_asm_units_mass_insert(asm_lines: list[str]) -> int:
+    for i, line in enumerate(asm_lines):
+        if line.strip().startswith("ASM_MODEL_NAME") or line.strip().startswith("ASM_TOL_TYPE"):
+            return i
+    return len(asm_lines)
+
+
+def _replace_units_block(
+    lines: list[str],
+    section_bounds,
+    *,
+    keyword: str,
+    value: str | None,
+    is_marker,
+    is_content_line,
+    fallback_insert,
+) -> list[str]:
+    section_start, section_end = section_bounds(lines)
+    section_lines = lines[section_start:section_end]
+    section_lines = _coerce_units_anchor(
+        section_lines, keyword=keyword, is_marker=is_marker
+    )
+    new_lines = [_format_mcs_line(keyword, value)] if value else []
+    section_lines = _apply_block_update(
+        section_lines,
+        new_lines,
+        is_content_line=is_content_line,
+        is_marker_line=is_marker,
+        block_end=lambda ls, start: _units_block_end(
+            ls, start, is_content_line=is_content_line
+        ),
+        fallback_insert=fallback_insert,
+    )
+    return lines[:section_start] + section_lines + lines[section_end:]
+
+
+def replace_prt_units_length(lines: list[str], value: str | None) -> list[str]:
+    return _replace_units_block(
+        lines,
+        _part_section_bounds,
+        keyword="PRT_UNITS_LENGTH",
+        value=value,
+        is_marker=_is_prt_units_length_marker,
+        is_content_line=_is_prt_units_length_line,
+        fallback_insert=_fallback_prt_units_length_insert,
+    )
+
+
+def replace_prt_units_mass(lines: list[str], value: str | None) -> list[str]:
+    return _replace_units_block(
+        lines,
+        _part_section_bounds,
+        keyword="PRT_UNITS_MASS",
+        value=value,
+        is_marker=_is_prt_units_mass_marker,
+        is_content_line=_is_prt_units_mass_line,
+        fallback_insert=_fallback_prt_units_mass_insert,
+    )
+
+
+def replace_asm_units_length(lines: list[str], value: str | None) -> list[str]:
+    return _replace_units_block(
+        lines,
+        _assembly_section_bounds,
+        keyword="ASM_UNITS_LENGTH",
+        value=value,
+        is_marker=_is_asm_units_length_marker,
+        is_content_line=_is_asm_units_length_line,
+        fallback_insert=_fallback_asm_units_length_insert,
+    )
+
+
+def replace_asm_units_mass(lines: list[str], value: str | None) -> list[str]:
+    return _replace_units_block(
+        lines,
+        _assembly_section_bounds,
+        keyword="ASM_UNITS_MASS",
+        value=value,
+        is_marker=_is_asm_units_mass_marker,
+        is_content_line=_is_asm_units_mass_line,
+        fallback_insert=_fallback_asm_units_mass_insert,
+    )
 
 
 def _marker_index(part_lines: list[str], is_marker_line) -> int | None:
@@ -790,6 +1258,33 @@ def replace_prt_blocks(
     )
 
 
+def replace_prt_datum_view_blocks(
+    lines: list[str],
+    datum_lines: list[str],
+    view_names: list[str],
+) -> list[str]:
+    section_start, section_end = _part_section_bounds(lines)
+    section_lines = lines[section_start:section_end]
+    view_lines = [_format_mcs_line("PRT_VIEW", name) for name in view_names]
+    section_lines = _apply_block_update(
+        section_lines,
+        datum_lines,
+        is_content_line=_is_prt_datum_line,
+        is_marker_line=_is_prt_datum_marker,
+        block_end=_prt_datum_block_end,
+        fallback_insert=_fallback_prt_datum_insert,
+    )
+    section_lines = _apply_block_update(
+        section_lines,
+        view_lines,
+        is_content_line=_is_prt_view_line,
+        is_marker_line=_is_prt_view_marker,
+        block_end=_prt_view_block_end,
+        fallback_insert=_fallback_prt_view_insert,
+    )
+    return lines[:section_start] + section_lines + lines[section_end:]
+
+
 def replace_asm_blocks(
     lines: list[str],
     param_names: list[str],
@@ -811,6 +1306,33 @@ def replace_asm_blocks(
         param_names=param_names,
         layer_names=layer_names,
     )
+
+
+def replace_asm_datum_view_blocks(
+    lines: list[str],
+    datum_lines: list[str],
+    view_names: list[str],
+) -> list[str]:
+    section_start, section_end = _assembly_section_bounds(lines)
+    section_lines = lines[section_start:section_end]
+    view_lines = [_format_mcs_line("ASM_VIEW", name) for name in view_names]
+    section_lines = _apply_block_update(
+        section_lines,
+        datum_lines,
+        is_content_line=_is_asm_datum_line,
+        is_marker_line=_is_asm_datum_marker,
+        block_end=_asm_datum_block_end,
+        fallback_insert=_fallback_asm_datum_insert,
+    )
+    section_lines = _apply_block_update(
+        section_lines,
+        view_lines,
+        is_content_line=_is_asm_view_line,
+        is_marker_line=_is_asm_view_marker,
+        block_end=_asm_view_block_end,
+        fallback_insert=_fallback_asm_view_insert,
+    )
+    return lines[:section_start] + section_lines + lines[section_end:]
 
 
 def replace_drw_blocks(
@@ -850,12 +1372,20 @@ def replace_drw_blocks(
 
 
 def _is_template_extracted_line(line: str) -> bool:
-    """True for PRT/ASM/DRW parameter, layer, and symbol lines written from template XML."""
+    """True for PRT/ASM/DRW lines written from template XML."""
     return (
         _is_prt_parameter_line(line)
         or _is_prt_layer_line(line)
+        or _is_prt_datum_line(line)
+        or _is_prt_view_line(line)
+        or _is_prt_units_length_line(line)
+        or _is_prt_units_mass_line(line)
         or _is_asm_parameter_line(line)
         or _is_asm_layer_line(line)
+        or _is_asm_datum_line(line)
+        or _is_asm_view_line(line)
+        or _is_asm_units_length_line(line)
+        or _is_asm_units_mass_line(line)
         or _is_drw_parameter_line(line)
         or _is_drw_layer_line(line)
         or _is_drw_symbol_line(line)
@@ -892,13 +1422,28 @@ def update_start(
     if not mcs_path.is_file():
         raise FileNotFoundError(f"MCS file not found:\n{mcs_path}")
 
+    part_datums: list[str] = []
+    part_views: list[str] = []
+    part_units: str | None = None
+    part_mass: str | None = None
+    asm_datums: list[str] = []
+    asm_views: list[str] = []
+    asm_units: str | None = None
+    asm_mass: str | None = None
+
     if part_xml_path is not None and part_xml_path.is_file():
         part_params, part_layers = parse_part_xml(part_xml_path)
+        part_datums, part_views = parse_part_datums_views(part_xml_path)
+        part_units = _units_length_from_xml(part_xml_path)
+        part_mass = _units_mass_from_xml(part_xml_path)
     else:
         part_params, part_layers = [], []
 
     if asm_xml_path is not None and asm_xml_path.is_file():
         asm_params, asm_layers = parse_asm_xml(asm_xml_path)
+        asm_datums, asm_views = parse_asm_datums_views(asm_xml_path)
+        asm_units = _units_length_from_xml(asm_xml_path)
+        asm_mass = _units_mass_from_xml(asm_xml_path)
     else:
         asm_params, asm_layers = [], []
 
@@ -912,16 +1457,30 @@ def update_start(
     if (
         not part_params
         and not part_layers
+        and not part_datums
+        and not part_views
+        and not part_units
+        and not part_mass
         and not asm_params
         and not asm_layers
+        and not asm_datums
+        and not asm_views
+        and not asm_units
+        and not asm_mass
         and not drw_params
         and not drw_layers
         and not drw_symbols
     ):
         updated_lines = _strip_template_extracted_lines(updated_lines)
     else:
+        updated_lines = replace_prt_datum_view_blocks(updated_lines, part_datums, part_views)
         updated_lines = replace_prt_blocks(updated_lines, part_params, part_layers)
+        updated_lines = replace_prt_units_length(updated_lines, part_units)
+        updated_lines = replace_prt_units_mass(updated_lines, part_mass)
+        updated_lines = replace_asm_datum_view_blocks(updated_lines, asm_datums, asm_views)
         updated_lines = replace_asm_blocks(updated_lines, asm_params, asm_layers)
+        updated_lines = replace_asm_units_length(updated_lines, asm_units)
+        updated_lines = replace_asm_units_mass(updated_lines, asm_mass)
         updated_lines = replace_drw_blocks(
             updated_lines, drw_params, drw_layers, drw_symbols
         )

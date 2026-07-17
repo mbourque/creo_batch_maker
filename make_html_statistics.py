@@ -1816,10 +1816,17 @@ _MQ_STATS_CSS = """
 .mq-template-categories { margin: 0; }
 .mq-template-category { margin: 0 0 14px 0; }
 .mq-template-category:last-child { margin-bottom: 0; }
-.mq-template-cat-title { margin: 0 0 4px 0; font-size: 0.92rem; font-weight: 600; color: #0f172a; }
-.mq-template-cat-body { margin: 0; padding-left: 12px; font-size: 0.92rem; line-height: 1.45; color: #334155; }
+.mq-template-cat-title { margin: 0 0 6px 0; font-size: 0.92rem; font-weight: 600; color: #0f172a; }
+.mq-template-cat-body {
+  margin: 0; padding-left: 0; font-size: 0.92rem; line-height: 1.7; color: #334155;
+}
 .mq-template-cat-pre { white-space: pre-line; }
-.mq-template-cat-body + .mq-template-cat-body { margin-top: 4px; }
+.mq-template-cat-body + .mq-template-cat-body { margin-top: 6px; }
+.mq-template-cat-prefix { margin-right: 4px; color: #475569; }
+.mq-template-tag {
+  display: inline-block; background: #f1f5f9; border-radius: 6px;
+  padding: 2px 8px; margin: 2px 4px 2px 0; color: #334155; line-height: 1.4;
+}
 .mq-template-empty { color: #94a3b8; }
 
 .mq-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
@@ -2367,6 +2374,46 @@ def _templates_scanned_summary_line(kinds: list[str]) -> str:
     return f"<p><strong>Templates scanned ({count_word}):</strong> {types_label}</p>"
 
 
+def _template_split_tag_values(text: str) -> list[str]:
+    """Split a joined value list (comma or middot) into individual display tags."""
+    raw = (text or "").strip()
+    if not raw:
+        return []
+    if "\n" in raw:
+        return [part.strip() for part in raw.splitlines() if part.strip()]
+    if " · " in raw:
+        return [part.strip() for part in raw.split(" · ") if part.strip()]
+    if ", " in raw:
+        return [part.strip() for part in raw.split(", ") if part.strip()]
+    return [raw]
+
+
+def _template_tags_html(values: list[str]) -> str:
+    return "".join(
+        f'<span class="mq-template-tag">{_esc(value)}</span>' for value in values
+    )
+
+
+def _template_line_html(line: str) -> str:
+    """Render one category line; comma/middot values become individual rounded tags."""
+    text = (line or "").strip()
+    if not text:
+        return ""
+    if ": " in text and "\n" not in text:
+        prefix, rest = text.split(": ", 1)
+        values = _template_split_tag_values(rest)
+        if values:
+            return (
+                f'<p class="mq-template-cat-body">'
+                f'<span class="mq-template-cat-prefix">{_esc(prefix)}:</span>'
+                f"{_template_tags_html(values)}</p>"
+            )
+    values = _template_split_tag_values(text)
+    if not values:
+        return ""
+    return f'<p class="mq-template-cat-body">{_template_tags_html(values)}</p>'
+
+
 def _template_category_html(label: str, count: int | None, lines: list[str]) -> str:
     if count is None:
         title = _esc(label)
@@ -2374,12 +2421,10 @@ def _template_category_html(label: str, count: int | None, lines: list[str]) -> 
         title = f"{_esc(label)} ({count})"
     if not lines:
         body = '<p class="mq-template-cat-body mq-template-empty">—</p>'
-    elif len(lines) == 1 and "\n" in lines[0]:
-        body = f'<p class="mq-template-cat-body mq-template-cat-pre">{_esc(lines[0])}</p>'
     else:
-        body = "".join(
-            f'<p class="mq-template-cat-body">{_esc(line)}</p>' for line in lines
-        )
+        body = "".join(_template_line_html(line) for line in lines)
+        if not body:
+            body = '<p class="mq-template-cat-body mq-template-empty">—</p>'
     return (
         f'<div class="mq-template-category">'
         f'<p class="mq-template-cat-title">{title}</p>{body}</div>'
