@@ -49,3 +49,5 @@ W:contains obsolete dimension
 E:entirely outside the model.
 
 W:External ref. for feature/component not found
+
+W: WARNING: Cannot update placement of component
