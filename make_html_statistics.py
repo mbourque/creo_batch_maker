@@ -671,36 +671,74 @@ PERFORMANCE_REPORT_ISSUE_ROW_CHECKS: dict[str, str] = {
     "_MECH_COMPONENTS": "MECH_COMPONENTS",
 }
 
-PERFORMANCE_TABLE_ROWS: list[tuple[str, str | None]] = [
-    ("Scan date", "_SCAN_DATE"),
-    ("Model checks", "_MODEL_CHECKS"),
-    ("Working directory", "_WORKING_DIRECTORY"),
-    ("Models scanned", "_FILES_SCANNED"),
-    ("Scan duration", "_SCAN_DURATION"),
-    ("Total size of scanned models", "_TOTAL_SCANNED_SIZE"),
-    ("Last saved by", "_USERS"),
-    ("Parts", "_PART_COUNT"),
-    ("Assemblies", "_ASSEMBLY_COUNT"),
-    ("Drawings", "_DRAWING_COUNT"),
-    ("Sheet metal parts", "_SHEETMETAL_PARTS"),
-    ("Multibody parts", "_MULTIBODY_PARTS"),
-    ("Skeleton parts", "_SKELETON_MODELS"),
-    ("Bulk parts", "_BULK_PARTS"),
-    ("Non solid parts", "_NON_SOLID_PARTS"),
-    ("Total components in all assemblies", "NUM_COMPONENTS"),
-    ("Number of unique models", "UNQ_COMPONENTS"),
-    ("Duplicate models", "_DUPLICATE_MODELS"),
-    ("Maximum assembly depth", "_MAX_ASSEMBLY_DEPTH"),
-    ("Number of created simplified representations", "_SIMPREP_REPRESENTATIONS"),
-    ("Number of components in master representation", "_MASTER_REP_COUNT"),
-    ("Number of flexible components", "_FLEXIBLE_COMPONENTS"),
-    ("Total number of suppressed components", "_SUPPRESSED_COMPONENTS"),
-    ("Number of packaged components", "_PACKAGED_COMPONENTS"),
-    ("Total number of fixed components", "_FIXED_COMPONENTS"),
-    ("Number of mechanism components", "_MECH_COMPONENTS"),
-    ("Number of family table generics", "_FAMILY_GENERIC_PART_COUNT"),
-    ("Number of family table instances", "_FAMILY_INSTANCE_COUNT"),
-    ("Total number of features in top level assembly", "_TOP_LEVEL_FEATURES"),
+PERFORMANCE_TABLE_SECTIONS: list[tuple[str, list[tuple[str, str | None]]]] = [
+    (
+        "Scan Summary",
+        [
+            ("Scan date", "_SCAN_DATE"),
+            ("Model checks", "_MODEL_CHECKS"),
+            ("Working directory", "_WORKING_DIRECTORY"),
+            ("Scan duration", "_SCAN_DURATION"),
+            ("Total size of scanned models", "_TOTAL_SCANNED_SIZE"),
+        ],
+    ),
+    (
+        "Dataset Overview",
+        [
+            ("Models scanned", "_FILES_SCANNED"),
+            ("Number of unique models", "UNQ_COMPONENTS"),
+            ("Duplicate models", "_DUPLICATE_MODELS"),
+            ("Parts", "_PART_COUNT"),
+            ("Assemblies", "_ASSEMBLY_COUNT"),
+            ("Drawings", "_DRAWING_COUNT"),
+        ],
+    ),
+    (
+        "Model Type Breakdown",
+        [
+            ("Sheet metal parts", "_SHEETMETAL_PARTS"),
+            ("Multibody parts", "_MULTIBODY_PARTS"),
+            ("Skeleton parts", "_SKELETON_MODELS"),
+            ("Bulk parts", "_BULK_PARTS"),
+            ("Non solid parts", "_NON_SOLID_PARTS"),
+        ],
+    ),
+    (
+        "Assembly Structure",
+        [
+            ("Total components in all assemblies", "NUM_COMPONENTS"),
+            ("Number of components in master representation", "_MASTER_REP_COUNT"),
+            ("Maximum assembly depth", "_MAX_ASSEMBLY_DEPTH"),
+        ],
+    ),
+    (
+        "Assembly State / Placement Health",
+        [
+            ("Total number of suppressed components", "_SUPPRESSED_COMPONENTS"),
+            ("Number of packaged components", "_PACKAGED_COMPONENTS"),
+            ("Total number of fixed components", "_FIXED_COMPONENTS"),
+            ("Number of flexible components", "_FLEXIBLE_COMPONENTS"),
+        ],
+    ),
+    (
+        "Representations and Advanced Assembly Usage",
+        [
+            ("Number of created simplified representations", "_SIMPREP_REPRESENTATIONS"),
+            ("Number of mechanism components", "_MECH_COMPONENTS"),
+        ],
+    ),
+    (
+        "Family Table Usage",
+        [
+            ("Number of family table generics", "_FAMILY_GENERIC_PART_COUNT"),
+            ("Number of family table instances", "_FAMILY_INSTANCE_COUNT"),
+        ],
+    ),
+    ("Metadata", [("Last saved by", "_USERS")]),
+    (
+        "Notable Model Findings",
+        [("Total number of features in top level assembly", "_TOP_LEVEL_FEATURES")],
+    ),
 ]
 
 
@@ -1256,14 +1294,16 @@ def _top_level_features_label(metrics: PerformanceMetrics) -> str:
     return "Total number of features in top level assembly"
 
 
-def build_performance_table_rows(metrics: PerformanceMetrics) -> list[tuple[str, str, str | None]]:
+def build_performance_table_rows(metrics: PerformanceMetrics) -> list[tuple[str, str | None, str, str | None]]:
     answers = performance_metrics_answers(metrics)
-    rows: list[tuple[str, str, str | None]] = []
-    for label, key in PERFORMANCE_TABLE_ROWS:
-        if key == "_TOP_LEVEL_FEATURES":
-            label = _top_level_features_label(metrics)
-        value, check = _resolve_performance_value(answers, key)
-        rows.append((label, value, check if key and not key.startswith("_") else key))
+    rows: list[tuple[str, str | None, str, str | None]] = []
+    for section, section_rows in PERFORMANCE_TABLE_SECTIONS:
+        rows.append(("section", None, section, None))
+        for label, key in section_rows:
+            if key == "_TOP_LEVEL_FEATURES":
+                label = _top_level_features_label(metrics)
+            value, check = _resolve_performance_value(answers, key)
+            rows.append(("item", label, value, check if key and not key.startswith("_") else key))
     return rows
 
 
@@ -1274,7 +1314,14 @@ def generate_performance_table_html(
 ) -> str:
     """Performance metrics table for Scan Information (embedded mq-stats styles)."""
     body_rows: list[str] = []
-    for label, value, check_key in build_performance_table_rows(metrics):
+    for row_type, label, value, check_key in build_performance_table_rows(metrics):
+        if row_type == "section":
+            body_rows.append(
+                f'<tr class="mq-perf-section-row"><td colspan="2">{_esc(value)}</td></tr>'
+            )
+            continue
+        if label is None:
+            continue
         label_esc = _esc(label)
         if value == "—":
             val_html = '<span class="mq-perf-missing">—</span>'
@@ -1297,7 +1344,7 @@ def generate_performance_table_html(
     return f"""
   <div class="mq-stats-grid">
     <div class="mq-stat-card mq-perf-card">
-      <h2>Statistics</h2>
+      <h2>CAD Assessment Summary</h2>
       <table class="mq-perf-table" role="table">
         <tbody>
 {table_body}
@@ -1735,13 +1782,15 @@ _MQ_STATS_CSS = """
 
 .mq-perf-table tbody tr { transition: background-color 0.15s ease; }
 
-.mq-perf-table tbody tr:hover td { background: #f1f5f9; }
+.mq-perf-table tbody tr:not(.mq-perf-section-row):hover td { background: #f1f5f9; }
 
 .mq-perf-table td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
 
 .mq-perf-table tr:last-child td { border-bottom: none; }
 
-.mq-perf-label { text-align: left; color: #1a1a1a; width: 1%; white-space: nowrap; vertical-align: top; }
+.mq-perf-section-row td { padding: 14px 10px 6px 10px; border-bottom: none; color: #0f172a; font-weight: 700; letter-spacing: .01em; background: #fff; }
+
+.mq-perf-label { text-align: left; color: #1a1a1a; width: 1%; white-space: nowrap; vertical-align: top; padding-left: 28px !important; }
 
 .mq-perf-val { text-align: right; font-weight: 600; color: #0f172a; white-space: nowrap; }
 

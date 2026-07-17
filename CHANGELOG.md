@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-17 — v1.11.121
+
+- **Scan Information**: **Statistics** is now **CAD Assessment Summary**, with grouped rows for scan summary, dataset overview, model types, assembly health, metadata, and notable findings.
+
 ## 2026-07-17 — v1.11.120
 
 - **Create Report**: **Processing, please wait…** appears immediately; building ``master.xml`` runs in the background (no long freeze before the overlay).
