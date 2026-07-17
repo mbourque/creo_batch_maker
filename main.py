@@ -2271,10 +2271,6 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                         + "\n\n".join(cleanup_errors),
                     )
                 self._remove_batch_runner_scripts(templates_dir)
-            kinds: list[str] = []
-            if templates_dir is not None:
-                kinds = self._scanned_template_kind_labels(templates_dir)
-            self._write_template_scan_session_for_working_dir("done", kinds)
             self._wizard_step_outcome[WIZARD_STEP_SCAN] = "done"
             self._set_wizard_step(WIZARD_STEP_MODELCHECK)
         elif step == WIZARD_STEP_MODELCHECK:
@@ -3028,15 +3024,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         )
 
     def _discard_working_templates_on_skip(self) -> None:
-        """Skip Scan Templates: no JSON; drop pending picks; remove folder unless scan XML exists."""
+        """Skip Scan Templates: drop pending picks; remove folder unless scan XML exists."""
         self._pending_template_sources.clear()
         wd = (self.working_directory.get() or "").strip()
         if not wd or not _working_directory_exists_as_dir(wd):
             return
-        try:
-            make_html_statistics.clear_template_scan_session(wd)
-        except OSError:
-            pass
         if self._templates_dir_has_scan_xml(wd):
             return
         templates_dir = Path(wd).expanduser() / "templates"
@@ -4320,34 +4312,6 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             if xml_name and not (templates_dir / xml_name).is_file():
                 return False
         return expected_any
-
-    def _scanned_template_kind_labels(self, templates_dir: Path) -> list[str]:
-        """Uploaded templates that finished with ModelCHECK .xml (part/assembly/drawing labels)."""
-        if not templates_dir.is_dir():
-            return []
-        found: list[str] = []
-        for kind, dest_name in _START_TEMPLATE_DEST_NAMES.items():
-            if not self._scan_kind_enabled(kind):
-                continue
-            if not (templates_dir / dest_name).is_file():
-                continue
-            xml_name = _START_TEMPLATE_XML_NAMES.get(kind)
-            if xml_name and (templates_dir / xml_name).is_file():
-                label = _TEMPLATE_KIND_LABELS.get(kind)
-                if label:
-                    found.append(label)
-        return found
-
-    def _write_template_scan_session_for_working_dir(
-        self, outcome: str, kinds: list[str] | None = None
-    ) -> None:
-        wd = (self.working_directory.get() or "").strip()
-        if not wd or not _working_directory_exists_as_dir(wd):
-            return
-        try:
-            make_html_statistics.write_template_scan_session(wd, outcome, kinds)
-        except OSError:
-            pass
 
     def _wizard_scan_step_has_failed(self) -> bool:
         watch = self._wizard_batch_watch
@@ -7177,7 +7141,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         prompt = (
             "Remove prior scan and batch data from the working folder?\n\n"
             "Keeps Creo models (.prt, .asm, .drw) in the working folder.\n"
-            "Removes templates\\ (including creo-batch-template-scan.json), modchk\\, "
+            "Removes templates\\, modchk\\, "
             "batch status files (*-run.complete, pause/stop flags, .pvz), and other scan outputs."
         )
         if not self._show_proceed_cancel_dialog("Start over", prompt):
@@ -10045,9 +10009,6 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 messagebox.showerror("Templates", err)
                 return
             self._sync_start_mcs_for_templates()
-            wd = working_dir_raw.strip()
-            if _working_directory_exists_as_dir(wd):
-                make_html_statistics.clear_template_scan_session(wd)
         elif self._wizard_step == WIZARD_STEP_MODELCHECK:
             self._wizard_step_outcome.pop(WIZARD_STEP_MODELCHECK, None)
         if not self._go_model_source_ready(working_dir_raw, task_display_raw):

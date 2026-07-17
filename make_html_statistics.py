@@ -1642,8 +1642,6 @@ class BatchStatistics:
 
     skeleton_models: int = 0
 
-    templates_scanned: list[str] = field(default_factory=list)
-
     top_features_parts: list[tuple[str, int]] = field(default_factory=list)
 
     top_size_parts: list[tuple[str, float]] = field(default_factory=list)
@@ -2292,88 +2290,6 @@ def _skipped_models_section(skipped_models: list[str]) -> str:
   </div>"""
 
 
-TEMPLATE_SCAN_SESSION_BASENAME = "creo-batch-template-scan.json"
-
-
-def _template_scan_session_path(working_dir: str) -> str:
-    return os.path.join(working_dir, "templates", TEMPLATE_SCAN_SESSION_BASENAME)
-
-
-def _remove_empty_working_templates_dir(working_dir: str) -> None:
-    """Remove ``working_dir\\templates`` when it exists and has no files."""
-    templates_dir = os.path.join(working_dir, "templates")
-    try:
-        if os.path.isdir(templates_dir) and not os.listdir(templates_dir):
-            os.rmdir(templates_dir)
-    except OSError:
-        pass
-
-
-def write_template_scan_session(
-    working_dir: str, outcome: str, kinds: list[str] | None = None
-) -> None:
-    """Write ``templates\\creo-batch-template-scan.json`` when Scan Templates finishes."""
-    if outcome != "done":
-        return
-    path = _template_scan_session_path(working_dir)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    payload: dict[str, object] = {"outcome": outcome}
-    if kinds:
-        payload["kinds"] = kinds
-    with open(path, "w", encoding="utf-8") as fh:
-        json.dump(payload, fh, indent=2)
-        fh.write("\n")
-
-
-def clear_template_scan_session(working_dir: str) -> None:
-    path = _template_scan_session_path(working_dir)
-    try:
-        os.remove(path)
-    except FileNotFoundError:
-        pass
-    except OSError:
-        pass
-    _remove_empty_working_templates_dir(working_dir)
-
-
-def read_template_scan_session(working_dir: str) -> tuple[str | None, list[str]]:
-    path = _template_scan_session_path(working_dir)
-    if not os.path.isfile(path):
-        return None, []
-    try:
-        with open(path, encoding="utf-8") as fh:
-            data = json.load(fh)
-    except (OSError, json.JSONDecodeError, TypeError, ValueError):
-        return None, []
-    outcome = data.get("outcome")
-    if not isinstance(outcome, str):
-        return None, []
-    raw_kinds = data.get("kinds", [])
-    kinds: list[str] = []
-    if isinstance(raw_kinds, list):
-        for item in raw_kinds:
-            if isinstance(item, str) and item:
-                kinds.append(item)
-    return outcome, kinds
-
-
-def scan_templates_scanned(working_dir: str) -> list[str]:
-    """Model types scanned in this session (empty when skipped or no session record)."""
-    outcome, kinds = read_template_scan_session(working_dir)
-    if outcome != "done":
-        return []
-    return kinds
-
-
-def _templates_scanned_summary_line(kinds: list[str]) -> str:
-    if not kinds:
-        return ""
-    count_words = {1: "one", 2: "two", 3: "all three"}
-    count_word = count_words.get(len(kinds), str(len(kinds)))
-    types_label = ", ".join(kinds)
-    return f"<p><strong>Templates scanned ({count_word}):</strong> {types_label}</p>"
-
-
 def _template_split_tag_values(text: str) -> list[str]:
     """Split a joined value list (comma or middot) into individual display tags."""
     raw = (text or "").strip()
@@ -2482,33 +2398,14 @@ def generate_template_information_fragment(working_dir: str, *, embedded: bool =
 
 def generate_statistics_html(stats: BatchStatistics, *, embedded: bool = False) -> str:
 
-    extra_summary: list[str] = []
-    templates_line = _templates_scanned_summary_line(stats.templates_scanned)
-    if templates_line:
-        extra_summary.append(templates_line)
-
     skipped_section = _skipped_models_section(stats.skipped_models)
 
     summary_grid = ""
     if stats.performance_metrics and stats.performance_metrics.files_seen > 0:
         summary_grid = generate_performance_table_html(
             stats.performance_metrics,
-            extra_summary_html="".join(extra_summary),
+            extra_summary_html="",
         )
-    elif extra_summary:
-        summary_grid = f"""
-
-  <div class="mq-stats-grid">
-
-    <div class="mq-stat-card">
-
-      {''.join(extra_summary)}
-
-    </div>
-
-  </div>"""
-
-
 
     family_section = _family_table_section(stats.family_generics_detail)
 
@@ -2670,7 +2567,6 @@ def generate_statistics_fragment(
         master_path=master_path,
     )
     stats.skipped_models = scan_skipped_models(working_dir, master_root)
-    stats.templates_scanned = scan_templates_scanned(working_dir)
     if stats.top_level_assembly:
         stats.top_level_assembly_bom = load_top_level_assembly_bom(
             working_dir,
@@ -2700,7 +2596,6 @@ def write_statistics_html_file(master_xml_path: str, output_path: str) -> str:
         master_path=master_xml_path,
     )
     stats.skipped_models = scan_skipped_models(working_dir, root)
-    stats.templates_scanned = scan_templates_scanned(working_dir)
     if stats.top_level_assembly:
         stats.top_level_assembly_bom = load_top_level_assembly_bom(
             working_dir,

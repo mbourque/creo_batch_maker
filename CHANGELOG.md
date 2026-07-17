@@ -2,6 +2,30 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-17 — v1.11.144
+
+- **Scan Templates**: no longer writes `templates\creo-batch-template-scan.json` (unused after Template Information / summary cleanup).
+
+## 2026-07-17 — v1.11.143
+
+- **CAD Assessment Summary**: removed the **Templates scanned** line (Template Information already covers that).
+
+## 2026-07-17 — v1.11.142
+
+- **Template Information**: part and assembly templates now show **Mass units** (with **Length units**), from the same XML sources used for `start.mcs`.
+
+## 2026-07-17 — v1.11.141
+
+- **Scan Templates**: restored mass-units update — `UNITS_MASS` in `config\templates\checks.mch`, plus `PTC_UNITS_MASS` fallback (kg → KILOGRAM) when the check is missing from XML.
+
+## 2026-07-17 — v1.11.140
+
+- **Scan Templates**: removed the temporary `PTC_UNITS_MASS` fallback; mass units again come only from an `UNITS_MASS` check in the template XML.
+
+## 2026-07-17 — v1.11.139
+
+- **Scan Templates**: `PRT_UNITS_MASS` / `ASM_UNITS_MASS` now fill when the XML has no `UNITS_MASS` check, using `PTC_UNITS_MASS` from parameters (e.g. kg → KILOGRAM).
+
 ## 2026-07-17 — v1.11.138
 
 - **Scan Templates**: writes `PRT_UNITS_MASS` / `ASM_UNITS_MASS` in `config\start.mcs` from template XML `UNITS_MASS` (e.g. KILOGRAM).

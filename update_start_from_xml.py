@@ -11,7 +11,8 @@ is written as: anchor, generated lines, then a blank line after the last item. P
 ``PARAM_INFO``; layers from ``EXTRA_LAYERS``; drawing symbols from ``SYMBOL_INFO`` (unique ``info1``);
 datums from ``DTM_PLANE_INFO`` / ``DTM_CSYS_INFO`` / ``DTM_AXES_INFO`` / ``DTM_POINT_INFO`` as
 ``PRT_DATUM_PLANE`` (etc.); views from ``VIEW_INFO``; length units from ``UNITS_LENGTH`` (same source
-as Template Information Length units; MCS value MM/INCH); mass units from ``UNITS_MASS``.
+as Template Information Length units; MCS value MM/INCH); mass units from ``UNITS_MASS`` or
+``PARAM_INFO`` ``PTC_UNITS_MASS`` (kg → KILOGRAM).
 Sections: part until ``ASSEMBLY MODE START``, assembly until ``DRAWING INFORMATION``,
 drawing until ``# View Scales Allowed``.
 
@@ -518,11 +519,38 @@ def _units_length_from_xml(xml_path: Path) -> str | None:
 
 
 def _units_mass_mcs_value(root: ET.Element) -> str | None:
-    """MCS token for PRT_UNITS_MASS / ASM_UNITS_MASS from UNITS_MASS ``<ans>``."""
+    """MCS token for PRT_UNITS_MASS / ASM_UNITS_MASS.
+
+    Prefers ``UNITS_MASS`` ``<ans>`` (KILOGRAM/POUND). Template scans often omit that check;
+    then fall back to ``PARAM_INFO`` item ``PTC_UNITS_MASS`` (e.g. kg → KILOGRAM).
+    """
     ans = _direct_ans(_find_check(root, "UNITS_MASS"))
-    if not ans:
+    mapped = _normalize_units_mass_mcs(ans) if ans else None
+    if mapped:
+        return mapped
+    check = _find_check(root, "PARAM_INFO")
+    if check is None:
         return None
-    return ans.strip()
+    for item in check.findall("item"):
+        name = (item.findtext("info1") or "").strip()
+        if name.casefold() != "ptc_units_mass":
+            continue
+        return _normalize_units_mass_mcs((item.findtext("info2") or "").strip())
+    return None
+
+
+def _normalize_units_mass_mcs(raw: str | None) -> str | None:
+    """Map XML mass unit text to ModelCHECK PRT_UNITS_MASS tokens."""
+    if not raw:
+        return None
+    key = raw.strip().upper().replace(" ", "")
+    return {
+        "KILOGRAM": "KILOGRAM",
+        "KG": "KILOGRAM",
+        "POUND": "POUND",
+        "LB": "POUND",
+        "LBM": "POUND",
+    }.get(key)
 
 
 def _units_mass_from_xml(xml_path: Path) -> str | None:
@@ -556,6 +584,31 @@ def _report_category_scalar(
         text = normalizer(ans) if normalizer else ans
         return (label, None, [text])
     return (label, None, [])
+
+
+def _normalize_units_mass_display(raw: str) -> str:
+    """Display form for Template Information (Mass units → kg / lb)."""
+    text = raw.strip()
+    if not text:
+        return ""
+    key = text.upper().replace(" ", "")
+    return {
+        "KILOGRAM": "kg",
+        "KG": "kg",
+        "POUND": "lb",
+        "LB": "lb",
+        "LBM": "lb",
+    }.get(key, text)
+
+
+def _report_category_units_mass(
+    root: ET.Element,
+) -> tuple[str, int | None, list[str]]:
+    """Mass units for Template Information — same sources as start.mcs mass update."""
+    mcs = _units_mass_mcs_value(root)
+    if not mcs:
+        return ("Mass units", None, [])
+    return ("Mass units", None, [_normalize_units_mass_display(mcs)])
 
 
 def _report_category_accuracy(root: ET.Element) -> tuple[str, int | None, list[str]]:
@@ -618,6 +671,7 @@ def _part_template_report_categories(root: ET.Element) -> list[tuple[str, int | 
             _report_category_scalar(
                 root, "UNITS_LENGTH", "Length units", normalizer=_normalize_units_length
             ),
+            _report_category_units_mass(root),
             _report_category_accuracy(root),
         ]
     )
@@ -631,6 +685,7 @@ def _asm_template_report_categories(root: ET.Element) -> list[tuple[str, int | N
             _report_category_scalar(
                 root, "UNITS_LENGTH", "Length units", normalizer=_normalize_units_length
             ),
+            _report_category_units_mass(root),
             _report_category_accuracy(root),
         ]
     )
