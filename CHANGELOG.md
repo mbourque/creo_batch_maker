@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-18 — v1.11.163
+
+- **File size information**: raw byte counts are now shown in MB or GB in report information rows.
+
 ## 2026-07-18 — v1.11.162
 
 - **Report details**: item detail previews show five entries again; issue rows no longer show file size, feature count, overall size, or length units.

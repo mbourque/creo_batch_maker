@@ -105,6 +105,17 @@ def _mb_from_file_size_check(check_el: ET.Element) -> float | None:
     return round(int(text) / (1024 * 1024), 2)
 
 
+def _format_file_size_bytes(raw_bytes: str) -> str | None:
+    """Format Creo's byte count as MB, or GB for files at least 1 GiB."""
+    text = (raw_bytes or "").strip()
+    if not text.isdigit():
+        return None
+    size_bytes = int(text)
+    if size_bytes >= 1024**3:
+        return f"{size_bytes / (1024**3):.2f} GB"
+    return f"{size_bytes / (1024**2):.2f} MB"
+
+
 def _file_size_header_is_zero(size_text: str) -> bool:
     t = (size_text or "").strip()
     if not t:
@@ -424,6 +435,8 @@ def _parse_master_root(root: ET.Element) -> dict:
                 ans_el = _direct_child_ans(check)
                 ans_empty = _ans_element_is_empty(ans_el)
                 ans = _ans_text_from_element(ans_el)
+                if name == "FILE_SIZE":
+                    ans = _format_file_size_bytes(ans) or ans
                 condensed_msg = f"{msg.strip()} {ans}" if msg and ans else msg.strip()
 
                 check_entry: dict = {
