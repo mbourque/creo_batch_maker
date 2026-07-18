@@ -1371,9 +1371,11 @@
                 {% endif %}
                 <p><strong>Created by:</strong> {{ file.last_saved }} on {{ file.created }}</p>
                 <p><strong>File Size:</strong> {{ file.file_size }}</p>
+                {% if file.pro_type != 'DRW' %}
                 <p><strong>Number of Features:</strong> {{ file.num_features }}</p>
                 <p><strong>Model Overall Size:</strong> {{ file.overall_size }}</p>
                 <p><strong>Model Units for Length:</strong> {{ file.units_length }}</p>
+                {% endif %}
                 <div class="check-buttons">
                     {% if file.stat != 'INFO' %}
                     <button class="flag-button button" onclick="toggleFlag('{{ file.file_list_id | escape }}')">Flag&nbsp;this</button>

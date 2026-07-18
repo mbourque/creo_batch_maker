@@ -2,6 +2,38 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-18 — v1.11.152
+
+- **Report**: identical ModelCHECK results emitted twice for the same model (for example Missing Layers) are counted once.
+
+## 2026-07-18 — v1.11.151
+
+- **Template Information tags**: tags no longer select on a single click; double-click still selects one tag the normal browser way.
+
+## 2026-07-18 — v1.11.150
+
+- **Template Information tags**: double-clicking a parameter or similar tag now selects that tag only, not the whole row.
+
+## 2026-07-18 — v1.11.149
+
+- **Drawing template notes**: each note shows its location as a plain label with only the note value as a rounded tag.
+
+## 2026-07-18 — v1.11.148
+
+- **Drawing template notes**: the XML `<ans>` is used only as the note count; related `info#` values stay grouped by `<item>`.
+
+## 2026-07-18 — v1.11.147
+
+- **Drawing template notes**: Template Information now shows every `info#` value, including the note location/ID and note text.
+
+## 2026-07-18 — v1.11.146
+
+- **Template Information**: section headings now show only **Part template**, **Assembly template**, or **Drawing template**, without the fixed model filename.
+
+## 2026-07-18 — v1.11.145
+
+- **Drawing checks**: removed feature count, overall model size, and length units because those fields are not applicable to drawings.
+
 ## 2026-07-17 — v1.11.144
 
 - **Scan Templates**: no longer writes `templates\creo-batch-template-scan.json` (unused after Template Information / summary cleanup).

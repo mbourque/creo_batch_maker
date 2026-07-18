@@ -2305,7 +2305,8 @@ def _template_split_tag_values(text: str) -> list[str]:
 
 
 def _template_tags_html(values: list[str]) -> str:
-    return "".join(
+    # Space between spans so double-click selects one tag, not the whole row.
+    return " ".join(
         f'<span class="mq-template-tag">{_esc(value)}</span>' for value in values
     )
 
@@ -2348,14 +2349,14 @@ def _template_category_html(label: str, count: int | None, lines: list[str]) -> 
 
 
 def _template_block_html(
-    title: str, model_file: str, categories: list[tuple[str, int | None, list[str]]]
+    title: str, categories: list[tuple[str, int | None, list[str]]]
 ) -> str:
     rows = "".join(_template_category_html(label, count, lines) for label, count, lines in categories)
     return f"""
 
   <div class="mq-section mq-template-block">
 
-    <h2>{_esc(title)} — {_esc(model_file)}</h2>
+    <h2>{_esc(title)}</h2>
 
     <div class="mq-template-categories">{rows}
     </div>
@@ -2371,8 +2372,8 @@ def generate_template_information_html(working_dir: str, *, embedded: bool = Fal
     if not blocks:
         return ""
     body = "".join(
-        _template_block_html(title, model_file, categories)
-        for title, model_file, categories in blocks
+        _template_block_html(title, categories)
+        for title, _model_file, categories in blocks
     )
     page_class = "mq-stats-page mq-stats-embedded" if embedded else "mq-stats-page"
     if embedded:

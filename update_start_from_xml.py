@@ -571,6 +571,37 @@ def _report_category_named_items(
     return (label, 0, [])
 
 
+def _report_category_all_info_items(
+    root: ET.Element, check_name: str, label: str
+) -> tuple[str, int, list[str]]:
+    """Report each item's ``info#`` values; ``ans`` is the item count only."""
+    check = _find_check(root, check_name)
+    if check is None:
+        return (label, 0, [])
+    items = check.findall("item")
+    lines: list[str] = []
+    for item in items:
+        values = [
+            (child.text or "").strip()
+            for child in item
+            if re.fullmatch(r"info\d+", child.tag, flags=re.IGNORECASE)
+            and (child.text or "").strip()
+        ]
+        if not values:
+            continue
+        if len(values) == 1:
+            lines.append(values[0])
+        else:
+            # First info is the label (plain); remaining values are tagged.
+            lines.append(f"{values[0]}: {' · '.join(values[1:])}")
+    ans = _direct_ans(check)
+    try:
+        item_count = int(ans) if ans is not None else len(items)
+    except ValueError:
+        item_count = len(items)
+    return (label, item_count, lines)
+
+
 def _report_category_scalar(
     root: ET.Element,
     check_name: str,
@@ -703,7 +734,7 @@ def _drawing_template_report_categories(root: ET.Element) -> list[tuple[str, int
         _report_category_scalar(root, "NUM_DRAW_SHEETS", "Number of sheets"),
         _report_category_named_items(root, "SHEET_SIZE_INFO", "Sheet sizes"),
         _report_category_named_items(root, "SYMBOL_INFO", "Drawing symbols"),
-        _report_category_named_items(root, "NOTE_INFO", "Notes"),
+        _report_category_all_info_items(root, "NOTE_INFO", "Notes"),
     ]
 
 

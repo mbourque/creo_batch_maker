@@ -18,11 +18,29 @@ def clean_xml(file_path):
     
     return cleaned_file_path
 
+def _dedupe_identical_checks(checks):
+    """Keep the first of each identical check; drop exact duplicates within one model.
+
+    ModelCHECK can emit the same check twice (e.g. STARTLAYR via STARTCHECK and
+    again as its own entry). Only exact matches are removed so differing results
+    with the same name still both appear.
+    """
+    seen = set()
+    unique = []
+    for check in checks:
+        key = ET.tostring(check, encoding="unicode")
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(check)
+    return unique
+
+
 def extract_check_content(file_path):
     cleaned_file_path = clean_xml(file_path)
     tree = ET.parse(cleaned_file_path)
     root = tree.getroot()
-    checks = root.findall('.//check')
+    checks = _dedupe_identical_checks(root.findall('.//check'))
     
     # Extract additional details
     model = root.find('.//model').text if root.find('.//model') is not None else ''
@@ -51,7 +69,7 @@ def extract_check_content(file_path):
         key = text.upper()
         return {"MM": "mm", "INCH": "in", "IN": "in"}.get(key, text)
 
-    for check in root.findall('.//check'):
+    for check in checks:
         name = check.get('name')
         if name == 'FILE_SIZE':
             ans_el = _direct_ans(check)
