@@ -3745,6 +3745,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return
         watch["batch_finish_painted"] = True
         watch["batch_chunks_complete"] = True
+        self._record_wizard_batch_phase_duration(watch)
         step = watch.get("step")
         if isinstance(step, int):
             if self._automatic_mode and step in (
@@ -3763,6 +3764,31 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 self.update_idletasks()
             except tk.TclError:
                 pass
+
+    def _record_wizard_batch_phase_duration(self, watch: dict[str, object]) -> None:
+        """Persist wall-clock duration for ModelCHECK or one thumbnail pass (report Scan duration)."""
+        step = watch.get("step")
+        started = watch.get("started_at")
+        if not isinstance(started, (int, float)):
+            return
+        if step == WIZARD_STEP_MODELCHECK:
+            phase_key = "modelcheck"
+        elif step == WIZARD_STEP_JPEG_3D:
+            phase = watch.get("thumbnails_phase")
+            if not isinstance(phase, str) or not phase:
+                return
+            phase_key = phase
+        else:
+            return
+        wd = (self.working_directory.get() or "").strip()
+        if not wd:
+            batch_dir = watch.get("batch_dir")
+            if isinstance(batch_dir, Path):
+                wd = str(batch_dir)
+        if not wd:
+            return
+        elapsed = max(0.0, time.time() - float(started))
+        make_html_statistics.record_scan_phase_duration(wd, phase_key, elapsed)
 
     def _wizard_batch_cleanup_orphan_dxc_after_runner(self, watch: dict[str, object]) -> None:
         if watch.get("orphan_dxc_cleaned"):

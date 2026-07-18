@@ -1100,6 +1100,77 @@ def _format_scan_duration(seconds: float) -> str:
     return "1min" if minutes == 1 else f"{minutes}min"
 
 
+SCAN_TIMING_BASENAME = "creo-batch-scan-timing.json"
+_SCAN_DURATION_PHASE_KEYS = (
+    "modelcheck",
+    "jpeg3d_part",
+    "jpeg3d_asm",
+    "jpeg2d",
+)
+
+
+def _scan_timing_path(working_dir: str) -> Path:
+    return Path(working_dir).expanduser() / SCAN_TIMING_BASENAME
+
+
+def record_scan_phase_duration(working_dir: str, phase_key: str, seconds: float) -> None:
+    """Store one active batch phase duration (ModelCHECK or a thumbnail pass)."""
+    key = (phase_key or "").strip()
+    if key not in _SCAN_DURATION_PHASE_KEYS:
+        return
+    wd = (working_dir or "").strip()
+    if not wd:
+        return
+    path = _scan_timing_path(wd)
+    phases: dict[str, float] = {}
+    if path.is_file():
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            existing = raw.get("phases") if isinstance(raw, dict) else None
+            if isinstance(existing, dict):
+                for name, value in existing.items():
+                    if name in _SCAN_DURATION_PHASE_KEYS and isinstance(value, (int, float)):
+                        phases[name] = float(value)
+        except (OSError, json.JSONDecodeError, TypeError, ValueError):
+            phases = {}
+    phases[key] = max(0.0, float(seconds))
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps({"phases": phases}, indent=2) + "\n",
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
+
+
+def _scan_duration_from_timing_file(working_dir: str) -> str:
+    """Sum ModelCHECK + thumbnail phase durations when the timing file exists."""
+    wd = (working_dir or "").strip()
+    if not wd:
+        return ""
+    path = _scan_timing_path(wd)
+    if not path.is_file():
+        return ""
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return ""
+    phases = raw.get("phases") if isinstance(raw, dict) else None
+    if not isinstance(phases, dict):
+        return ""
+    total = 0.0
+    any_phase = False
+    for key in _SCAN_DURATION_PHASE_KEYS:
+        value = phases.get(key)
+        if isinstance(value, (int, float)) and value > 0:
+            total += float(value)
+            any_phase = True
+    if not any_phase or total < 1:
+        return ""
+    return _format_scan_duration(total)
+
+
 def _scan_date_for_report(master_path: str = "") -> str:
     """Prefer master.xml write time (scan merge); otherwise report build time."""
     dt: datetime | None = None
@@ -1116,11 +1187,15 @@ def _scan_date_for_report(master_path: str = "") -> str:
 
 
 def _scan_duration_from_modelcheck_xml(working_dir: str) -> str:
-    """Span from earliest to latest top-level ModelCHECK ``*.p/a/d.xml`` write time.
+    """Prefer timed ModelCHECK + thumbnail phases; else earliest/latest ModelCHECK XML span.
 
-    One ``scandir`` of the working folder: non-XML names are skipped without ``stat``;
-    only matching XML files contribute min/max mtime (not a full 31k-file inventory).
+    Timing file: ``creo-batch-scan-timing.json`` (written by the wizard after each batch pass).
+    Fallback uses one ``scandir`` of the working folder: non-XML names are skipped without
+    ``stat``; only matching XML files contribute min/max mtime.
     """
+    from_timing = _scan_duration_from_timing_file(working_dir)
+    if from_timing:
+        return from_timing
     if not working_dir:
         return ""
     try:
