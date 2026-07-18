@@ -44,6 +44,25 @@ def _direct_child_ans(check_el: ET.Element) -> ET.Element | None:
     return None
 
 
+def _check_item_details(check_el: ET.Element, limit: int = 5) -> tuple[list[str], bool]:
+    """Return up to ``limit`` non-empty item rows built from their ``info#`` values."""
+    details: list[str] = []
+    total = 0
+    for item in check_el.findall("item"):
+        values = [
+            (child.text or "").strip()
+            for child in item
+            if re.fullmatch(r"info\d+", child.tag, flags=re.IGNORECASE)
+            and (child.text or "").strip()
+        ]
+        if not values:
+            continue
+        total += 1
+        if len(details) < limit:
+            details.append(" · ".join(values))
+    return details, total > limit
+
+
 def _ans_element_is_empty(ans_el: ET.Element | None) -> bool:
     """True for missing ``<ans>``, ``<ans />``, or ``<ans></ans>``."""
     if ans_el is None:
@@ -418,6 +437,10 @@ def _parse_master_root(root: ET.Element) -> dict:
                 duplicate_models = _parse_duplicate_models_check(check)
                 if duplicate_models is not None:
                     check_entry["duplicate_models"] = duplicate_models
+                elif stat in ("ERROR", "WARNING", "INFO"):
+                    item_details, item_details_truncated = _check_item_details(check)
+                    check_entry["item_details"] = item_details
+                    check_entry["item_details_truncated"] = item_details_truncated
                 file_info["checks"].append(check_entry)
 
             if _file_size_header_is_zero(file_info["file_size"]):
@@ -889,6 +912,8 @@ def create_html_report(
                     "file_path": file_path,
                     "desc": check["desc"],
                     "condensed_msg": check["condensed_msg"],
+                    "item_details": check.get("item_details", []),
+                    "item_details_truncated": check.get("item_details_truncated", False),
                     "duplicate_models_detail_html": duplicate_detail,
                     "stat": stat,
                     "last_saved": file_info["last_saved"],

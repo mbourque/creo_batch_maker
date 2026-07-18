@@ -126,6 +126,14 @@
             clear: both;
         }
         .file-list p { margin: 5px 0; }
+        .mq-check-item-details {
+            margin: 2px 0 8px 0;
+            padding-left: 0;
+            list-style-position: inside;
+            font-size: 12px;
+            line-height: 1.35;
+        }
+        .mq-check-item-details li { margin: 1px 0; }
         .file-list.mq-bom-scroll-target {
             outline: 2px solid #2563eb;
             outline-offset: 2px;
@@ -1366,16 +1374,20 @@
                 </p>
                 <p class="mq-issue-desc">{% if file.stat == 'ERROR' %}<img class="mq-stat-icon" src="msgs_error.png" alt="ERROR" width="16" height="16">{% elif file.stat == 'WARNING' %}<img class="mq-stat-icon" src="msgs_warning.png" alt="WARNING" width="16" height="16">{% elif file.stat == 'INFO' %}<img class="mq-stat-icon" src="msgs_info.png" alt="INFO" width="16" height="16">{% endif %}<span>{{ file.desc | e }}</span></p>
                 <p>{{ file.condensed_msg | e }}</p>
+                {% if file.item_details %}
+                <ul class="mq-check-item-details">
+                    {% for detail in file.item_details %}
+                    <li>{{ detail | e }}</li>
+                    {% endfor %}
+                    {% if file.item_details_truncated %}
+                    <li>…</li>
+                    {% endif %}
+                </ul>
+                {% endif %}
                 {% if file.duplicate_models_detail_html %}
                 {{ file.duplicate_models_detail_html | safe }}
                 {% endif %}
                 <p><strong>Created by:</strong> {{ file.last_saved }} on {{ file.created }}</p>
-                <p><strong>File Size:</strong> {{ file.file_size }}</p>
-                {% if file.pro_type != 'DRW' %}
-                <p><strong>Number of Features:</strong> {{ file.num_features }}</p>
-                <p><strong>Model Overall Size:</strong> {{ file.overall_size }}</p>
-                <p><strong>Model Units for Length:</strong> {{ file.units_length }}</p>
-                {% endif %}
                 <div class="check-buttons">
                     {% if file.stat != 'INFO' %}
                     <button class="flag-button button" onclick="toggleFlag('{{ file.file_list_id | escape }}')">Flag&nbsp;this</button>

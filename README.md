@@ -106,7 +106,8 @@ Click **Create Report**. A **Processing, please wait…** dialog stays open whil
 If the report already exists, **Open Report** opens it without rebuilding.
 
 Report **Filter view** is hidden when there are no warnings, errors, or information sections; **Show information** lists checks marked `<info_check>Y</info_check>` with meaningful `INFO` answers (empty or self-closing `<ans />`, `0`, `-1`, `NA`, `NO`, and `NOT FOUND` are omitted; hidden until that filter is selected; not included in score or issue counts; no flag or remove buttons).
-Drawing check rows omit feature count, overall model size, and length units because those fields are not applicable to drawings.
+Warning, error, and visible information rows show up to five available ModelCHECK item details, followed by an ellipsis when more exist.
+Issue rows show Created by; they omit file size, feature count, overall model size, and length units.
 
 On **Duplicate Models** warnings, the report lists each duplicate under the count (`Preview the model : …`); click a model name to jump to that model’s row when it appears elsewhere in the report.
 Identical check results that ModelCHECK emits twice for the same model (for example Missing Layers) are counted once.

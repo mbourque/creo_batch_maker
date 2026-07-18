@@ -2,6 +2,46 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-18 — v1.11.162
+
+- **Report details**: item detail previews show five entries again; issue rows no longer show file size, feature count, overall size, or length units.
+
+## 2026-07-18 — v1.11.161
+
+- **Report layout**: reverted the metadata clear change that broke model row layout.
+
+## 2026-07-18 — v1.11.160
+
+- **Report layout**: Created by / size / features lines no longer wrap under the thumbnail when detail lists are present.
+
+## 2026-07-18 — v1.11.159
+
+- **Report details**: item detail previews now show three entries before the ellipsis to keep model rows compact.
+
+## 2026-07-18 — v1.11.158
+
+- **Report details**: item detail bullets now line up with the message text above them.
+
+## 2026-07-18 — v1.11.157
+
+- **Report details**: item detail lists are shown as bullets.
+
+## 2026-07-18 — v1.11.156
+
+- **Report details**: item detail lists use the same text color as the message line above them.
+
+## 2026-07-18 — v1.11.155
+
+- **Report details**: item detail lists under each issue use a smaller compact font.
+
+## 2026-07-18 — v1.11.154
+
+- **Report details**: visible information rows also list up to five available ModelCHECK item details.
+
+## 2026-07-18 — v1.11.153
+
+- **Report details**: warning and error rows now list up to five available ModelCHECK item details, with an ellipsis when more exist.
+
 ## 2026-07-18 — v1.11.152
 
 - **Report**: identical ModelCHECK results emitted twice for the same model (for example Missing Layers) are counted once.
