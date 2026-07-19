@@ -110,7 +110,7 @@ If the report already exists, **Open Report** opens it without rebuilding.
 
 Report **Filter view** is hidden when there are no warnings, errors, or information sections. Clicking a sidebar check loads only that check’s cards. In **Show all**, Score / Scan Information / Template Information stay in the sidebar and each opens alone; other filters hide those links. **Print This** temporarily shows every warning and error (and all summary cards). **Show information** lists checks marked `<info_check>Y</info_check>` with meaningful `INFO` answers (empty or self-closing `<ans />`, `0`, `-1`, `NA`, `NO`, and `NOT FOUND` are omitted; not included in score or issue counts; no flag or remove buttons). File-size answers are shown in MB or GB.
 Warning, error, and visible information rows show up to five available ModelCHECK item details, followed by an ellipsis when more exist.
-Issue rows show Created by; they omit file size, feature count, overall model size, and length units.
+Issue rows show Created by; they omit file size, feature count, overall model size, and length units. Hover a model thumbnail or name for the **Drag this into Creo** tip (click does not open the file).
 
 On **Duplicate Models** warnings, the report lists each duplicate under the count (`Preview the model : …`); click a model name to jump to that model’s row when it appears elsewhere in the report.
 Identical check results that ModelCHECK emits twice for the same model (for example Missing Layers) are counted once.

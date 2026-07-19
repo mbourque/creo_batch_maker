@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-19 — v1.12.3
+
+- **Report**: model thumbnail and name links show a “Drag this into Creo” hover tip again.
+
 ## 2026-07-19 — v1.12.2
 
 - **Model Type Breakdown**: renamed row to Parts with freeform features.

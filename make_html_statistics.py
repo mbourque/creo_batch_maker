@@ -2130,7 +2130,7 @@ def _skipped_model_name_html(name: str) -> str:
     href = "./" + quote(name)
     return (
         f'<a class="mq-skipped-drag" href="{_esc(href)}" '
-        f'onclick="void(0); return false;" title="Drag into Creo">{_esc(name)}</a>'
+        f'onclick="void(0); return false;" title="Drag this into Creo">{_esc(name)}</a>'
     )
 
 
