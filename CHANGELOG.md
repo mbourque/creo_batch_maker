@@ -2,7 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
-<<<<<<< HEAD
+## 2026-07-19 — v1.12.0
+
+- New version
+
 ## 2026-07-19 — v1.11.185
 
 - **Scan Information**: Multibody parts counts parts with more than one body (INFO included; single-body no longer counted).
@@ -18,11 +21,6 @@ Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. 
 ## 2026-07-19 — v1.11.182
 
 - **Scan Information**: Number of mechanism components counts INFO results (not only errors/warnings).
-=======
-## 2926-07-19 - v1.12.0
-
-- **Optimized report**: Major improvement to report performance.
->>>>>>> 84f7dfae50d268f697e37edb4b38f5132dacbed4
 
 ## 2026-07-19 — v1.11.181
 
@@ -238,7 +236,7 @@ Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. 
 
 ## 2026-07-17 — v1.11.128
 
-- **Configuration → Model Checks…**: opens the active ``.mch`` from **Settings → Checks…** / ``config\condition.mcc`` (not ``config\templates\``).
+- **Configuration → Model Checks…**: opens the active `.mch` from **Settings → Checks…** / `config\condition.mcc` (not `config\templates\`).
 
 ## 2026-07-17 — v1.11.127
 
@@ -254,7 +252,7 @@ Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. 
 
 ## 2026-07-17 — v1.11.124
 
-- **Models failed**: no longer lists Scan Templates models from ``templates\\`` (only the working-folder top level is checked).
+- **Models failed**: no longer lists Scan Templates models from `templates\\` (only the working-folder top level is checked).
 
 ## 2026-07-17 — v1.11.123
 
@@ -262,7 +260,7 @@ Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. 
 
 ## 2026-07-17 — v1.11.122
 
-- **CAD Assessment Summary**: **Model checks** reads ``config\condition.mcc`` beside ``main.exe`` in the packaged app (was missing in the EXE build).
+- **CAD Assessment Summary**: **Model checks** reads `config\condition.mcc` beside `main.exe` in the packaged app (was missing in the EXE build).
 
 ## 2026-07-17 — v1.11.121
 
@@ -270,7 +268,7 @@ Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. 
 
 ## 2026-07-17 — v1.11.120
 
-- **Create Report**: **Processing, please wait…** appears immediately; building ``master.xml`` runs in the background (no long freeze before the overlay).
+- **Create Report**: **Processing, please wait…** appears immediately; building `master.xml` runs in the background (no long freeze before the overlay).
 
 ## 2026-07-17 — v1.11.119
 
@@ -314,7 +312,7 @@ Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. 
 
 ## 2026-07-13 — v1.11.109
 
-- **Config folder**: app paths and menus now use ``config\`` (was ``configs\``). Rename the folder on disk to match (e.g. ``git mv configs config``).
+- **Config folder**: app paths and menus now use `config\` (was `configs\`). Rename the folder on disk to match (e.g. `git mv configs config`).
 
 ## 2026-07-12 — v1.11.108
 
@@ -342,11 +340,11 @@ Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. 
 
 ## 2026-07-08 — v1.11.102
 
-- **Create Report**: ``master.xml`` is built only from ModelCHECK XML in the working folder itself (not subfolders such as ``templates\\``).
+- **Create Report**: `master.xml` is built only from ModelCHECK XML in the working folder itself (not subfolders such as `templates\\`).
 
 ## 2026-07-08 — v1.11.101
 
-- **Create Report**: ``master.xml`` no longer includes ModelCHECK XML from ``templates\\``, so Scan Templates models (e.g. drawing template) do not inflate Statistics or the model list.
+- **Create Report**: `master.xml` no longer includes ModelCHECK XML from `templates\\`, so Scan Templates models (e.g. drawing template) do not inflate Statistics or the model list.
 
 ## 2026-07-08 — v1.11.100
 
@@ -378,11 +376,11 @@ Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. 
 
 ## 2026-07-08 — v1.11.93
 
-- **Create Report**: thumbnail status again checks only renamed ``*.part.jpg`` / ``*.assembly.jpg`` / ``*.drawing.jpg`` files; drawing thumbnails are required only when the JPEG 2D plot task is available from your Creo loadpoint.
+- **Create Report**: thumbnail status again checks only renamed `*.part.jpg` / `*.assembly.jpg` / `*.drawing.jpg` files; drawing thumbnails are required only when the JPEG 2D plot task is available from your Creo loadpoint.
 
 ## 2026-07-08 — v1.11.92
 
-- **Create Report**: thumbnail status now detects plain ``.jpg`` and legacy ``.model.jpg`` outputs (same rules as the Thumbnails batch step), not only renamed ``*.part.jpg`` / ``*.assembly.jpg`` / ``*.drawing.jpg`` files.
+- **Create Report**: thumbnail status now detects plain `.jpg` and legacy `.model.jpg` outputs (same rules as the Thumbnails batch step), not only renamed `*.part.jpg` / `*.assembly.jpg` / `*.drawing.jpg` files.
 
 ## 2026-07-08 — v1.11.91
 
