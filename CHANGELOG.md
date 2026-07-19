@@ -2,6 +2,22 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-19 — v1.11.185
+
+- **Scan Information**: Multibody parts counts parts with more than one body (INFO included; single-body no longer counted).
+
+## 2026-07-19 — v1.11.184
+
+- **Scan Information**: Bulk parts counts INFO results (not only errors/warnings).
+
+## 2026-07-19 — v1.11.183
+
+- **Scan Information**: Number of flexible components counts INFO results (not only errors/warnings).
+
+## 2026-07-19 — v1.11.182
+
+- **Scan Information**: Number of mechanism components counts INFO results (not only errors/warnings).
+
 ## 2026-07-19 — v1.11.181
 
 - **Filter view**: Sort by issue count is hidden when fewer than two warning/error checks remain.

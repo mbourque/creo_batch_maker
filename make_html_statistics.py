@@ -671,9 +671,7 @@ def find_top_level_assembly(master_root: ET.Element) -> str | None:
 # --- Performance report table (Creo Performance Report–style batch metrics) ---
 
 PERFORMANCE_REPORT_ISSUE_ROW_CHECKS: dict[str, str] = {
-    "_FLEXIBLE_COMPONENTS": "FLEX_COMPONENTS",
     "_PACKAGED_COMPONENTS": "PACK_COMPONENTS",
-    "_MECH_COMPONENTS": "MECH_COMPONENTS",
 }
 
 PERFORMANCE_TABLE_SECTIONS: list[tuple[str, list[tuple[str, str | None]]]] = [
@@ -758,6 +756,8 @@ class PerformanceMetrics:
     report_issue_counts: dict[str, int] = field(
         default_factory=lambda: {k: 0 for k in PERFORMANCE_REPORT_ISSUE_ROW_CHECKS}
     )
+    mech_components: int = 0
+    flexible_components: int = 0
     simprep_unique_count: int = 0
     sheetmetal_parts: int = 0
     multibody_parts: int = 0
@@ -820,11 +820,9 @@ def _counts_as_report_issue(file_element: ET.Element, check_name: str) -> int:
 
 
 def _bulk_item_names(file_element: ET.Element) -> list[str]:
-    """Unique BULK_ITEMS ``info1`` model names from one report-visible check."""
+    """Unique BULK_ITEMS ``info1`` model names from one check (any status)."""
     check = _find_check(file_element, "BULK_ITEMS")
     if check is None or _check_hidden_from_report(check):
-        return []
-    if _check_stat_text(check) not in ("ERROR", "WARNING"):
         return []
     names: list[str] = []
     seen: set[str] = set()
@@ -909,11 +907,22 @@ def _simprep_names_from(file_element: ET.Element) -> list[str]:
 
 
 def _is_multibody_part(file_element: ET.Element) -> bool:
+    """True when MULTIBODY_MODEL / BODY_INFO shows more than one body (includes INFO)."""
     mb = _find_check(file_element, "MULTIBODY_MODEL")
-    if mb is None:
+    if mb is not None and not _check_hidden_from_report(mb):
+        ans = (mb.findtext("ans") or "").strip().upper()
+        if ans in ("YES", "Y", "TRUE"):
+            return True
+        n = _parse_int_metric(ans)
+        if n is not None:
+            return n > 1
+        items = mb.findall("item")
+        if items:
+            return len(items) > 1
+    body = _find_check(file_element, "BODY_INFO")
+    if body is None or _check_hidden_from_report(body):
         return False
-    ans = (mb.findtext("ans") or "").strip().upper()
-    return ans in ("YES", "Y", "TRUE", "1") or _parse_positive_ans(mb)
+    return len(body.findall("item")) > 1
 
 
 def _is_sheetmetal_part(file_element: ET.Element) -> bool:
@@ -1046,6 +1055,12 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
             metrics.assembly_count += 1
             metrics.total_num_components += _parse_int_metric(_check_ans_text(file_element, "NUM_COMPONENTS")) or 0
             metrics.master_rep_component_count += _master_rep_count_from_element(file_element)
+            metrics.mech_components += (
+                _parse_int_metric(_check_ans_text(file_element, "MECH_COMPONENTS")) or 0
+            )
+            metrics.flexible_components += (
+                _parse_int_metric(_check_ans_text(file_element, "FLEX_COMPONENTS")) or 0
+            )
             for row_key, check_name in PERFORMANCE_REPORT_ISSUE_ROW_CHECKS.items():
                 metrics.report_issue_counts[row_key] += _counts_as_report_issue(file_element, check_name)
             asm_children = _unq_asm_children(file_element)
@@ -1280,6 +1295,8 @@ def performance_metrics_answers(metrics: PerformanceMetrics) -> dict[str, str]:
         "_TOTAL_SCANNED_SIZE": _format_total_scanned_size(metrics.total_scanned_bytes),
         "_FIXED_COMPONENTS": str(metrics.fixed_components),
         "_SUPPRESSED_COMPONENTS": str(metrics.suppressed_components),
+        "_MECH_COMPONENTS": str(metrics.mech_components),
+        "_FLEXIBLE_COMPONENTS": str(metrics.flexible_components),
         "_TOP_LEVEL_FEATURES": (
             str(metrics.top_level_assembly_features)
             if metrics.top_level_assembly_features is not None
@@ -1769,15 +1786,9 @@ def scan_batch_statistics(master_root: ET.Element, *, master_path: str = "") -> 
 
 
 
-            mb = _find_check(file_element, "MULTIBODY_MODEL")
+            if _is_multibody_part(file_element):
 
-            if mb is not None:
-
-                ans = (mb.findtext("ans") or "").strip().upper()
-
-                if ans in ("YES", "Y", "TRUE", "1") or _parse_positive_ans(mb):
-
-                    stats.multibody_parts += 1
+                stats.multibody_parts += 1
 
 
 
