@@ -2,6 +2,74 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-19 — v1.11.181
+
+- **Filter view**: Sort by issue count is hidden when fewer than two warning/error checks remain.
+
+## 2026-07-19 — v1.11.180
+
+- **Remove this / Remove all like this**: opens the next check again instead of leaving a blank page.
+
+## 2026-07-19 — v1.11.179
+
+- **Sidebar navigation**: Score, Scan Information, Template Information, and checks all use the same scroll-to-top behavior.
+
+## 2026-07-19 — v1.11.178
+
+- **Sidebar checks**: clicking a check no longer bounces the page up and down.
+
+## 2026-07-19 — v1.11.177
+
+- **Filter view**: category and model filters drop from the list when only information checks remain for that group.
+
+## 2026-07-19 — v1.11.176
+
+- **Sidebar checks**: first click after open loads the check (no longer needs a second click while the report finishes starting).
+
+## 2026-07-19 — v1.11.175
+
+- **Remove this**: deleted checks are removed from the sidebar, and empty filter options are dropped from the Filter view list.
+
+## 2026-07-19 — v1.11.174
+
+- **Filter view**: when a filter has no checks left, it resets to Show all and drops the empty option again (no “No checks match” message).
+
+## 2026-07-19 — v1.11.173
+
+- **Remove this**: after removing an open check, the next check opens (same as filtered views); Score only if none remain.
+
+## 2026-07-19 — v1.11.172
+
+- **Remove this**: after removing an open check, the report returns to Score instead of an empty card.
+
+## 2026-07-19 — v1.11.171
+
+- **Show all**: Score, Scan Information, and Template Information respond on the first sidebar click after open.
+
+## 2026-07-19 — v1.11.170
+
+- **Show all**: Score, Scan Information, and Template Information each open alone from the sidebar (not all three at once).
+
+## 2026-07-19 — v1.11.169
+
+- **Show all**: Score, Scan Information, and Template Information stay in the sidebar while a check is open.
+
+## 2026-07-19 — v1.11.168
+
+- **Sidebar checks**: clicking a check loads only that check’s cards (including in Show all); Print This temporarily shows every warning and error.
+
+## 2026-07-19 — v1.11.167
+
+- **Filtered reports**: loads one selected check at a time and hides the summary cards; Show all still loads every warning and error for scrolling and printing.
+
+## 2026-07-19 — v1.11.166
+
+- **Show information**: hides Score, Scan Information, and Template Information so the selected check stays at the top; sidebar clicks scroll to it.
+
+## 2026-07-19 — v1.11.165
+
+- **Show information**: loads one information check at a time (faster on large reports); pick another from the sidebar to switch.
+
 ## 2026-07-18 — v1.11.164
 
 - **Scan duration**: now adds ModelCHECK and thumbnail pass times (idle time between steps is not counted).

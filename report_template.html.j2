@@ -98,6 +98,15 @@
         body[data-mq-view-filter="information"] .check-section-wrapper[data-mq-section-stat="ERROR"],
         body[data-mq-view-filter="information"] .sidebar-check-nav[data-mq-sidebar-stat="WARNING"],
         body[data-mq-view-filter="information"] .sidebar-check-nav[data-mq-sidebar-stat="ERROR"] { display: none !important; }
+        body[data-mq-view-filter]:not([data-mq-view-filter="all"]) .summary,
+        body[data-mq-view-filter]:not([data-mq-view-filter="all"]) .sidebar-top-nav { display: none !important; }
+        body[data-mq-active-section] .summary { display: none !important; }
+        .mq-summary-panel { display: none; }
+        body[data-mq-summary-panel="score"] .mq-summary-panel[data-mq-panel="score"],
+        body[data-mq-summary-panel="statistics"] .mq-summary-panel[data-mq-panel="statistics"],
+        body[data-mq-summary-panel="template"] .mq-summary-panel[data-mq-panel="template"] { display: block; }
+        body[data-mq-printing="1"] .summary { display: block !important; }
+        body[data-mq-printing="1"] .mq-summary-panel { display: block !important; }
         body[data-mq-view-filter="flagged"] .file-row:not(:has(.mq-issue-row.flagged)) { display: none !important; }
         body[data-mq-view-filter="flagged"] .check-section-wrapper:not(:has(.file-row .mq-issue-row.flagged)) { display: none !important; }
         body[data-mq-view-filter="unflagged"] .file-row:has(.mq-issue-row.flagged) { display: none !important; }
@@ -120,6 +129,15 @@
         body[data-mq-view-filter="Model Integrity"] .sidebar-check-nav:not([data-mq-category="Model Integrity"]) { display: none !important; }
         body[data-mq-view-filter="MBD Readiness"] .check-section-wrapper:not([data-mq-category="MBD Readiness"]),
         body[data-mq-view-filter="MBD Readiness"] .sidebar-check-nav:not([data-mq-category="MBD Readiness"]) { display: none !important; }
+        .mq-info-hint {
+            margin: 16px 0;
+            padding: 12px 14px;
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            color: #334155;
+            font-size: 0.95rem;
+        }
         .file-list::after {
             content: "";
             display: table;
@@ -274,6 +292,10 @@
         var mqSummary = null;
         var mqCategoryCards = {};
         var mqPassBaseline = { overall: 0, byCategory: {} };
+        var mqSectionRegistry = {};
+        var mqActiveSectionId = '';
+        var mqPendingSectionId = '';
+        var mqInitFinished = false;
         var MQ_CATEGORY_FILTER_ORDER = [
             'Consistency',
             'Design Intent Strength',
@@ -311,11 +333,20 @@
             var count = 0;
             for (var i = 0; i < rows.length; i++) {
                 var fileRow = fileRowFor(rows[i]);
-                if (fileRow && fileRow.parentNode && document.body.contains(fileRow)) {
+                if (fileRow && fileRow.parentNode) {
                     count++;
                 }
             }
             return count;
+        }
+
+        function mqNavIssueCount(nav) {
+            var wrapper = mqGetSection(mqNavSectionId(nav));
+            if (wrapper) {
+                return mqCountSectionIssues(wrapper);
+            }
+            var n = parseInt(nav.getAttribute('data-mq-issue-count') || '0', 10);
+            return isNaN(n) ? 0 : n;
         }
 
         function mqApplySidebarNavOrder(mode) {
@@ -331,10 +362,8 @@
             }
             if (isSortByIssueCountMode(mode)) {
                 sorted.sort(function (a, b) {
-                    var wa = document.getElementById(mqNavSectionId(a));
-                    var wb = document.getElementById(mqNavSectionId(b));
-                    var ca = mqCountSectionIssues(wa);
-                    var cb = mqCountSectionIssues(wb);
+                    var ca = mqNavIssueCount(a);
+                    var cb = mqNavIssueCount(b);
                     if (cb !== ca) { return cb - ca; }
                     var oa = parseInt(a.getAttribute('data-mq-nav-order') || '0', 10);
                     var ob = parseInt(b.getAttribute('data-mq-nav-order') || '0', 10);
@@ -356,8 +385,12 @@
 
         function categoriesPresentInDom() {
             var present = {};
-            var sections = document.getElementsByClassName('check-section-wrapper');
+            var sections = mqAllSections();
             for (var i = 0; i < sections.length; i++) {
+                var stat = sections[i].getAttribute('data-mq-section-stat') || '';
+                // Category filters only list warning/error checks (INFO is under Show information).
+                if (stat === 'INFO') { continue; }
+                if (!sections[i].querySelector('.mq-issue-row')) { continue; }
                 var cat = sections[i].getAttribute('data-mq-category') || '';
                 if (cat) { present[cat] = true; }
             }
@@ -371,6 +404,7 @@
             if (!optgroup) { return; }
 
             var present = categoriesPresentInDom();
+            var activeFilter = document.body.getAttribute('data-mq-view-filter') || sel.value;
             var options = optgroup.getElementsByTagName('option');
             for (var j = options.length - 1; j >= 0; j--) {
                 var opt = options[j];
@@ -383,16 +417,20 @@
                 optgroup.parentNode.removeChild(optgroup);
             }
 
-            if (isCategoryFilterMode(sel.value) && !present[sel.value]) {
+            if (isCategoryFilterMode(activeFilter) && !present[activeFilter]) {
                 sel.value = 'all';
-                document.body.setAttribute('data-mq-view-filter', 'all');
+                document.body.removeAttribute('data-mq-view-filter');
+                mqBrowseHome();
+                mqSyncSidebarNav();
+                mqApplySidebarNavOrder('all');
             }
         }
 
         function proTypesPresentInDom() {
             var present = {};
-            var sections = document.getElementsByClassName('check-section-wrapper');
+            var sections = mqAllSections();
             for (var s = 0; s < sections.length; s++) {
+                if ((sections[s].getAttribute('data-mq-section-stat') || '') === 'INFO') { continue; }
                 var rows = sections[s].querySelectorAll('.mq-issue-row[data-mq-pro-type]');
                 for (var i = 0; i < rows.length; i++) {
                     var pro = (rows[i].getAttribute('data-mq-pro-type') || '').toUpperCase();
@@ -409,6 +447,7 @@
             if (!optgroup) { return; }
 
             var present = proTypesPresentInDom();
+            var activeFilter = document.body.getAttribute('data-mq-view-filter') || sel.value;
             var options = optgroup.getElementsByTagName('option');
             for (var j = options.length - 1; j >= 0; j--) {
                 var opt = options[j];
@@ -421,25 +460,30 @@
                 optgroup.parentNode.removeChild(optgroup);
             }
 
-            if (isModelFilterMode(sel.value) && !present[sel.value]) {
+            if (isModelFilterMode(activeFilter) && !present[activeFilter]) {
                 sel.value = 'all';
-                document.body.setAttribute('data-mq-view-filter', 'all');
+                document.body.removeAttribute('data-mq-view-filter');
+                mqBrowseHome();
+                mqSyncSidebarNav();
+                mqApplySidebarNavOrder('all');
             }
         }
 
         function mqFlaggedFiltersPresentInDom() {
             var flagged = false;
             var unflagged = false;
-            var rows = document.querySelectorAll('.mq-issue-row');
-            for (var i = 0; i < rows.length; i++) {
-                var fileRow = fileRowFor(rows[i]);
-                if (!fileRow || !fileRow.parentNode || !document.body.contains(fileRow)) {
-                    continue;
-                }
-                if (rows[i].classList.contains('flagged')) {
-                    flagged = true;
-                } else {
-                    unflagged = true;
+            var sections = mqAllSections();
+            for (var s = 0; s < sections.length; s++) {
+                var rows = sections[s].querySelectorAll('.mq-issue-row');
+                for (var i = 0; i < rows.length; i++) {
+                    var fileRow = fileRowFor(rows[i]);
+                    if (!fileRow || !fileRow.parentNode) { continue; }
+                    if (rows[i].classList.contains('flagged')) {
+                        flagged = true;
+                    } else {
+                        unflagged = true;
+                    }
+                    if (flagged && unflagged) { break; }
                 }
                 if (flagged && unflagged) { break; }
             }
@@ -450,7 +494,7 @@
             var warning = false;
             var error = false;
             var info = false;
-            var sections = document.getElementsByClassName('check-section-wrapper');
+            var sections = mqAllSections();
             for (var i = 0; i < sections.length; i++) {
                 var stat = sections[i].getAttribute('data-mq-section-stat') || '';
                 if (stat === 'WARNING') { warning = true; }
@@ -478,9 +522,22 @@
                 (sel.value === 'unflagged' && !showUnflagged)) {
                 sel.value = 'all';
                 document.body.removeAttribute('data-mq-view-filter');
+                mqBrowseHome();
                 mqSyncSidebarNav();
                 mqApplySidebarNavOrder('all');
             }
+        }
+
+        function sortableIssueSectionCount() {
+            var n = 0;
+            var sections = mqAllSections();
+            for (var i = 0; i < sections.length; i++) {
+                var stat = sections[i].getAttribute('data-mq-section-stat') || '';
+                if (stat === 'INFO') { continue; }
+                if (!sections[i].querySelector('.mq-issue-row')) { continue; }
+                n++;
+            }
+            return n;
         }
 
         function syncStatFilterOptions() {
@@ -489,12 +546,14 @@
             if (!sel) { return; }
             var present = statFiltersPresentInDom();
             var hasFilterable = present.warning || present.error || present.info;
+            var canSortByCount = sortableIssueSectionCount() > 1;
             if (wrap) {
                 wrap.style.display = hasFilterable ? '' : 'none';
             }
             if (!hasFilterable) {
                 sel.value = 'all';
                 document.body.removeAttribute('data-mq-view-filter');
+                mqBrowseHome();
                 mqSyncSidebarNav();
                 mqApplySidebarNavOrder('all');
                 return;
@@ -502,11 +561,14 @@
             mqSetFilterOptionVisible(sel.querySelector('option[value="warning"]'), present.warning);
             mqSetFilterOptionVisible(sel.querySelector('option[value="error"]'), present.error);
             mqSetFilterOptionVisible(sel.querySelector('option[value="information"]'), present.info);
+            mqSetFilterOptionVisible(sel.querySelector('option[value="sort-by-count"]'), canSortByCount);
             if ((sel.value === 'warning' && !present.warning) ||
                 (sel.value === 'error' && !present.error) ||
-                (sel.value === 'information' && !present.info)) {
+                (sel.value === 'information' && !present.info) ||
+                (sel.value === 'sort-by-count' && !canSortByCount)) {
                 sel.value = 'all';
                 document.body.removeAttribute('data-mq-view-filter');
+                mqBrowseHome();
                 mqSyncSidebarNav();
                 mqApplySidebarNavOrder('all');
             }
@@ -550,6 +612,124 @@
             return '';
         }
 
+        function mqAllSections() {
+            var sections = [];
+            for (var id in mqSectionRegistry) {
+                if (Object.prototype.hasOwnProperty.call(mqSectionRegistry, id)) {
+                    sections.push(mqSectionRegistry[id].wrapper);
+                }
+            }
+            return sections;
+        }
+
+        function mqGetSection(id) {
+            var entry = mqSectionRegistry[id];
+            return entry ? entry.wrapper : null;
+        }
+
+        function mqInitSectionRegistry() {
+            mqSectionRegistry = {};
+            var stores = document.querySelectorAll('template.mq-section-store');
+            for (var i = 0; i < stores.length; i++) {
+                var store = stores[i];
+                var sectionId = store.getAttribute('data-mq-section-id') || '';
+                var wrapper = store.content.querySelector('.check-section-wrapper');
+                var anchor = store.content.querySelector('.mq-check-anchor');
+                if (!wrapper && sectionId) {
+                    wrapper = document.getElementById(sectionId);
+                    if (wrapper && wrapper.previousElementSibling &&
+                        wrapper.previousElementSibling.classList.contains('mq-check-anchor')) {
+                        anchor = wrapper.previousElementSibling;
+                    }
+                }
+                if (!sectionId || !wrapper) { continue; }
+                mqSectionRegistry[sectionId] = {
+                    store: store,
+                    wrapper: wrapper,
+                    anchor: anchor,
+                    stat: wrapper.getAttribute('data-mq-section-stat') || ''
+                };
+            }
+        }
+
+        function mqParkSection(entry) {
+            if (!entry || !entry.store || !entry.wrapper || !document.body.contains(entry.wrapper)) { return; }
+            if (entry.anchor && document.body.contains(entry.anchor)) {
+                entry.store.content.appendChild(entry.anchor);
+            }
+            entry.store.content.appendChild(entry.wrapper);
+        }
+
+        function mqAttachSection(entry) {
+            if (!entry || !entry.store || !entry.wrapper || document.body.contains(entry.wrapper)) { return; }
+            var parent = entry.store.parentNode;
+            if (!parent) { return; }
+            if (entry.anchor) { parent.insertBefore(entry.anchor, entry.store); }
+            parent.insertBefore(entry.wrapper, entry.store);
+        }
+
+        function mqParkAllSections() {
+            for (var id in mqSectionRegistry) {
+                if (Object.prototype.hasOwnProperty.call(mqSectionRegistry, id)) {
+                    mqParkSection(mqSectionRegistry[id]);
+                }
+            }
+        }
+
+        function mqSummaryPanelFromHash(hash) {
+            var h = (hash || '').replace(/^#/, '');
+            if (h === 'statistics') { return 'statistics'; }
+            if (h === 'template-information') { return 'template'; }
+            if (h === 'summary' || h === 'mq-page-title') { return 'score'; }
+            return '';
+        }
+
+        function mqBrowseHome() {
+            if (mqPendingSectionId) { return; }
+            if (!mqInitFinished && mqActiveSectionId && mqGetSection(mqActiveSectionId)) { return; }
+            mqShowSummaryPanel('score', { scroll: false });
+        }
+
+        function mqShowSummaryPanel(panel, opts) {
+            opts = opts || {};
+            panel = panel || 'score';
+            mqParkAllSections();
+            mqActiveSectionId = '';
+            document.body.removeAttribute('data-mq-active-section');
+            document.body.setAttribute('data-mq-summary-panel', panel);
+            var hint = document.getElementById('mq-filter-hint');
+            if (hint) { hint.hidden = true; }
+            var navs = document.querySelectorAll('.sidebar ul li.sidebar-nav-active');
+            for (var i = 0; i < navs.length; i++) {
+                navs[i].classList.remove('sidebar-nav-active');
+            }
+            var top = document.querySelector('.sidebar-top-nav[data-mq-panel="' + panel + '"]');
+            if (top) { top.classList.add('sidebar-nav-active'); }
+            if (opts.scroll) {
+                setTimeout(mqScrollToTop, 0);
+            }
+        }
+
+        function mqClearSummaryPanel() {
+            document.body.removeAttribute('data-mq-summary-panel');
+            var tops = document.querySelectorAll('.sidebar-top-nav.sidebar-nav-active');
+            for (var i = 0; i < tops.length; i++) {
+                tops[i].classList.remove('sidebar-nav-active');
+            }
+        }
+
+        function mqAttachAllIssueSections() {
+            for (var id in mqSectionRegistry) {
+                if (!Object.prototype.hasOwnProperty.call(mqSectionRegistry, id)) { continue; }
+                var entry = mqSectionRegistry[id];
+                if (entry.stat === 'INFO') {
+                    mqParkSection(entry);
+                } else {
+                    mqAttachSection(entry);
+                }
+            }
+        }
+
         function mqSectionMatchesFilter(wrapper, mode) {
             if (!wrapper) { return true; }
             var stat = wrapper.getAttribute('data-mq-section-stat') || '';
@@ -573,13 +753,134 @@
             for (var i = 0; i < navs.length; i++) {
                 var nav = navs[i];
                 var sectionId = mqNavSectionId(nav);
-                var wrapper = sectionId ? document.getElementById(sectionId) : null;
-                if (!wrapper || !document.body.contains(wrapper)) {
+                var wrapper = mqGetSection(sectionId);
+                if (!wrapper) {
                     nav.style.display = 'none';
                     continue;
                 }
                 nav.style.display = mqSectionMatchesFilter(wrapper, mode) ? '' : 'none';
             }
+        }
+
+        function mqScrollToTop() {
+            try { window.scrollTo(0, 0); }
+            catch (err) { /* ignore */ }
+        }
+
+        function mqFirstEligibleSectionId(mode) {
+            var sections = mqAllSections();
+            var bestId = '';
+            var bestOrder = Infinity;
+            for (var i = 0; i < sections.length; i++) {
+                var wrapper = sections[i];
+                if (!mqSectionMatchesFilter(wrapper, mode)) { continue; }
+                var id = wrapper.id || '';
+                if (!id) { continue; }
+                var nav = document.querySelector('.sidebar-check-nav[data-mq-section-id="' + escapeCssSelector(id) + '"]');
+                var order = nav
+                    ? parseInt(nav.getAttribute('data-mq-nav-order') || '0', 10)
+                    : i;
+                if (isNaN(order)) { order = i; }
+                if (order < bestOrder) {
+                    bestOrder = order;
+                    bestId = id;
+                }
+            }
+            return bestId;
+        }
+
+        function mqPruneOrphanSidebarNavs() {
+            var navs = document.querySelectorAll('.sidebar-check-nav');
+            for (var i = navs.length - 1; i >= 0; i--) {
+                var id = mqNavSectionId(navs[i]);
+                if (!id || !mqGetSection(id)) {
+                    if (navs[i].parentNode) { navs[i].parentNode.removeChild(navs[i]); }
+                }
+            }
+        }
+
+        function mqRemoveSidebarNavForSection(id) {
+            if (!id) { return; }
+            var navs = document.querySelectorAll('.sidebar-check-nav[data-mq-section-id="' + escapeCssSelector(id) + '"]');
+            for (var i = 0; i < navs.length; i++) {
+                if (navs[i].parentNode) { navs[i].parentNode.removeChild(navs[i]); }
+            }
+            var byClass = document.querySelectorAll('.sidebar .' + escapeCssSelector(id));
+            for (var j = 0; j < byClass.length; j++) {
+                if (byClass[j].parentNode) { byClass[j].parentNode.removeChild(byClass[j]); }
+            }
+        }
+
+        function mqSelectFilteredSection(sectionId, opts) {
+            opts = opts || {};
+            if (!sectionId) { return null; }
+            var mode = document.body.getAttribute('data-mq-view-filter') || 'all';
+            var wrapper = mqGetSection(sectionId);
+            if (!wrapper) {
+                // Registry not ready yet (common on first click while large reports init).
+                mqPendingSectionId = sectionId;
+                document.body.setAttribute('data-mq-active-section', sectionId);
+                mqClearSummaryPanel();
+                return null;
+            }
+            if (!mqSectionMatchesFilter(wrapper, mode)) {
+                return null;
+            }
+            mqPendingSectionId = '';
+            var alreadyOpen = (mqActiveSectionId === sectionId && document.body.contains(wrapper));
+            if (!alreadyOpen) {
+                mqParkAllSections();
+                mqAttachSection(mqSectionRegistry[sectionId]);
+                wrapper = mqGetSection(sectionId);
+            }
+            mqActiveSectionId = sectionId;
+            document.body.setAttribute('data-mq-active-section', sectionId);
+            mqClearSummaryPanel();
+            var navs = document.querySelectorAll('.sidebar-check-nav');
+            for (var i = 0; i < navs.length; i++) {
+                navs[i].classList.toggle('sidebar-nav-active', mqNavSectionId(navs[i]) === sectionId);
+            }
+            var hint = document.getElementById('mq-filter-hint');
+            if (hint) { hint.hidden = true; }
+            if (opts.scroll && !alreadyOpen) {
+                setTimeout(mqScrollToTop, 0);
+            }
+            return wrapper;
+        }
+
+        function mqFlushPendingSection(scroll) {
+            var id = mqPendingSectionId || document.body.getAttribute('data-mq-active-section') || '';
+            if (!id || !mqGetSection(id)) { return null; }
+            mqPendingSectionId = '';
+            return mqSelectFilteredSection(id, { scroll: !!scroll });
+        }
+
+        function mqSectionIdFromHash(hash) {
+            var h = (hash || '').replace(/^#/, '');
+            if (!h || mqSummaryPanelFromHash('#' + h)) { return ''; }
+            if (mqGetSection('wrapper-' + h)) { return 'wrapper-' + h; }
+            if (mqGetSection(h)) { return h; }
+            return '';
+        }
+
+        function mqEnsureFilteredSection(mode, scroll) {
+            var current = mqActiveSectionId || document.body.getAttribute('data-mq-active-section') || '';
+            var wrapper = mqGetSection(current);
+            if (wrapper && mqSectionMatchesFilter(wrapper, mode)) {
+                return mqSelectFilteredSection(current, { scroll: scroll });
+            }
+            current = mqFirstEligibleSectionId(mode);
+            if (current) { return mqSelectFilteredSection(current, { scroll: scroll }); }
+            // No checks left for this filter — return to Show all (dropdown sync removes empty options).
+            var sel = document.getElementById('sidebar-view-filter');
+            if (sel) { sel.value = 'all'; }
+            document.body.removeAttribute('data-mq-view-filter');
+            mqBrowseHome();
+            syncViewFilterOptions();
+            mqPruneOrphanSidebarNavs();
+            mqSyncSidebarNav();
+            mqApplySidebarNavOrder('all');
+            return null;
         }
 
         function applyViewFilter() {
@@ -588,8 +889,10 @@
             var mode = sel.value;
             if (mode === 'all') {
                 document.body.removeAttribute('data-mq-view-filter');
+                mqBrowseHome();
             } else {
                 document.body.setAttribute('data-mq-view-filter', mode);
+                mqEnsureFilteredSection(mode, true);
             }
             mqSyncSidebarNav();
             mqApplySidebarNavOrder(mode);
@@ -597,10 +900,9 @@
 
         function setViewFilterAll() {
             var sel = document.getElementById('sidebar-view-filter');
-            var mode = document.body.getAttribute('data-mq-view-filter') || 'all';
-            if (mode === 'all' && sel && sel.value === 'all') { return; }
             if (sel) { sel.value = 'all'; }
             document.body.removeAttribute('data-mq-view-filter');
+            mqBrowseHome();
             mqSyncSidebarNav();
             mqApplySidebarNavOrder('all');
         }
@@ -611,82 +913,85 @@
             return (modelName || '').toLowerCase();
         }
 
-        function mqIsModelJumpRowVisible(row) {
-            if (!row || !document.body.contains(row)) { return false; }
-            var stat = (row.getAttribute('data-mq-stat') || '').toUpperCase();
-            var mode = document.body.getAttribute('data-mq-view-filter') || 'all';
-            if (stat === 'INFO' && mode !== 'information') { return false; }
-            if (mode === 'warning' && stat !== 'WARNING') { return false; }
-            if (mode === 'error' && stat !== 'ERROR') { return false; }
-            return row.offsetParent !== null;
-        }
-
         function mqFindModelJumpTarget(modelName) {
             var key = mqModelJumpKey(modelName);
             if (!key) { return null; }
-            var rows = document.querySelectorAll('.file-list[data-mq-model]');
+            var sections = mqAllSections();
             var fallback = null;
-            for (var i = 0; i < rows.length; i++) {
-                var row = rows[i];
-                if (mqModelJumpKey(row.getAttribute('data-mq-model')) !== key) { continue; }
-                var stat = (row.getAttribute('data-mq-stat') || '').toUpperCase();
-                if (stat === 'INFO') {
-                    if (!fallback) { fallback = row; }
-                    continue;
+            for (var s = 0; s < sections.length; s++) {
+                var rows = sections[s].querySelectorAll('.file-list[data-mq-model]');
+                for (var i = 0; i < rows.length; i++) {
+                    var row = rows[i];
+                    if (mqModelJumpKey(row.getAttribute('data-mq-model')) !== key) { continue; }
+                    var stat = (row.getAttribute('data-mq-stat') || '').toUpperCase();
+                    if (stat === 'INFO') {
+                        if (!fallback) { fallback = row; }
+                        continue;
+                    }
+                    return row;
                 }
-                if (mqIsModelJumpRowVisible(row)) { return row; }
             }
-            if (fallback && mqIsModelJumpRowVisible(fallback)) { return fallback; }
-            mqEnsureModelJumpIndex();
-            var cached = mqModelJumpTargets[key];
-            if (cached && mqIsModelJumpRowVisible(cached)) { return cached; }
-            return null;
+            return fallback;
         }
 
         function mqEnsureModelJumpIndex() {
             if (mqModelJumpTargets) { return; }
             mqModelJumpTargets = Object.create(null);
-            var rows = document.querySelectorAll('.file-list[data-mq-model]');
-            for (var i = 0; i < rows.length; i++) {
-                var row = rows[i];
-                var key = mqModelJumpKey(row.getAttribute('data-mq-model'));
-                if (!key) { continue; }
-                var stat = (row.getAttribute('data-mq-stat') || '').toUpperCase();
-                var existing = mqModelJumpTargets[key];
-                if (!existing) {
-                    mqModelJumpTargets[key] = row;
-                    continue;
-                }
-                var existingStat = (existing.getAttribute('data-mq-stat') || '').toUpperCase();
-                if (existingStat === 'INFO' && stat !== 'INFO') {
-                    mqModelJumpTargets[key] = row;
+            var sections = mqAllSections();
+            for (var s = 0; s < sections.length; s++) {
+                var rows = sections[s].querySelectorAll('.file-list[data-mq-model]');
+                for (var i = 0; i < rows.length; i++) {
+                    var row = rows[i];
+                    var key = mqModelJumpKey(row.getAttribute('data-mq-model'));
+                    if (!key) { continue; }
+                    var stat = (row.getAttribute('data-mq-stat') || '').toUpperCase();
+                    var existing = mqModelJumpTargets[key];
+                    if (!existing) {
+                        mqModelJumpTargets[key] = row;
+                        continue;
+                    }
+                    var existingStat = (existing.getAttribute('data-mq-stat') || '').toUpperCase();
+                    if (existingStat === 'INFO' && stat !== 'INFO') {
+                        mqModelJumpTargets[key] = row;
+                    }
                 }
             }
         }
 
+        function mqWrapperForRow(row) {
+            return row && row.closest ? row.closest('.check-section-wrapper') : null;
+        }
+
         function jumpToModel(modelName) {
             if (!modelName) { return; }
-            var mode = document.body.getAttribute('data-mq-view-filter') || 'all';
-            if (mode !== 'all') { setViewFilterAll(); }
             var target = mqFindModelJumpTarget(modelName);
-            if (!target || !document.body.contains(target)) { return; }
+            if (!target) {
+                mqEnsureModelJumpIndex();
+                target = mqModelJumpTargets[mqModelJumpKey(modelName)];
+            }
+            if (!target) { return; }
+            var wrapper = mqWrapperForRow(target);
+            if (!wrapper) { return; }
+            setViewFilterAll();
+            mqSelectFilteredSection(wrapper.id, { scroll: false });
             if (target.id) {
                 window.location.hash = target.id;
             }
             target.classList.add('mq-bom-scroll-target');
             setTimeout(function () { target.classList.remove('mq-bom-scroll-target'); }, 2500);
-            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(function () {
+                try { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+                catch (err) { target.scrollIntoView(true); }
+            }, 0);
         }
 
         function initModelJumps() {
-            var btns = document.querySelectorAll(
-                '.mq-bom-jump[data-mq-model-jump], .mq-complexity-jump[data-mq-model-jump], .mq-duplicate-model-jump[data-mq-model-jump]'
-            );
-            for (var i = 0; i < btns.length; i++) {
-                btns[i].addEventListener('click', function () {
-                    jumpToModel(this.getAttribute('data-mq-model-jump'));
-                });
-            }
+            document.addEventListener('click', function (ev) {
+                var btn = ev.target.closest ? ev.target.closest(
+                    '.mq-bom-jump[data-mq-model-jump], .mq-complexity-jump[data-mq-model-jump], .mq-duplicate-model-jump[data-mq-model-jump]'
+                ) : null;
+                if (btn) { jumpToModel(btn.getAttribute('data-mq-model-jump')); }
+            });
             if (window.requestIdleCallback) {
                 requestIdleCallback(function () { mqEnsureModelJumpIndex(); }, { timeout: 3000 });
             }
@@ -696,11 +1001,20 @@
             if (!checkName) { return; }
             setViewFilterAll();
             var attr = checkName.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-            var target = document.querySelector('.check-section-wrapper[data-mq-check-name="' + attr + '"][data-mq-section-stat="ERROR"]')
-                || document.querySelector('.check-section-wrapper[data-mq-check-name="' + attr + '"]');
-            if (!target || !document.body.contains(target)) { return; }
-            var heading = target.querySelector('.check-title h2');
-            var hash = heading && heading.id ? heading.id : target.id.replace(/^wrapper-/, '');
+            var sections = mqAllSections();
+            var target = null;
+            for (var i = 0; i < sections.length; i++) {
+                var sec = sections[i];
+                if ((sec.getAttribute('data-mq-check-name') || '') !== checkName) { continue; }
+                if ((sec.getAttribute('data-mq-section-stat') || '') === 'ERROR') {
+                    target = sec;
+                    break;
+                }
+                if (!target) { target = sec; }
+            }
+            if (!target) { return; }
+            mqSelectFilteredSection(target.id, { scroll: true });
+            var hash = target.id.replace(/^wrapper-/, '');
             if (hash) {
                 window.location.hash = hash;
                 var sb = document.querySelector('.sidebar');
@@ -717,7 +1031,6 @@
                     }
                 }
             }
-            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         function initHealthCheckJumps() {
@@ -818,9 +1131,12 @@
 
         function mqRebuildSummaryFromDom() {
             mqSummary = mqEmptySummary();
-            var rows = document.querySelectorAll('.mq-issue-row');
-            for (var i = 0; i < rows.length; i++) {
-                mqSummaryAddRow(mqRowInfo(rows[i]));
+            var sections = mqAllSections();
+            for (var s = 0; s < sections.length; s++) {
+                var rows = sections[s].querySelectorAll('.mq-issue-row');
+                for (var i = 0; i < rows.length; i++) {
+                    mqSummaryAddRow(mqRowInfo(rows[i]));
+                }
             }
         }
 
@@ -891,10 +1207,31 @@
             scoreViewAdjusted = true;
             markReportSessionDirty();
             if (opts.syncFilters) { syncViewFilterOptions(); }
+            mqPruneOrphanSidebarNavs();
             mqApplySummaryToDom();
             if (opts.syncNav) {
                 mqSyncSidebarNav();
                 mqApplySidebarNavOrder(document.body.getAttribute('data-mq-view-filter') || 'all');
+            }
+            var mode = document.body.getAttribute('data-mq-view-filter') || 'all';
+            // Re-read mode after syncFilters may have reset an empty filter to Show all.
+            mode = document.body.getAttribute('data-mq-view-filter') || 'all';
+            var active = mqActiveSectionId || document.body.getAttribute('data-mq-active-section') || '';
+            var hasOpenCheck = !!(active && mqGetSection(active) && document.body.contains(mqGetSection(active)));
+            if (!hasOpenCheck) {
+                mqActiveSectionId = '';
+                document.body.removeAttribute('data-mq-active-section');
+            }
+            var hasSummary = !!document.body.getAttribute('data-mq-summary-panel');
+            // After Remove this / Remove all like this, the open check may already be
+            // gone from the registry — recover the next check (or Score), same as filters.
+            if (!hasOpenCheck && !hasSummary) {
+                mqPendingSectionId = '';
+            }
+            if (mode !== 'all' && !isSortByIssueCountMode(mode)) {
+                mqEnsureFilteredSection(mode, false);
+            } else if (!hasOpenCheck && !hasSummary) {
+                mqEnsureFilteredSection(mode, false);
             }
         }
 
@@ -906,7 +1243,10 @@
             if (flagButton) { flagButton.classList.toggle('dimmed-button'); }
             syncFlaggedFilterOptions();
             var mode = document.body.getAttribute('data-mq-view-filter') || 'all';
-            if (mode === 'flagged' || mode === 'unflagged') { mqSyncSidebarNav(); }
+            if (mode === 'flagged' || mode === 'unflagged') {
+                mqSyncSidebarNav();
+                mqEnsureFilteredSection(mode, false);
+            }
             markReportSessionDirty();
             updateSaveButtonVisibility();
         }
@@ -949,7 +1289,11 @@
 
         function reportHasUnsavedChanges() {
             if (scoreViewAdjusted) { return true; }
-            return document.querySelector('.file-list.flagged') !== null;
+            var sections = mqAllSections();
+            for (var i = 0; i < sections.length; i++) {
+                if (sections[i].querySelector('.file-list.flagged')) { return true; }
+            }
+            return false;
         }
 
         function updateSaveButtonVisibility() {
@@ -980,14 +1324,17 @@
 
         function hideElementsByClass(className) {
             var escapedClass = escapeCssSelector(className);
-            var elements = document.getElementsByClassName(escapedClass);
             mqEnsureSummary();
             var toRemove = [];
-            for (var i = elements.length - 1; i >= 0; i--) {
-                var el = elements[i];
-                var issueRow = mqIssueRowFromTarget(el);
-                if (issueRow) { mqSummaryRemoveRow(mqRowInfo(issueRow)); }
-                toRemove.push(fileRowFor(el) || el);
+            var sections = mqAllSections();
+            for (var s = 0; s < sections.length; s++) {
+                var elements = sections[s].getElementsByClassName(className);
+                for (var i = elements.length - 1; i >= 0; i--) {
+                    var el = elements[i];
+                    var issueRow = mqIssueRowFromTarget(el);
+                    if (issueRow) { mqSummaryRemoveRow(mqRowInfo(issueRow)); }
+                    toRemove.push(fileRowFor(el) || el);
+                }
             }
             for (var r = 0; r < toRemove.length; r++) {
                 if (toRemove[r].parentNode) { toRemove[r].parentNode.removeChild(toRemove[r]); }
@@ -1001,7 +1348,7 @@
         }
 
         function removeEmptyCheckSections() {
-            var checkSections = document.getElementsByClassName('check-section-wrapper');
+            var checkSections = mqAllSections();
             for (var i = 0; i < checkSections.length; i++) {
                 var checkSectionWrapper = checkSections[i];
                 var checkSection = checkSectionWrapper.getElementsByClassName('check-section')[0];
@@ -1011,36 +1358,92 @@
                     if (fileLists[j].parentNode) { allHidden = false; break; }
                 }
                 if (allHidden) {
-                    var sidebarItems = document.querySelectorAll('.sidebar .' + checkSectionWrapper.id);
-                    sidebarItems.forEach(function (sidebarItem) {
-                        sidebarItem.parentNode.removeChild(sidebarItem);
-                    });
                     hiddenSections.push(checkSectionWrapper.id);
-                    checkSectionWrapper.parentNode.removeChild(checkSectionWrapper);
-                    i--;
+                    mqRemoveSidebarNavForSection(checkSectionWrapper.id);
+                    mqRemoveSectionFromRegistry(checkSectionWrapper.id);
                 }
             }
         }
 
+        function mqRemoveSectionFromRegistry(id) {
+            var entry = mqSectionRegistry[id];
+            if (!entry) { return; }
+            if (entry.anchor && entry.anchor.parentNode) { entry.anchor.parentNode.removeChild(entry.anchor); }
+            if (entry.wrapper && entry.wrapper.parentNode) { entry.wrapper.parentNode.removeChild(entry.wrapper); }
+            if (entry.store && entry.store.parentNode) { entry.store.parentNode.removeChild(entry.store); }
+            delete mqSectionRegistry[id];
+            if (mqActiveSectionId === id ||
+                document.body.getAttribute('data-mq-active-section') === id) {
+                mqActiveSectionId = '';
+                document.body.removeAttribute('data-mq-active-section');
+            }
+        }
+
         function hideCheckSection(id) {
-            var wrapper = document.getElementById(id);
+            var wrapper = mqGetSection(id);
             if (wrapper) {
                 mqEnsureSummary();
                 var rows = wrapper.querySelectorAll('.mq-issue-row');
                 for (var i = 0; i < rows.length; i++) {
                     mqSummaryRemoveRow(mqRowInfo(rows[i]));
                 }
-                wrapper.parentNode.removeChild(wrapper);
+                mqRemoveSectionFromRegistry(id);
                 hiddenSections.push(id);
             }
-            var sidebarItems = document.querySelectorAll('.sidebar .' + escapeCssSelector(id));
-            sidebarItems.forEach(function (sidebarItem) {
-                sidebarItem.parentNode.removeChild(sidebarItem);
-            });
+            mqRemoveSidebarNavForSection(id);
             mqOnReportMutation({ syncFilters: true, syncNav: true });
         }
 
-        function printReport() { window.print(); }
+        var mqPrintSnapshot = null;
+
+        function mqBeginPrintLayout() {
+            if (mqPrintSnapshot) { return; }
+            mqPrintSnapshot = {
+                active: mqActiveSectionId || document.body.getAttribute('data-mq-active-section') || '',
+                mode: document.body.getAttribute('data-mq-view-filter') || 'all',
+                summaryPanel: document.body.getAttribute('data-mq-summary-panel') || ''
+            };
+            document.body.setAttribute('data-mq-printing', '1');
+            document.body.removeAttribute('data-mq-active-section');
+            mqActiveSectionId = '';
+            mqAttachAllIssueSections();
+        }
+
+        function mqEndPrintLayout() {
+            if (!mqPrintSnapshot) { return; }
+            var prevActive = mqPrintSnapshot.active;
+            var prevMode = mqPrintSnapshot.mode;
+            var prevSummary = mqPrintSnapshot.summaryPanel;
+            mqPrintSnapshot = null;
+            document.body.removeAttribute('data-mq-printing');
+            var sel = document.getElementById('sidebar-view-filter');
+            if (sel) { sel.value = prevMode === 'all' ? 'all' : prevMode; }
+            if (prevMode === 'all') {
+                document.body.removeAttribute('data-mq-view-filter');
+                if (prevActive && mqGetSection(prevActive)) {
+                    mqSelectFilteredSection(prevActive, { scroll: false });
+                } else if (prevSummary) {
+                    mqShowSummaryPanel(prevSummary, { scroll: false });
+                } else {
+                    mqBrowseHome();
+                }
+            } else {
+                document.body.setAttribute('data-mq-view-filter', prevMode);
+                if (prevActive && mqGetSection(prevActive) &&
+                    mqSectionMatchesFilter(mqGetSection(prevActive), prevMode)) {
+                    mqSelectFilteredSection(prevActive, { scroll: false });
+                } else {
+                    mqEnsureFilteredSection(prevMode, false);
+                }
+            }
+            mqSyncSidebarNav();
+            mqApplySidebarNavOrder(prevMode);
+        }
+
+        function printReport() {
+            mqBeginPrintLayout();
+            window.print();
+        }
 
         function openSaveHelp() {
             var overlay = document.getElementById('save-help-overlay');
@@ -1082,6 +1485,18 @@
 
         function prepareDocumentForSave() {
             closeSaveHelp();
+            var active = mqActiveSectionId || document.body.getAttribute('data-mq-active-section') || '';
+            var summaryPanel = document.body.getAttribute('data-mq-summary-panel') || '';
+            mqParkAllSections();
+            if (active) {
+                document.body.setAttribute('data-mq-active-section', active);
+                document.body.removeAttribute('data-mq-summary-panel');
+            } else {
+                document.body.removeAttribute('data-mq-active-section');
+                if (summaryPanel) {
+                    document.body.setAttribute('data-mq-summary-panel', summaryPanel);
+                }
+            }
             syncViewFilterForSave();
             if (scoreViewAdjusted) {
                 document.body.setAttribute('data-mq-adjusted', '1');
@@ -1164,44 +1579,64 @@
                     if (links[j].getAttribute('href') === hash) { link = links[j]; break; }
                 }
                 setActiveOnLink(link);
+                var mode = document.body.getAttribute('data-mq-view-filter') || 'all';
+                var panel = mqSummaryPanelFromHash(hash);
+                if (panel && mode === 'all' && !document.body.getAttribute('data-mq-active-section')) {
+                    mqShowSummaryPanel(panel, { scroll: false });
+                    return;
+                }
+                var sectionId = mqSectionIdFromHash(hash);
+                if (sectionId) {
+                    mqSelectFilteredSection(sectionId, { scroll: false });
+                }
             }
             function initSidebarNavHighlight() {
                 var sb = document.querySelector('.sidebar');
-                if (!sb) { return; }
+                if (!sb || sb.getAttribute('data-mq-nav-bound') === '1') { return; }
+                sb.setAttribute('data-mq-nav-bound', '1');
                 sb.addEventListener('click', function (ev) {
                     var a = ev.target.closest ? ev.target.closest('a') : null;
                     if (!a) { return; }
                     var href = a.getAttribute('href') || '';
                     if (href.charAt(0) !== '#') { return; }
+                    var topNav = a.closest ? a.closest('.sidebar-top-nav') : null;
+                    if (topNav) {
+                        ev.preventDefault();
+                        clearSidebarNavActive();
+                        setActiveOnLink(a);
+                        mqShowSummaryPanel(topNav.getAttribute('data-mq-panel') || 'score', { scroll: true });
+                        return;
+                    }
+                    var li = a.closest ? a.closest('.sidebar-check-nav') : null;
+                    if (!li) { return; }
+                    ev.preventDefault();
                     clearSidebarNavActive();
                     setActiveOnLink(a);
+                    var mode = document.body.getAttribute('data-mq-view-filter') || 'all';
+                    mqSelectFilteredSection(mqNavSectionId(li), { scroll: true });
+                    mqApplySidebarNavOrder(mode);
                 });
                 window.addEventListener('hashchange', setActiveSidebarNavFromHash);
                 setActiveSidebarNavFromHash();
             }
             function initModelThumbDrag() {
-                var wraps = document.querySelectorAll('a.model-thumb-wrap[href], a.mq-skipped-drag[href]');
-                for (var i = 0; i < wraps.length; i++) {
-                    (function (wrap) {
-                        var img = wrap.querySelector('img');
-                        if (img) {
-                            img.setAttribute('draggable', 'false');
-                        }
-                        wrap.addEventListener('dragstart', function (e) {
-                            var rel = wrap.getAttribute('href');
-                            if (!rel) { return; }
-                            var fileUrl;
-                            try {
-                                fileUrl = new URL(rel, window.location.href).href;
-                            } catch (err) {
-                                fileUrl = rel;
-                            }
-                            e.dataTransfer.setData('text/uri-list', fileUrl);
-                            e.dataTransfer.setData('text/plain', fileUrl);
-                            e.dataTransfer.effectAllowed = 'copy';
-                        });
-                    })(wraps[i]);
-                }
+                document.addEventListener('dragstart', function (e) {
+                    var wrap = e.target.closest
+                        ? e.target.closest('a.model-thumb-wrap[href], a.mq-skipped-drag[href]')
+                        : null;
+                    if (!wrap) { return; }
+                    var rel = wrap.getAttribute('href');
+                    if (!rel) { return; }
+                    var fileUrl;
+                    try {
+                        fileUrl = new URL(rel, window.location.href).href;
+                    } catch (err) {
+                        fileUrl = rel;
+                    }
+                    e.dataTransfer.setData('text/uri-list', fileUrl);
+                    e.dataTransfer.setData('text/plain', fileUrl);
+                    e.dataTransfer.effectAllowed = 'copy';
+                });
             }
             function initSaveHelpDialog() {
                 var overlay = document.getElementById('save-help-overlay');
@@ -1228,28 +1663,60 @@
             function initReportUi() {
                 initPersistedReportState();
                 restoreViewFilterFromDom();
-                syncStatFilterOptions();
-                syncFlaggedFilterOptions();
+                // Bind sidebar clicks before the slow section registry walk so
+                // Score / Scan / Template / check links work on the first click.
+                var persistedSummary = document.body.getAttribute('data-mq-summary-panel') || 'score';
+                var persistedFilter = document.body.getAttribute('data-mq-view-filter');
+                var persistedActive = document.body.getAttribute('data-mq-active-section') || '';
+                initSidebarNavHighlight();
+                mqInitSectionRegistry();
                 mqInitSidebarNavOrder();
                 mqInitPassBaseline();
                 mqInitCategoryCards();
+                syncStatFilterOptions();
+                syncFlaggedFilterOptions();
                 var baked = document.querySelector('.mq-dashboard[data-mq-summary-baked="1"]');
                 var adjusted = document.body.getAttribute('data-mq-adjusted') === '1';
                 if (!adjusted) {
                     syncViewFilterOptions();
                 }
-                initSidebarNavHighlight();
                 initHealthCheckJumps();
                 initModelJumps();
                 initModelThumbDrag();
                 initSaveHelpDialog();
                 initBeforeUnloadWarning();
-                var persistedFilter = document.body.getAttribute('data-mq-view-filter');
-                var sel = document.getElementById('sidebar-view-filter');
-                var mode = sel ? sel.value : 'all';
-                if (persistedFilter || (mode && mode !== 'all')) {
-                    applyViewFilter();
+                window.addEventListener('beforeprint', mqBeginPrintLayout);
+                window.addEventListener('afterprint', mqEndPrintLayout);
+
+                // Prefer a check the user already clicked while init was running.
+                var opened = mqFlushPendingSection(true);
+                if (!opened) {
+                    var hashSection = mqSectionIdFromHash(window.location.hash || '');
+                    if (hashSection) {
+                        opened = mqSelectFilteredSection(hashSection, { scroll: false });
+                    }
                 }
+                if (!opened && persistedFilter && persistedFilter !== 'all') {
+                    var sel = document.getElementById('sidebar-view-filter');
+                    if (sel) { sel.value = persistedFilter; }
+                    applyViewFilter();
+                    opened = !!mqActiveSectionId;
+                }
+                if (!opened && persistedActive && mqGetSection(persistedActive)) {
+                    opened = !!mqSelectFilteredSection(persistedActive, { scroll: false });
+                }
+                if (!opened) {
+                    var hashPanel = mqSummaryPanelFromHash(window.location.hash || '');
+                    var currentPanel = document.body.getAttribute('data-mq-summary-panel') || '';
+                    if (hashPanel) {
+                        mqShowSummaryPanel(hashPanel, { scroll: false });
+                    } else if (currentPanel && currentPanel !== persistedSummary) {
+                        mqShowSummaryPanel(currentPanel, { scroll: false });
+                    } else {
+                        mqShowSummaryPanel(persistedSummary, { scroll: false });
+                    }
+                }
+                mqInitFinished = true;
                 if (adjusted || !baked) {
                     mqRebuildSummaryFromDom();
                     mqApplySummaryToDom();
@@ -1271,7 +1738,7 @@
         })();
     </script>
 </head>
-<body>
+<body data-mq-summary-panel="score">
 <div class="sidebar">
     <button class="button print-button" onclick="printReport()">Print This</button>
     <button class="button" type="button" id="save-help-button" style="display: none;" onclick="openSaveHelp()">Save</button>
@@ -1301,15 +1768,16 @@
         </select>
     </div>
     <ul>
-        <li><a href="#summary" id="mq-sidebar-score-link">Score</a></li>
-        <li><a href="#statistics">Scan Information</a></li>
+        <li class="sidebar-top-nav" data-mq-panel="score"><a href="#summary" id="mq-sidebar-score-link">Score</a></li>
+        <li class="sidebar-top-nav" data-mq-panel="statistics"><a href="#statistics">Scan Information</a></li>
         {% if template_information_div %}
-        <li><a href="#template-information">Template Information</a></li>
+        <li class="sidebar-top-nav" data-mq-panel="template"><a href="#template-information">Template Information</a></li>
         {% endif %}
         <hr>
         {% for section in check_sections %}
         <li title="{{ section.category }}" class="sidebar-check-nav wrapper-{{ section.class }}"
             data-mq-section-id="wrapper-{{ section.class }}"
+            data-mq-issue-count="{{ section.count }}"
             data-mq-sidebar-stat="{{ 'ERROR' if section.stat_type == 'ERRORS' else ('INFO' if section.stat_type == 'INFO' else 'WARNING') }}"
             data-mq-category="{{ section.category | e }}">
             <a href="#{{ section.class }}">{{ section.name }} ({{ section.count }})</a>
@@ -1320,23 +1788,29 @@
 
 <a id="summary"></a>
 <div class="container main-content">
-    <div class="summary">
-        <div id="summary-section">
+    <div class="summary" id="summary-section">
+        <div class="mq-summary-panel" data-mq-panel="score">
             {{ summary_div }}
+        </div>
+        <div class="mq-summary-panel" data-mq-panel="statistics">
             {{ statistics_div }}
+        </div>
+        {% if template_information_div %}
+        <div class="mq-summary-panel" data-mq-panel="template">
             {{ template_information_div | safe }}
         </div>
+        {% endif %}
     </div>
 
-    {% for section in check_sections %}
-    <a id="{{ section.class }}"></a>
+    {% macro render_check_section(section) -%}
+    <a id="{{ section.class }}" class="mq-check-anchor"></a>
     <div class="check-section-wrapper" id="wrapper-{{ section.class }}"
          data-mq-section-stat="{{ 'ERROR' if section.stat_type == 'ERRORS' else ('INFO' if section.stat_type == 'INFO' else 'WARNING') }}"
          data-mq-category="{{ section.category | e }}"
          data-mq-check-name="{{ section.model_check_name | e }}">
         <div class="check-header">
             <div class="check-title">
-                <h2 id="{{ section.class }}"><span class="bold-text">{% if section.stat_type == 'INFO' %}INFORMATION{% elif section.stat_type == 'ERRORS' %}ERRORS{% else %}WARNINGS{% endif %}:</span> {{ section.count }} {{ section.entity_word }}{% if section.count != 1 %}s{% endif %} with {{ section.name }}</h2>
+                <h2 id="heading-{{ section.class }}"><span class="bold-text">{% if section.stat_type == 'INFO' %}INFORMATION{% elif section.stat_type == 'ERRORS' %}ERRORS{% else %}WARNINGS{% endif %}:</span> {{ section.count }} {{ section.entity_word }}{% if section.count != 1 %}s{% endif %} with {{ section.name }}</h2>
                 <p><strong>Category:</strong> {{ section.category }}</p>
                 <p>{{ section.description }}</p>
                 <div class="why">{{ section.why | safe }}</div>
@@ -1347,7 +1821,7 @@
                 {% endif %}
             </div>
         </div>
-        <div class="check-section {{ section.class }}" id="{{ section.class }}">
+        <div class="check-section {{ section.class }}" id="body-{{ section.class }}">
             {% for file in section.files %}
             <div class="file-row">
             <div class="file-list mq-issue-row {{ file.stat }}{{ (file.desc or '').replace(' ', '').replace(':', '\\:').replace('.', '\\.') }}"
@@ -1400,7 +1874,16 @@
             {% endfor %}
         </div>
     </div>
+    {%- endmacro %}
+
+    {% for section in check_sections %}
+    <template id="tpl-{{ section.class }}" class="mq-section-store"
+              data-mq-section-id="wrapper-{{ section.class }}">
+    {{ render_check_section(section) }}
+    </template>
     {% endfor %}
+
+    <p id="mq-filter-hint" class="mq-info-hint" hidden>Select a check in the sidebar to load its details.</p>
 </div>
 
 <div class="save-help-overlay" id="save-help-overlay" role="dialog" aria-modal="true" aria-labelledby="save-help-title">
