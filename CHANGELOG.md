@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2926-07-19 - v1.12.0
+
+- **Optimized report**: Major improvement to report performance.
+
 ## 2026-07-19 — v1.11.181
 
 - **Filter view**: Sort by issue count is hidden when fewer than two warning/error checks remain.
