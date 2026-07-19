@@ -700,6 +700,7 @@ PERFORMANCE_TABLE_SECTIONS: list[tuple[str, list[tuple[str, str | None]]]] = [
         [
             ("Sheet metal parts", "_SHEETMETAL_PARTS"),
             ("Multibody parts", "_MULTIBODY_PARTS"),
+            ("Parts with Freeform Features", "_FREEFORM_PARTS"),
             ("Skeleton parts", "_SKELETON_MODELS"),
             ("Bulk parts", "_BULK_PARTS"),
             ("Non solid parts", "_NON_SOLID_PARTS"),
@@ -761,6 +762,7 @@ class PerformanceMetrics:
     simprep_unique_count: int = 0
     sheetmetal_parts: int = 0
     multibody_parts: int = 0
+    freeform_parts: int = 0
     skeleton_models: int = 0
     duplicate_models: int = 0
     bulk_parts: int = 0
@@ -929,6 +931,15 @@ def _is_sheetmetal_part(file_element: ET.Element) -> bool:
     return _find_check(file_element, "SHTMTL_THICK") is not None
 
 
+def _has_freeform_features(file_element: ET.Element) -> bool:
+    """True when the FREEFORM INFO check reports one or more features."""
+    check = _find_check(file_element, "FREEFORM")
+    if check is None or _check_hidden_from_report(check):
+        return False
+    count = _parse_int_metric(_check_ans_text(file_element, "FREEFORM"))
+    return count is not None and count > 0
+
+
 def _body_info_item_state(info2: str) -> str | None:
     """``BODY_INFO`` ``info2`` tail after ``:`` is ``Type/State/Construction``."""
     text = (info2 or "").strip()
@@ -1049,6 +1060,8 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
                 metrics.sheetmetal_parts += 1
             if _is_multibody_part(file_element):
                 metrics.multibody_parts += 1
+            if _has_freeform_features(file_element):
+                metrics.freeform_parts += 1
             if _is_non_solid_part(file_element):
                 metrics.non_solid_parts += 1
         elif pro_type == "ASM":
@@ -1288,6 +1301,7 @@ def performance_metrics_answers(metrics: PerformanceMetrics) -> dict[str, str]:
         "_SIMPREP_REPRESENTATIONS": str(metrics.simprep_unique_count),
         "_SHEETMETAL_PARTS": str(metrics.sheetmetal_parts),
         "_MULTIBODY_PARTS": str(metrics.multibody_parts),
+        "_FREEFORM_PARTS": str(metrics.freeform_parts),
         "_SKELETON_MODELS": str(metrics.skeleton_models),
         "_DUPLICATE_MODELS": str(metrics.duplicate_models),
         "_BULK_PARTS": str(metrics.bulk_parts),
@@ -1342,6 +1356,9 @@ def _resolve_performance_value(answers: dict[str, str], key: str | None) -> tupl
     if key == "_MULTIBODY_PARTS":
         val = answers.get(key)
         return (val if val is not None else "—", "MULTIBODY_MODEL")
+    if key == "_FREEFORM_PARTS":
+        val = answers.get(key)
+        return (val if val is not None else "—", "FREEFORM")
     if key == "_SKELETON_MODELS":
         val = answers.get(key)
         return (val if val is not None else "—", None)

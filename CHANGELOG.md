@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-19 — v1.12.1
+
+- **Model Type Breakdown**: added Parts with Freeform Features using positive FREEFORM information results.
+
 ## 2026-07-19 — v1.12.0
 
 - New version
