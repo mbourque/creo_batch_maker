@@ -700,7 +700,7 @@ PERFORMANCE_TABLE_SECTIONS: list[tuple[str, list[tuple[str, str | None]]]] = [
         [
             ("Sheet metal parts", "_SHEETMETAL_PARTS"),
             ("Multibody parts", "_MULTIBODY_PARTS"),
-            ("Parts with Freeform Features", "_FREEFORM_PARTS"),
+            ("Parts with freeform features", "_FREEFORM_PARTS"),
             ("Skeleton parts", "_SKELETON_MODELS"),
             ("Bulk parts", "_BULK_PARTS"),
             ("Non solid parts", "_NON_SOLID_PARTS"),
