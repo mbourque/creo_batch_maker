@@ -69,8 +69,18 @@
             overflow: hidden;
             box-sizing: border-box;
         }
+        /* Keep body in the DOM (no display:none) so scroll position is preserved. */
         body[data-mq-sidebar="collapsed"] .sidebar-body {
-            display: none;
+            visibility: hidden;
+            pointer-events: none;
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: var(--mq-sidebar-width);
+            height: 100%;
+            overflow: hidden;
+            box-sizing: content-box;
+            padding: 10px;
         }
         body[data-mq-sidebar="collapsed"] .sidebar-edge {
             display: block;
@@ -81,6 +91,7 @@
             border-radius: 8px;
             box-sizing: border-box;
             cursor: ew-resize;
+            z-index: 1;
         }
         /* Peek: overlay expand — content stays full-width under the rail layout. */
         body[data-mq-sidebar="collapsed"][data-mq-sidebar-peek="1"] .sidebar {
@@ -93,7 +104,13 @@
             box-shadow: 8px 0 28px rgba(15, 23, 42, 0.22);
         }
         body[data-mq-sidebar="collapsed"][data-mq-sidebar-peek="1"] .sidebar-body {
-            display: block;
+            visibility: visible;
+            pointer-events: auto;
+            position: static;
+            width: auto;
+            height: auto;
+            overflow: visible;
+            padding: 0;
         }
         body[data-mq-sidebar="collapsed"][data-mq-sidebar-peek="1"] .sidebar-edge {
             display: none;
@@ -363,6 +380,7 @@
         var mqInitFinished = false;
         var MQ_SIDEBAR_BREAKPOINT = 1100;
         var mqSidebarPeekTimer = null;
+        var mqSidebarScrollTop = 0;
         var MQ_CATEGORY_FILTER_ORDER = [
             'Consistency',
             'Design Intent Strength',
@@ -377,6 +395,26 @@
             return document.body.getAttribute('data-mq-sidebar') === 'collapsed';
         }
 
+        function mqSidebarScrollEl() {
+            return document.getElementById('mq-sidebar');
+        }
+
+        function mqSidebarSaveScroll() {
+            var sb = mqSidebarScrollEl();
+            if (sb) { mqSidebarScrollTop = sb.scrollTop; }
+        }
+
+        function mqSidebarRestoreScroll() {
+            var sb = mqSidebarScrollEl();
+            if (!sb) { return; }
+            var y = mqSidebarScrollTop || 0;
+            sb.scrollTop = y;
+            requestAnimationFrame(function () {
+                sb.scrollTop = y;
+                requestAnimationFrame(function () { sb.scrollTop = y; });
+            });
+        }
+
         function mqSidebarClearPeekTimer() {
             if (mqSidebarPeekTimer) {
                 clearTimeout(mqSidebarPeekTimer);
@@ -386,6 +424,9 @@
 
         function mqSidebarEndPeek() {
             mqSidebarClearPeekTimer();
+            if (document.body.getAttribute('data-mq-sidebar-peek') === '1') {
+                mqSidebarSaveScroll();
+            }
             document.body.removeAttribute('data-mq-sidebar-peek');
         }
 
@@ -393,6 +434,7 @@
             if (!mqSidebarIsCollapsed()) { return; }
             mqSidebarClearPeekTimer();
             document.body.setAttribute('data-mq-sidebar-peek', '1');
+            mqSidebarRestoreScroll();
         }
 
         function mqSidebarScheduleEndPeek() {
@@ -400,9 +442,9 @@
             mqSidebarPeekTimer = setTimeout(function () {
                 mqSidebarPeekTimer = null;
                 if (!mqSidebarIsCollapsed()) { return; }
-                var sb = document.getElementById('mq-sidebar');
+                var sb = mqSidebarScrollEl();
                 if (sb && sb.contains(document.activeElement)) { return; }
-                document.body.removeAttribute('data-mq-sidebar-peek');
+                mqSidebarEndPeek();
             }, 160);
         }
 
@@ -412,10 +454,17 @@
 
         function mqSidebarApplyMode(mode, opts) {
             opts = opts || {};
-            mode = mode === 'collapsed' ? 'collapsed' : 'expanded';
-            document.body.setAttribute('data-mq-sidebar', mode);
-            if (mode === 'expanded' || opts.clearPeek) {
+            var next = mode === 'collapsed' ? 'collapsed' : 'expanded';
+            var prev = document.body.getAttribute('data-mq-sidebar') || 'expanded';
+            if (next === 'collapsed' && prev !== 'collapsed') {
+                mqSidebarSaveScroll();
+            }
+            document.body.setAttribute('data-mq-sidebar', next);
+            if (next === 'expanded' || opts.clearPeek) {
                 mqSidebarEndPeek();
+            }
+            if (next === 'expanded') {
+                mqSidebarRestoreScroll();
             }
         }
 
@@ -424,10 +473,16 @@
         }
 
         function initCollapsibleSidebar() {
-            var sb = document.getElementById('mq-sidebar');
+            var sb = mqSidebarScrollEl();
             if (!sb || sb.getAttribute('data-mq-collapse-bound') === '1') { return; }
             sb.setAttribute('data-mq-collapse-bound', '1');
             mqSidebarSyncFromViewport();
+
+            sb.addEventListener('scroll', function () {
+                if (!mqSidebarIsCollapsed() || document.body.getAttribute('data-mq-sidebar-peek') === '1') {
+                    mqSidebarScrollTop = sb.scrollTop;
+                }
+            }, { passive: true });
 
             sb.addEventListener('mouseenter', function () {
                 if (mqSidebarIsCollapsed()) { mqSidebarStartPeek(); }
