@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-22 — v1.12.4
+
+- **Report**: sidebar auto-collapses on narrow windows to a thin hover strip; hover peeks it as an overlay (no toggle icon on wide screens).
+
 ## 2026-07-19 — v1.12.3
 
 - **Report**: model thumbnail and name links show a “Drag this into Creo” hover tip again.

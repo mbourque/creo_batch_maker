@@ -12,29 +12,94 @@
             margin: 0;
             padding: 5px;
         }
+        :root {
+            --mq-sidebar-width: 365px;
+            --mq-sidebar-rail: 14px;
+            --mq-sidebar-left: 5px;
+            /* Match pre-collapse layout: sidebar width + padding (content-box) + left offset. */
+            --mq-sidebar-dock-margin: 395px;
+            --mq-sidebar-dock-max: calc(100% - 435px);
+            --mq-sidebar-rail-margin: calc(var(--mq-sidebar-left) + var(--mq-sidebar-rail) + 15px);
+            --mq-sidebar-rail-max: calc(100% - var(--mq-sidebar-rail) - 30px);
+        }
         .container {
-            margin-left: 395px;
-            max-width: calc(100% - 435px);
+            margin-left: var(--mq-sidebar-dock-margin);
+            max-width: var(--mq-sidebar-dock-max);
             background: #fff;
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             color: #1a1a1a;
             font-size: 0.95rem;
+            transition: margin-left 0.2s ease, max-width 0.2s ease;
         }
         .container > h1 { font-size: 1.75rem; }
         .sidebar {
             position: fixed;
             top: 5px;
-            left: 5px;
-            width: 365px;
+            left: var(--mq-sidebar-left);
+            width: var(--mq-sidebar-width);
+            height: 100%;
             padding: 10px;
             background: #fff;
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            height: 100%;
             overflow-y: auto;
             color: #1a1a1a;
+            z-index: 40;
+            box-sizing: content-box;
+            transition: width 0.2s ease, padding 0.2s ease, box-shadow 0.2s ease;
+        }
+        .sidebar-body {
+            min-width: 0;
+        }
+        /* Hover rail only when auto-collapsed on a narrow window. */
+        .sidebar-edge {
+            display: none;
+        }
+        body[data-mq-sidebar="collapsed"] .container {
+            margin-left: var(--mq-sidebar-rail-margin);
+            max-width: var(--mq-sidebar-rail-max);
+        }
+        body[data-mq-sidebar="collapsed"] .sidebar {
+            width: var(--mq-sidebar-rail);
+            height: calc(100% - 10px);
+            max-height: calc(100% - 10px);
+            padding: 0;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+        body[data-mq-sidebar="collapsed"] .sidebar-body {
+            display: none;
+        }
+        body[data-mq-sidebar="collapsed"] .sidebar-edge {
+            display: block;
+            position: absolute;
+            inset: 0;
+            background: #e8ecf1;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            box-sizing: border-box;
+            cursor: ew-resize;
+        }
+        /* Peek: overlay expand — content stays full-width under the rail layout. */
+        body[data-mq-sidebar="collapsed"][data-mq-sidebar-peek="1"] .sidebar {
+            width: var(--mq-sidebar-width);
+            height: 100%;
+            padding: 10px;
+            overflow-y: auto;
+            box-sizing: content-box;
+            z-index: 60;
+            box-shadow: 8px 0 28px rgba(15, 23, 42, 0.22);
+        }
+        body[data-mq-sidebar="collapsed"][data-mq-sidebar-peek="1"] .sidebar-body {
+            display: block;
+        }
+        body[data-mq-sidebar="collapsed"][data-mq-sidebar-peek="1"] .sidebar-edge {
+            display: none;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .container, .sidebar { transition: none; }
         }
         .sidebar a { display: block; padding: 5px 0; color: #007BFF; text-decoration: none; }
         .sidebar a:hover { text-decoration: underline; }
@@ -280,7 +345,7 @@
         .save-help-actions .button { margin: 0; }
         @media print {
             .save-help-overlay { display: none !important; }
-            .sidebar, .hide-button, .check-buttons, .print-button, .button { display: none; }
+            .sidebar, .sidebar-edge, .hide-button, .check-buttons, .print-button, .button { display: none; }
             body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: #1a1a1a; }
             .container { margin: 0; max-width: none; box-shadow: none; font-size: 0.95rem; }
         }
@@ -296,6 +361,8 @@
         var mqActiveSectionId = '';
         var mqPendingSectionId = '';
         var mqInitFinished = false;
+        var MQ_SIDEBAR_BREAKPOINT = 1100;
+        var mqSidebarPeekTimer = null;
         var MQ_CATEGORY_FILTER_ORDER = [
             'Consistency',
             'Design Intent Strength',
@@ -305,6 +372,88 @@
             'MBD Readiness'
         ];
         var MQ_MODEL_FILTER_ORDER = ['PRT', 'ASM', 'DRW'];
+
+        function mqSidebarIsCollapsed() {
+            return document.body.getAttribute('data-mq-sidebar') === 'collapsed';
+        }
+
+        function mqSidebarClearPeekTimer() {
+            if (mqSidebarPeekTimer) {
+                clearTimeout(mqSidebarPeekTimer);
+                mqSidebarPeekTimer = null;
+            }
+        }
+
+        function mqSidebarEndPeek() {
+            mqSidebarClearPeekTimer();
+            document.body.removeAttribute('data-mq-sidebar-peek');
+        }
+
+        function mqSidebarStartPeek() {
+            if (!mqSidebarIsCollapsed()) { return; }
+            mqSidebarClearPeekTimer();
+            document.body.setAttribute('data-mq-sidebar-peek', '1');
+        }
+
+        function mqSidebarScheduleEndPeek() {
+            mqSidebarClearPeekTimer();
+            mqSidebarPeekTimer = setTimeout(function () {
+                mqSidebarPeekTimer = null;
+                if (!mqSidebarIsCollapsed()) { return; }
+                var sb = document.getElementById('mq-sidebar');
+                if (sb && sb.contains(document.activeElement)) { return; }
+                document.body.removeAttribute('data-mq-sidebar-peek');
+            }, 160);
+        }
+
+        function mqSidebarDesiredMode() {
+            return window.innerWidth < MQ_SIDEBAR_BREAKPOINT ? 'collapsed' : 'expanded';
+        }
+
+        function mqSidebarApplyMode(mode, opts) {
+            opts = opts || {};
+            mode = mode === 'collapsed' ? 'collapsed' : 'expanded';
+            document.body.setAttribute('data-mq-sidebar', mode);
+            if (mode === 'expanded' || opts.clearPeek) {
+                mqSidebarEndPeek();
+            }
+        }
+
+        function mqSidebarSyncFromViewport() {
+            mqSidebarApplyMode(mqSidebarDesiredMode(), { clearPeek: true });
+        }
+
+        function initCollapsibleSidebar() {
+            var sb = document.getElementById('mq-sidebar');
+            if (!sb || sb.getAttribute('data-mq-collapse-bound') === '1') { return; }
+            sb.setAttribute('data-mq-collapse-bound', '1');
+            mqSidebarSyncFromViewport();
+
+            sb.addEventListener('mouseenter', function () {
+                if (mqSidebarIsCollapsed()) { mqSidebarStartPeek(); }
+            });
+            sb.addEventListener('mouseleave', function () {
+                if (mqSidebarIsCollapsed()) { mqSidebarScheduleEndPeek(); }
+            });
+            sb.addEventListener('focusin', function () {
+                if (mqSidebarIsCollapsed()) { mqSidebarStartPeek(); }
+            });
+            sb.addEventListener('focusout', function (ev) {
+                if (!mqSidebarIsCollapsed()) { return; }
+                var next = ev.relatedTarget;
+                if (next && sb.contains(next)) { return; }
+                mqSidebarScheduleEndPeek();
+            });
+
+            var resizeTimer = null;
+            window.addEventListener('resize', function () {
+                if (resizeTimer) { clearTimeout(resizeTimer); }
+                resizeTimer = setTimeout(function () {
+                    resizeTimer = null;
+                    mqSidebarSyncFromViewport();
+                }, 120);
+            });
+        }
 
         function isCategoryFilterMode(mode) {
             return MQ_CATEGORY_FILTER_ORDER.indexOf(mode) !== -1;
@@ -896,6 +1045,7 @@
             }
             mqSyncSidebarNav();
             mqApplySidebarNavOrder(mode);
+            mqSidebarEndPeek();
         }
 
         function setViewFilterAll() {
@@ -1605,6 +1755,7 @@
                         clearSidebarNavActive();
                         setActiveOnLink(a);
                         mqShowSummaryPanel(topNav.getAttribute('data-mq-panel') || 'score', { scroll: true });
+                        mqSidebarEndPeek();
                         return;
                     }
                     var li = a.closest ? a.closest('.sidebar-check-nav') : null;
@@ -1615,6 +1766,7 @@
                     var mode = document.body.getAttribute('data-mq-view-filter') || 'all';
                     mqSelectFilteredSection(mqNavSectionId(li), { scroll: true });
                     mqApplySidebarNavOrder(mode);
+                    mqSidebarEndPeek();
                 });
                 window.addEventListener('hashchange', setActiveSidebarNavFromHash);
                 setActiveSidebarNavFromHash();
@@ -1668,6 +1820,7 @@
                 var persistedSummary = document.body.getAttribute('data-mq-summary-panel') || 'score';
                 var persistedFilter = document.body.getAttribute('data-mq-view-filter');
                 var persistedActive = document.body.getAttribute('data-mq-active-section') || '';
+                initCollapsibleSidebar();
                 initSidebarNavHighlight();
                 mqInitSectionRegistry();
                 mqInitSidebarNavOrder();
@@ -1738,8 +1891,9 @@
         })();
     </script>
 </head>
-<body data-mq-summary-panel="score">
-<div class="sidebar">
+<body data-mq-summary-panel="score" data-mq-sidebar="expanded">
+<div class="sidebar" id="mq-sidebar">
+    <div class="sidebar-body">
     <button class="button print-button" onclick="printReport()">Print This</button>
     <button class="button" type="button" id="save-help-button" style="display: none;" onclick="openSaveHelp()">Save</button>
     <div class="sidebar-filter-wrap" id="sidebar-filter-wrap">
@@ -1784,6 +1938,8 @@
         </li>
         {% endfor %}
     </ul>
+    </div>
+    <div class="sidebar-edge" id="mq-sidebar-edge" title="Hover to show navigation" aria-hidden="true"></div>
 </div>
 
 <a id="summary"></a>
