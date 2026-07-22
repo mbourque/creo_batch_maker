@@ -43,7 +43,6 @@ call :require version || exit /b 1
 call :require CHANGELOG.md || exit /b 1
 call :require README.md || exit /b 1
 call :require_dir config || exit /b 1
-call :require_dir models || exit /b 1
 
 if exist "%ZIP%" (
     echo Removing existing %ZIP%...
@@ -55,7 +54,7 @@ if exist "%ZIP%" (
 )
 
 echo Creating %ZIP%...
-tar -a -cf "%ZIP%" main.exe kill.bat purge_cache.ps1 model_checks.xml report_template.html.j2 version CHANGELOG.md README.md config models
+tar -a -cf "%ZIP%" main.exe kill.bat purge_cache.ps1 model_checks.xml report_template.html.j2 version CHANGELOG.md README.md config
 if errorlevel 1 (
     echo ERROR: Failed to create zip.
     exit /b 1
