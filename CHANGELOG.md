@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-25 — v1.12.6
+
+- **Score**: grading scale and “How the grade works” are merged into one card; display-only E and F grades are listed (scoring still uses A–D only).
+
 ## 2026-07-25 — v1.12.5
 
 - **Thumbnails**: only models that already have ModelCHECK XML (`*.p.xml` / `*.a.xml` / `*.d.xml`) are batched for images.

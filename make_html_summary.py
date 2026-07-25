@@ -218,6 +218,9 @@ _MQ_DASHBOARD_CSS = """
 .mq-dot-b { background: #65a30d; }
 .mq-dot-c { background: #ca8a04; }
 .mq-dot-d { background: #dc2626; }
+.mq-dot-e { background: #dc2626; }
+.mq-dot-f { background: #dc2626; }
+.mq-scale-note { font-size: 0.82rem; line-height: 1.45; color: #475569; margin: 0 0 12px 0; }
 .mq-right { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
 @media (max-width: 700px) { .mq-right { grid-template-columns: 1fr; } }
 .mq-cat-card { background: #fff; border-radius: 12px; padding: 16px 16px 14px;
@@ -236,11 +239,6 @@ _MQ_DASHBOARD_CSS = """
 .mq-legend { font-size: 0.78rem; color: #334155; display: flex; flex-wrap: wrap; gap: 10px 14px; }
 .mq-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .mq-sq { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
-.mq-rationale { background: #fff; border-radius: 12px; padding: 18px 20px;
-  box-shadow: 0 1px 3px rgba(0,0,0,.08); font-size: 0.88rem; line-height: 1.5; color: #334155; }
-.mq-rationale h3 { margin: 0 0 10px 0; font-size: 1rem; color: #0f172a; }
-.mq-rationale ul { margin: 8px 0 0 1.1em; padding: 0; }
-.mq-rationale li { margin-bottom: 8px; }
 </style>"""
 
 
@@ -284,21 +282,14 @@ def generate_adjusted_summary_shell(
         </div>
         <div class="mq-scale">
           <div class="mq-scale-title">Grading scale</div>
-          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-a"></span><div><strong>A</strong> — Warnings under 5% of checks, no errors.</div></div>
-          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-b"></span><div><strong>B</strong> — Moderate warnings (5–25% of checks), no errors.</div></div>
-          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-c"></span><div><strong>C</strong> — Higher warnings (&gt;25% of checks), no errors.</div></div>
-          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-d"></span><div><strong>D</strong> — Any remaining errors.</div></div>
+          <p class="mq-scale-note">PASS check totals stay fixed from the batch. Grades use PASS plus the WARNING and ERROR rows still shown; remove sections or models to update the score.</p>
+          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-a"></span><div><strong>Grade A:</strong> Warnings under 5% of checks (PASS + visible issues), no errors.</div></div>
+          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-b"></span><div><strong>Grade B:</strong> Warnings are 5% to 25% of checks, no errors.</div></div>
+          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-c"></span><div><strong>Grade C:</strong> Warnings are over 25% of checks, no errors.</div></div>
+          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-d"></span><div><strong>Grade D:</strong> Any remaining errors.</div></div>
+          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-e"></span><div><strong>Grade E:</strong> Too many Errors</div></div>
+          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-f"></span><div><strong>Grade F:</strong> Too many Errors and Warnings</div></div>
         </div>
-      </div>
-      <div class="mq-rationale">
-        <h3>How the grade works</h3>
-        <p>PASS check totals stay fixed from the batch. Grades use PASS plus the WARNING and ERROR rows still shown; remove sections or models to update the score.</p>
-        <ul>
-          <li><strong>Grade A:</strong> Warnings under 5% of checks (PASS + visible issues), no errors.</li>
-          <li><strong>Grade B:</strong> Warnings are 5% to 25% of checks, no errors.</li>
-          <li><strong>Grade C:</strong> Warnings are over 25% of checks, no errors.</li>
-          <li><strong>Grade D:</strong> Any remaining errors.</li>
-        </ul>
       </div>
     </div>
     <div class="mq-right" id="mq-categories">
@@ -420,21 +411,14 @@ def generate_summary_div(master_xml_path, model_checks_xml_path):
         </div>
         <div class="mq-scale">
           <div class="mq-scale-title">Grading scale</div>
-          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-a"></span><div><strong>A</strong> — Very high proportion of PASS checks, under 5% warnings, no errors.</div></div>
-          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-b"></span><div><strong>B</strong> — Moderate warnings (5–25%), no errors.</div></div>
-          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-c"></span><div><strong>C</strong> — Higher warnings (&gt;25%), no errors.</div></div>
-          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-d"></span><div><strong>D</strong> — Any errors; errors must be fixed.</div></div>
+          <p class="mq-scale-note">PASS check totals stay fixed from the batch. Grades use PASS plus the WARNING and ERROR rows still shown; remove sections or models to update the score.</p>
+          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-a"></span><div><strong>Grade A:</strong> Warnings under 5% of checks (PASS + visible issues), no errors.</div></div>
+          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-b"></span><div><strong>Grade B:</strong> Warnings are 5% to 25% of checks, no errors.</div></div>
+          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-c"></span><div><strong>Grade C:</strong> Warnings are over 25% of checks, no errors.</div></div>
+          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-d"></span><div><strong>Grade D:</strong> Any remaining errors.</div></div>
+          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-e"></span><div><strong>Grade E:</strong> Too many Errors</div></div>
+          <div class="mq-scale-row"><span class="mq-scale-dot mq-dot-f"></span><div><strong>Grade F:</strong> Too many Errors and Warnings</div></div>
         </div>
-      </div>
-      <div class="mq-rationale">
-        <h3>How the grade is determined</h3>
-        <p>The grade for each category uses the proportion of PASS, WARNING, and ERROR checks:</p>
-        <ul>
-          <li><strong>Grade A:</strong> Very high proportion of PASS, minimal warnings (under 5%), no errors.</li>
-          <li><strong>Grade B:</strong> Moderate warnings (5% to 25%), no errors.</li>
-          <li><strong>Grade C:</strong> Higher warnings (over 25%), no errors.</li>
-          <li><strong>Grade D:</strong> Any errors — critical and must be fixed.</li>
-        </ul>
       </div>
     </div>
     <div class="mq-right">
