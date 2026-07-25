@@ -422,6 +422,14 @@ def _modelcheck_expected_output_basenames(model_path: Path) -> list[str]:
     return [f"{stem}.{letter}.xml", f"{stem}.{letter}.html"]
 
 
+def _modelcheck_xml_basename(model_name: str) -> str | None:
+    """``part.prt`` / ``part.prt.2`` → ``part.p.xml`` (None when not a Creo model name)."""
+    for basename in _modelcheck_expected_output_basenames(Path(model_name)):
+        if basename.lower().endswith(".xml"):
+            return basename
+    return None
+
+
 def _glob_toplevel_file_names(
     directory: Path, globs: tuple[str, ...]
 ) -> tuple[str, ...]:
@@ -1644,11 +1652,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         ):
             if not self._wizard_thumbnails_phase_applicable(phase, s):
                 continue
-            extensions = self._wizard_thumbnails_phase_scan_extensions(phase)
-            if not extensions:
-                continue
-            latest = self._scan_models_non_recursive(d, extensions=extensions)
-            paths = self._get_latest_model_files(latest)
+            paths = self._wizard_thumbnails_phase_eligible_models(d, phase)
             if not paths:
                 continue
             pending = self._filter_models_missing_task_output(
@@ -1701,25 +1705,12 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self, working_dir: Path, phase: str
     ) -> tuple[int, int]:
         """Return (total models, pending models) for one thumbnail sub-phase."""
-        wd_str = str(working_dir)
-        if not self._wizard_thumbnails_phase_applicable(phase, wd_str):
-            return 0, 0
-        extensions = self._wizard_thumbnails_phase_scan_extensions(phase)
-        if not extensions:
-            return 0, 0
-        try:
-            wd = working_dir.expanduser().resolve()
-        except OSError:
-            return 0, 0
-        if not wd.is_dir():
-            return 0, 0
-        latest = self._scan_models_non_recursive(wd, extensions=extensions)
-        paths = self._get_latest_model_files(latest)
+        paths = self._wizard_thumbnails_phase_eligible_models(working_dir, phase)
         if not paths:
             return 0, 0
         pending = self._filter_models_missing_task_output(
             paths,
-            wd,
+            working_dir,
             self._wizard_thumbnails_phase_runner_task_kind(phase),
         )
         return len(paths), len(pending)
@@ -1759,13 +1750,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
     def _wizard_thumbnails_phase_pending_paths(
         self, working_dir: Path, phase: str
     ) -> list[Path]:
-        if not self._wizard_thumbnails_phase_applicable(phase, str(working_dir)):
-            return []
-        extensions = self._wizard_thumbnails_phase_scan_extensions(phase)
-        if not extensions:
-            return []
-        latest = self._scan_models_non_recursive(working_dir, extensions=extensions)
-        paths = self._get_latest_model_files(latest)
+        paths = self._wizard_thumbnails_phase_eligible_models(working_dir, phase)
         if not paths:
             return []
         return self._filter_models_missing_task_output(
@@ -1790,11 +1775,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return None
         if not self._wizard_thumbnails_phase_applicable(phase_key, wd_str):
             return None
-        extensions = self._wizard_thumbnails_phase_scan_extensions(phase_key)
-        if not extensions:
-            return None
-        latest = self._scan_models_non_recursive(wd, extensions=extensions)
-        paths = self._get_latest_model_files(latest)
+        paths = self._wizard_thumbnails_phase_eligible_models(wd, phase_key)
         total = len(paths)
         if total <= 0:
             return None
@@ -1896,41 +1877,23 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         """First thumbnail sub-phase that still has models missing output."""
         wd_str = str(working_dir)
         if self._wizard_thumbnails_needs_part_phase(wd_str):
-            extensions = self._wizard_thumbnails_phase_scan_extensions(
-                _WIZARD_THUMBNAILS_PHASE_PART
+            pending = self._wizard_thumbnails_phase_pending_paths(
+                working_dir, _WIZARD_THUMBNAILS_PHASE_PART
             )
-            if extensions:
-                latest = self._scan_models_non_recursive(working_dir, extensions=extensions)
-                paths = self._get_latest_model_files(latest)
-                pending = self._filter_models_missing_task_output(
-                    paths, working_dir, "jpeg3d_part"
-                )
-                if pending:
-                    return _WIZARD_THUMBNAILS_PHASE_PART
+            if pending:
+                return _WIZARD_THUMBNAILS_PHASE_PART
         if self._wizard_thumbnails_needs_assembly_phase(wd_str):
-            extensions = self._wizard_thumbnails_phase_scan_extensions(
-                _WIZARD_THUMBNAILS_PHASE_ASSEMBLY
+            pending = self._wizard_thumbnails_phase_pending_paths(
+                working_dir, _WIZARD_THUMBNAILS_PHASE_ASSEMBLY
             )
-            if extensions:
-                latest = self._scan_models_non_recursive(working_dir, extensions=extensions)
-                paths = self._get_latest_model_files(latest)
-                pending = self._filter_models_missing_task_output(
-                    paths, working_dir, "jpeg3d_asm"
-                )
-                if pending:
-                    return _WIZARD_THUMBNAILS_PHASE_ASSEMBLY
+            if pending:
+                return _WIZARD_THUMBNAILS_PHASE_ASSEMBLY
         if self._wizard_thumbnails_needs_drawing_phase(wd_str) and self._drawing_thumbnails_applicable():
-            extensions = self._wizard_thumbnails_phase_scan_extensions(
-                _WIZARD_THUMBNAILS_PHASE_2D
+            pending = self._wizard_thumbnails_phase_pending_paths(
+                working_dir, _WIZARD_THUMBNAILS_PHASE_2D
             )
-            if extensions:
-                latest = self._scan_models_non_recursive(working_dir, extensions=extensions)
-                paths = self._get_latest_model_files(latest)
-                pending = self._filter_models_missing_task_output(
-                    paths, working_dir, "jpeg2d"
-                )
-                if pending:
-                    return _WIZARD_THUMBNAILS_PHASE_2D
+            if pending:
+                return _WIZARD_THUMBNAILS_PHASE_2D
         return None
 
     def _wizard_thumbnails_mark_phase_done(self, phase: str) -> None:
@@ -2064,17 +2027,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         """True when models for one sub-phase still lack that phase's thumbnail output."""
         if phase == _WIZARD_THUMBNAILS_PHASE_2D and not self._drawing_thumbnails_applicable():
             return False
-        extensions = self._wizard_thumbnails_phase_scan_extensions(phase)
-        if not extensions:
-            return False
-        latest = self._scan_models_non_recursive(working_dir, extensions=extensions)
-        paths = self._get_latest_model_files(latest)
-        pending = self._filter_models_missing_task_output(
-            paths,
-            working_dir,
-            self._wizard_thumbnails_phase_runner_task_kind(phase),
-        )
-        return bool(pending)
+        return bool(self._wizard_thumbnails_phase_pending_paths(working_dir, phase))
 
     def _wizard_jpeg_2d_display(self) -> str:
         return (
@@ -2452,6 +2405,38 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 names_cf=names_cf,
             )
         ]
+
+    def _filter_models_with_modelcheck_xml(
+        self,
+        latest_files: list[Path],
+        working_dir: Path,
+    ) -> list[Path]:
+        """Keep models that already have ModelCHECK ``*.p.xml`` / ``*.a.xml`` / ``*.d.xml``."""
+        if not latest_files:
+            return []
+        names_cf = self._working_dir_output_names_cf(working_dir, "modelcheck")
+        out: list[Path] = []
+        for path in latest_files:
+            xml_name = _modelcheck_xml_basename(path.name)
+            if not xml_name:
+                continue
+            if _working_dir_has_output_basename(working_dir, xml_name, names_cf=names_cf):
+                out.append(path)
+        return out
+
+    def _wizard_thumbnails_phase_eligible_models(
+        self, working_dir: Path, phase: str
+    ) -> list[Path]:
+        """Models for one thumbnail pass that already have matching ModelCHECK XML."""
+        if not self._wizard_thumbnails_phase_applicable(phase, str(working_dir)):
+            return []
+        extensions = self._wizard_thumbnails_phase_scan_extensions(phase)
+        if not extensions:
+            return []
+        latest = self._get_latest_model_files(
+            self._scan_models_non_recursive(working_dir, extensions=extensions)
+        )
+        return self._filter_models_with_modelcheck_xml(latest, working_dir)
 
     def _batch_paths_by_model_base(self, latest_files: list[Path]) -> dict[str, Path]:
         by_base: dict[str, Path] = {}
@@ -3240,14 +3225,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             ):
                 if kind == "jpeg2d" and not self._drawing_thumbnails_applicable():
                     continue
-                extensions = self._wizard_thumbnails_phase_scan_extensions(phase)
-                if not extensions:
-                    continue
-                scanned = self._scan_models_non_recursive(working_dir, extensions=extensions)
-                latest = self._get_latest_model_files(scanned)
-                for path in self._filter_models_missing_task_output(
-                    latest, working_dir, kind
-                ):
+                for path in self._wizard_thumbnails_phase_pending_paths(working_dir, phase):
                     if path not in pending:
                         pending.append(path)
             return pending
@@ -4210,7 +4188,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             label.pack_forget()
 
     def _wizard_thumbnails_latest_models(self, working_dir: Path) -> list[Path]:
-        """Top-level models included in any applicable thumbnail pass."""
+        """Top-level models included in any applicable thumbnail pass (with ModelCHECK XML)."""
         seen: set[Path] = set()
         out: list[Path] = []
         for phase in (
@@ -4220,11 +4198,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         ):
             if phase == _WIZARD_THUMBNAILS_PHASE_2D and not self._drawing_thumbnails_applicable():
                 continue
-            extensions = self._wizard_thumbnails_phase_scan_extensions(phase)
-            if not extensions:
-                continue
-            scanned = self._scan_models_non_recursive(working_dir, extensions=extensions)
-            for path in self._get_latest_model_files(scanned):
+            for path in self._wizard_thumbnails_phase_eligible_models(working_dir, phase):
                 if path not in seen:
                     seen.add(path)
                     out.append(path)
@@ -4252,13 +4226,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         there automatically; this also records models that finished the pass chunks but
         still have no output (so part failures stay visible after chaining to drawings).
         """
-        extensions = self._wizard_thumbnails_phase_scan_extensions(phase)
-        if not extensions:
-            return
         task_kind = self._wizard_thumbnails_phase_runner_task_kind(phase)
-        latest = self._scan_models_non_recursive(working_dir, extensions=extensions)
-        paths = self._get_latest_model_files(latest)
-        pending = self._filter_models_missing_task_output(paths, working_dir, task_kind)
+        pending = self._wizard_thumbnails_phase_pending_paths(working_dir, phase)
         if not pending:
             return
         _append_batch_timeout_log_models(
@@ -5517,7 +5486,11 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             working_dir,
             extensions=self._model_scan_extensions_for_task(task_display),
         )
-        return self._get_latest_model_files(scanned)
+        latest = self._get_latest_model_files(scanned)
+        task_kind = self._runner_task_kind(task_display)
+        if task_kind in _THUMBNAIL_JPEG_TASK_KINDS:
+            return self._filter_models_with_modelcheck_xml(latest, working_dir)
+        return latest
 
     def _format_batch_model_count_message(
         self,
@@ -10182,6 +10155,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 if thumbnail_phase is not None:
                     batch_task_kind = self._wizard_thumbnails_phase_runner_task_kind(
                         thumbnail_phase
+                    )
+                if batch_task_kind in _THUMBNAIL_JPEG_TASK_KINDS:
+                    latest_files = self._filter_models_with_modelcheck_xml(
+                        latest_files, working_dir
                     )
                 if batch_task_kind in ("modelcheck",) or batch_task_kind in _THUMBNAIL_JPEG_TASK_KINDS:
                     latest_files, continue_go, chunk_size_override, _ = (
