@@ -2,6 +2,34 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-27 — v1.12.13
+
+- **Purge cache**: also removes Local Temp ModelCHECK folders (`mc_reports`, `MC_Metrics`, `mc_preview`, `mc_dup_read`, `mc_dup_write`).
+
+## 2026-07-27 — v1.12.12
+
+- **Model Gallery**: section counts update as you search to show how many models are visible.
+
+## 2026-07-27 — v1.12.11
+
+- **Model Gallery**: models without a captured thumbnail still appear, using the same blank placeholder as issue rows.
+
+## 2026-07-27 — v1.12.10
+
+- **Scan Information**: loads into the page only when you open it (and parks when you leave), like Model Gallery.
+
+## 2026-07-27 — v1.12.9
+
+- **Model Gallery**: loads into the page only when you open it (and parks when you leave), so large scans keep a lighter DOM.
+
+## 2026-07-27 — v1.12.8
+
+- **Model Gallery**: section headings show model counts (for example `103 Parts`).
+
+## 2026-07-27 — v1.12.7
+
+- **Report**: Model Gallery sidebar section shows a searchable grid of unique model thumbnails (parts, then assemblies, then drawings); drag cards into Creo like other report thumbs.
+
 ## 2026-07-25 — v1.12.6
 
 - **Score**: grading scale and “How the grade works” are merged into one card; display-only E and F grades are listed (scoring still uses A–D only).

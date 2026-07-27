@@ -823,6 +823,155 @@ def thumbnail_src_for_report(
     return _placeholder_src()
 
 
+_GALLERY_TYPE_ORDER = {"PRT": 0, "ASM": 1, "DRW": 2}
+_GALLERY_TYPE_LABELS = {"PRT": "Parts", "ASM": "Assemblies", "DRW": "Drawings"}
+
+
+def collect_model_gallery_items(
+    files_info: dict,
+    report_assets_dir: str,
+    working_dir: str,
+) -> list[dict[str, str]]:
+    """Unique scanned models for the gallery, ordered PRT → ASM → DRW, then name.
+
+    Missing thumbs use the shared blank placeholder (same as issue rows).
+    """
+    seen: set[tuple[str, str]] = set()
+    items: list[dict[str, str]] = []
+    for file_path, file_info in files_info.items():
+        display = (file_info.get("report_display_name") or get_display_name(file_path) or "").strip()
+        if not display:
+            continue
+        pro_type = (file_info.get("pro_type") or "").strip().upper()
+        if not pro_type:
+            m = re.search(r"\.(prt|asm|drw)$", display, flags=re.IGNORECASE)
+            pro_type = m.group(1).upper() if m else ""
+        if pro_type not in _GALLERY_TYPE_ORDER:
+            continue
+        key = (display.casefold(), pro_type)
+        if key in seen:
+            continue
+        seen.add(key)
+        href = model_file_link_href(display) or ""
+        src = thumbnail_src_for_report(
+            report_assets_dir, working_dir, display, pro_type=pro_type
+        )
+        items.append(
+            {
+                "name": display,
+                "pro_type": pro_type,
+                "href": href,
+                "image_url": src,
+            }
+        )
+    items.sort(
+        key=lambda row: (
+            _GALLERY_TYPE_ORDER.get(row["pro_type"], 9),
+            row["name"].casefold(),
+        )
+    )
+    return items
+
+
+def generate_model_gallery_fragment(
+    files_info: dict,
+    report_assets_dir: str,
+    working_dir: str,
+) -> str:
+    """Sidebar Model Gallery panel HTML, or empty when no scanned models exist."""
+    ensure_shared_placeholder_jpeg(report_assets_dir)
+    items = collect_model_gallery_items(files_info, report_assets_dir, working_dir)
+    if not items:
+        return ""
+
+    by_type: dict[str, list[dict[str, str]]] = {"PRT": [], "ASM": [], "DRW": []}
+    other: list[dict[str, str]] = []
+    for item in items:
+        bucket = by_type.get(item["pro_type"])
+        if bucket is None:
+            other.append(item)
+        else:
+            bucket.append(item)
+
+    sections: list[str] = []
+    for pro_type in ("PRT", "ASM", "DRW"):
+        rows = by_type[pro_type]
+        if not rows:
+            continue
+        label = _GALLERY_TYPE_LABELS[pro_type]
+        cards: list[str] = []
+        for row in rows:
+            name_esc = html.escape(row["name"])
+            name_attr = html.escape(row["name"], quote=True)
+            src_esc = html.escape(row["image_url"], quote=True)
+            img = (
+                f'<img loading="lazy" decoding="async" draggable="false" '
+                f'title="Drag this into Creo" src="{src_esc}" alt=""/>'
+            )
+            name_html = f'<span class="mq-gallery-name">{name_esc}</span>'
+            if row["href"]:
+                href_esc = html.escape(row["href"], quote=True)
+                cards.append(
+                    f'<a class="mq-gallery-card" href="{href_esc}" '
+                    f'data-mq-gallery-name="{name_attr}" title="Drag this into Creo" '
+                    f'onclick="void(0); return false;">{img}{name_html}</a>'
+                )
+            else:
+                cards.append(
+                    f'<div class="mq-gallery-card mq-gallery-card-plain" '
+                    f'data-mq-gallery-name="{name_attr}" '
+                    f'title="No file link: session-style model name (not used as a file URL).">'
+                    f"{img}{name_html}</div>"
+                )
+        sections.append(
+            f'<section class="mq-gallery-section" data-mq-gallery-type="{pro_type}">'
+            f'<h2><span class="mq-gallery-count">{len(rows)}</span> {html.escape(label)}</h2>'
+            f'<div class="mq-gallery-grid">{"".join(cards)}</div>'
+            "</section>"
+        )
+
+    if other:
+        cards = []
+        for row in other:
+            name_esc = html.escape(row["name"])
+            name_attr = html.escape(row["name"], quote=True)
+            src_esc = html.escape(row["image_url"], quote=True)
+            img = (
+                f'<img loading="lazy" decoding="async" draggable="false" '
+                f'title="Drag this into Creo" src="{src_esc}" alt=""/>'
+            )
+            name_html = f'<span class="mq-gallery-name">{name_esc}</span>'
+            if row["href"]:
+                href_esc = html.escape(row["href"], quote=True)
+                cards.append(
+                    f'<a class="mq-gallery-card" href="{href_esc}" '
+                    f'data-mq-gallery-name="{name_attr}" title="Drag this into Creo" '
+                    f'onclick="void(0); return false;">{img}{name_html}</a>'
+                )
+            else:
+                cards.append(
+                    f'<div class="mq-gallery-card mq-gallery-card-plain" '
+                    f'data-mq-gallery-name="{name_attr}">{img}{name_html}</div>'
+                )
+        sections.append(
+            '<section class="mq-gallery-section" data-mq-gallery-type="OTHER">'
+            f'<h2><span class="mq-gallery-count">{len(other)}</span> Other</h2>'
+            f'<div class="mq-gallery-grid">{"".join(cards)}</div>'
+            "</section>"
+        )
+
+    body = "".join(sections)
+    return f"""<div class="mq-stats-page mq-stats-embedded mq-gallery-page" id="mq-model-gallery">
+  <h1 class="mq-page-title" id="model-gallery">Model Gallery</h1>
+  <div class="mq-gallery-toolbar">
+    <input type="search" id="mq-gallery-search" class="mq-gallery-search"
+           placeholder="Search models…" autocomplete="off" spellcheck="false"/>
+    <p id="mq-gallery-empty" class="mq-gallery-empty" hidden>No models match this search.</p>
+  </div>
+{body}
+</div>"""
+
+
 def _remove_legacy_hash_placeholders(assets_folder: str) -> None:
     """Remove old per-model ``_mcplaceholder_<hash>.jpg`` files from earlier versions."""
     try:
@@ -873,6 +1022,12 @@ def create_html_report(
     report_assets_dir = os.path.dirname(os.path.abspath(output_file))
     if not report_assets_dir:
         report_assets_dir = os.path.abspath(".")
+
+    model_gallery_div = generate_model_gallery_fragment(
+        files_info,
+        report_assets_dir,
+        working_dir,
+    )
 
     check_sections: list = []
     check_dict: dict = defaultdict(list)
@@ -982,6 +1137,7 @@ def create_html_report(
         summary_div=summary_div,
         statistics_div=statistics_div,
         template_information_div=template_information_div,
+        model_gallery_div=model_gallery_div,
     )
 
     out_dir = os.path.dirname(os.path.abspath(output_file))

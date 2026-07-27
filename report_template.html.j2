@@ -186,9 +186,45 @@
         .mq-summary-panel { display: none; }
         body[data-mq-summary-panel="score"] .mq-summary-panel[data-mq-panel="score"],
         body[data-mq-summary-panel="statistics"] .mq-summary-panel[data-mq-panel="statistics"],
-        body[data-mq-summary-panel="template"] .mq-summary-panel[data-mq-panel="template"] { display: block; }
+        body[data-mq-summary-panel="template"] .mq-summary-panel[data-mq-panel="template"],
+        body[data-mq-summary-panel="gallery"] .mq-summary-panel[data-mq-panel="gallery"] { display: block; }
         body[data-mq-printing="1"] .summary { display: block !important; }
         body[data-mq-printing="1"] .mq-summary-panel { display: block !important; }
+        .mq-gallery-page { max-width: 100%; }
+        .mq-gallery-toolbar { margin: 0 0 16px 0; }
+        .mq-gallery-search {
+            width: 100%; max-width: 28rem; box-sizing: border-box;
+            padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px;
+            font: inherit; font-size: 0.95rem;
+        }
+        .mq-gallery-search:focus { outline: 2px solid #2563eb; outline-offset: 1px; }
+        .mq-gallery-empty { color: #64748b; font-size: 0.92rem; margin: 8px 0 0 0; }
+        .mq-gallery-section { margin: 0 0 28px 0; }
+        .mq-gallery-section h2 {
+            margin: 0 0 12px 0; font-size: 1.1rem; color: #0f172a; font-weight: 700;
+        }
+        .mq-gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+        }
+        .mq-gallery-card, .mq-gallery-card-plain {
+            display: flex; flex-direction: column; gap: 8px;
+            padding: 10px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+            text-decoration: none; color: #0f172a; min-width: 0;
+        }
+        a.mq-gallery-card { cursor: grab; }
+        a.mq-gallery-card:active { cursor: grabbing; }
+        .mq-gallery-card img, .mq-gallery-card-plain img {
+            display: block; width: 100%; height: auto; aspect-ratio: 1 / 1;
+            object-fit: contain; background: #f8fafc; border-radius: 6px;
+            -webkit-user-drag: none; pointer-events: none;
+        }
+        .mq-gallery-name {
+            font-size: 0.8rem; line-height: 1.3; word-break: break-all; text-align: center;
+        }
+        .mq-gallery-card[hidden], .mq-gallery-section[hidden] { display: none !important; }
         body[data-mq-view-filter="flagged"] .file-row:not(:has(.mq-issue-row.flagged)) { display: none !important; }
         body[data-mq-view-filter="flagged"] .check-section-wrapper:not(:has(.file-row .mq-issue-row.flagged)) { display: none !important; }
         body[data-mq-view-filter="unflagged"] .file-row:has(.mq-issue-row.flagged) { display: none !important; }
@@ -880,10 +916,103 @@
             }
         }
 
+        var mqGalleryEntry = null;
+        var mqStatisticsEntry = null;
+
+        function mqInitGalleryStore() {
+            mqGalleryEntry = null;
+            var store = document.getElementById('mq-gallery-store');
+            var host = document.getElementById('mq-gallery-host');
+            if (!store || !host) { return; }
+            var root = store.content.querySelector('#mq-model-gallery');
+            if (!root) { return; }
+            mqGalleryEntry = { store: store, host: host, root: root };
+        }
+
+        function mqParkGallery() {
+            if (!mqGalleryEntry || !mqGalleryEntry.root || !mqGalleryEntry.store) { return; }
+            if (document.body.contains(mqGalleryEntry.root)) {
+                mqGalleryEntry.store.content.appendChild(mqGalleryEntry.root);
+            }
+        }
+
+        function mqAttachGallery() {
+            if (!mqGalleryEntry || !mqGalleryEntry.root || !mqGalleryEntry.host) { return; }
+            if (!document.body.contains(mqGalleryEntry.root)) {
+                mqGalleryEntry.host.appendChild(mqGalleryEntry.root);
+            }
+            mqInitModelGallerySearch();
+        }
+
+        function mqInitStatisticsStore() {
+            mqStatisticsEntry = null;
+            var store = document.getElementById('mq-statistics-store');
+            var host = document.getElementById('mq-statistics-host');
+            if (!store || !host) { return; }
+            var root = store.content.querySelector('#mq-scan-information');
+            if (!root) { return; }
+            mqStatisticsEntry = { store: store, host: host, root: root };
+        }
+
+        function mqParkStatistics() {
+            if (!mqStatisticsEntry || !mqStatisticsEntry.root || !mqStatisticsEntry.store) { return; }
+            if (document.body.contains(mqStatisticsEntry.root)) {
+                mqStatisticsEntry.store.content.appendChild(mqStatisticsEntry.root);
+            }
+        }
+
+        function mqAttachStatistics() {
+            if (!mqStatisticsEntry || !mqStatisticsEntry.root || !mqStatisticsEntry.host) { return; }
+            if (!document.body.contains(mqStatisticsEntry.root)) {
+                mqStatisticsEntry.host.appendChild(mqStatisticsEntry.root);
+            }
+        }
+
+        function mqParkLazySummaryPanels(exceptPanel) {
+            if (exceptPanel !== 'gallery') { mqParkGallery(); }
+            if (exceptPanel !== 'statistics') { mqParkStatistics(); }
+        }
+
+        function mqInitModelGallerySearch() {
+            var root = mqGalleryEntry && mqGalleryEntry.root
+                ? mqGalleryEntry.root
+                : document.getElementById('mq-model-gallery');
+            if (!root || root.getAttribute('data-mq-gallery-bound') === '1') { return; }
+            root.setAttribute('data-mq-gallery-bound', '1');
+            var input = root.querySelector('#mq-gallery-search');
+            var empty = root.querySelector('#mq-gallery-empty');
+            if (!input) { return; }
+            function applyFilter() {
+                var q = (input.value || '').trim().toLowerCase();
+                var cards = root.querySelectorAll('[data-mq-gallery-name]');
+                var visible = 0;
+                for (var i = 0; i < cards.length; i++) {
+                    var name = (cards[i].getAttribute('data-mq-gallery-name') || '').toLowerCase();
+                    var show = !q || name.indexOf(q) !== -1;
+                    cards[i].hidden = !show;
+                    if (show) { visible++; }
+                }
+                var sections = root.querySelectorAll('.mq-gallery-section');
+                for (var s = 0; s < sections.length; s++) {
+                    var sectionCards = sections[s].querySelectorAll('[data-mq-gallery-name]');
+                    var shown = 0;
+                    for (var j = 0; j < sectionCards.length; j++) {
+                        if (!sectionCards[j].hidden) { shown++; }
+                    }
+                    sections[s].hidden = shown === 0;
+                    var countEl = sections[s].querySelector('.mq-gallery-count');
+                    if (countEl) { countEl.textContent = String(shown); }
+                }
+                if (empty) { empty.hidden = visible > 0; }
+            }
+            input.addEventListener('input', applyFilter);
+        }
+
         function mqSummaryPanelFromHash(hash) {
             var h = (hash || '').replace(/^#/, '');
             if (h === 'statistics') { return 'statistics'; }
             if (h === 'template-information') { return 'template'; }
+            if (h === 'model-gallery') { return 'gallery'; }
             if (h === 'summary' || h === 'mq-page-title') { return 'score'; }
             return '';
         }
@@ -900,6 +1029,15 @@
             mqParkAllSections();
             mqActiveSectionId = '';
             document.body.removeAttribute('data-mq-active-section');
+            if (panel === 'gallery') {
+                mqParkLazySummaryPanels('gallery');
+                mqAttachGallery();
+            } else if (panel === 'statistics') {
+                mqParkLazySummaryPanels('statistics');
+                mqAttachStatistics();
+            } else {
+                mqParkLazySummaryPanels('');
+            }
             document.body.setAttribute('data-mq-summary-panel', panel);
             var hint = document.getElementById('mq-filter-hint');
             if (hint) { hint.hidden = true; }
@@ -915,6 +1053,7 @@
         }
 
         function mqClearSummaryPanel() {
+            mqParkLazySummaryPanels('');
             document.body.removeAttribute('data-mq-summary-panel');
             var tops = document.querySelectorAll('.sidebar-top-nav.sidebar-nav-active');
             for (var i = 0; i < tops.length; i++) {
@@ -1239,12 +1378,14 @@
         }
 
         function initHealthCheckJumps() {
-            var bars = document.querySelectorAll('.mq-health-jump[data-mq-health-check]');
-            for (var i = 0; i < bars.length; i++) {
-                bars[i].addEventListener('click', function () {
-                    jumpToHealthCheck(this.getAttribute('data-mq-health-check'));
-                });
-            }
+            if (document.documentElement.getAttribute('data-mq-health-bound') === '1') { return; }
+            document.documentElement.setAttribute('data-mq-health-bound', '1');
+            document.addEventListener('click', function (ev) {
+                var btn = ev.target.closest
+                    ? ev.target.closest('.mq-health-jump[data-mq-health-check]')
+                    : null;
+                if (btn) { jumpToHealthCheck(btn.getAttribute('data-mq-health-check')); }
+            });
         }
 
         function mqEmptySummary() {
@@ -1612,6 +1753,8 @@
             document.body.removeAttribute('data-mq-active-section');
             mqActiveSectionId = '';
             mqAttachAllIssueSections();
+            mqAttachStatistics();
+            mqAttachGallery();
         }
 
         function mqEndPrintLayout() {
@@ -1693,6 +1836,7 @@
             var active = mqActiveSectionId || document.body.getAttribute('data-mq-active-section') || '';
             var summaryPanel = document.body.getAttribute('data-mq-summary-panel') || '';
             mqParkAllSections();
+            mqParkLazySummaryPanels('');
             if (active) {
                 document.body.setAttribute('data-mq-active-section', active);
                 document.body.removeAttribute('data-mq-summary-panel');
@@ -1829,7 +1973,7 @@
             function initModelThumbDrag() {
                 document.addEventListener('dragstart', function (e) {
                     var wrap = e.target.closest
-                        ? e.target.closest('a.model-thumb-wrap[href], a.mq-skipped-drag[href]')
+                        ? e.target.closest('a.model-thumb-wrap[href], a.mq-skipped-drag[href], a.mq-gallery-card[href]')
                         : null;
                     if (!wrap) { return; }
                     var rel = wrap.getAttribute('href');
@@ -1878,6 +2022,8 @@
                 initCollapsibleSidebar();
                 initSidebarNavHighlight();
                 mqInitSectionRegistry();
+                mqInitStatisticsStore();
+                mqInitGalleryStore();
                 mqInitSidebarNavOrder();
                 mqInitPassBaseline();
                 mqInitCategoryCards();
@@ -1982,6 +2128,9 @@
         {% if template_information_div %}
         <li class="sidebar-top-nav" data-mq-panel="template"><a href="#template-information">Template Information</a></li>
         {% endif %}
+        {% if model_gallery_div %}
+        <li class="sidebar-top-nav" data-mq-panel="gallery"><a href="#model-gallery">Model Gallery</a></li>
+        {% endif %}
         <hr>
         {% for section in check_sections %}
         <li title="{{ section.category }}" class="sidebar-check-nav wrapper-{{ section.class }}"
@@ -2003,13 +2152,20 @@
         <div class="mq-summary-panel" data-mq-panel="score">
             {{ summary_div }}
         </div>
-        <div class="mq-summary-panel" data-mq-panel="statistics">
-            {{ statistics_div }}
-        </div>
+        <div class="mq-summary-panel" data-mq-panel="statistics" id="mq-statistics-host"></div>
+        <template id="mq-statistics-store" class="mq-statistics-store">
+            {{ statistics_div | safe }}
+        </template>
         {% if template_information_div %}
         <div class="mq-summary-panel" data-mq-panel="template">
             {{ template_information_div | safe }}
         </div>
+        {% endif %}
+        {% if model_gallery_div %}
+        <div class="mq-summary-panel" data-mq-panel="gallery" id="mq-gallery-host"></div>
+        <template id="mq-gallery-store" class="mq-gallery-store">
+            {{ model_gallery_div | safe }}
+        </template>
         {% endif %}
     </div>
 

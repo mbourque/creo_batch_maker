@@ -2643,8 +2643,15 @@ def generate_statistics_html(stats: BatchStatistics, *, embedded: bool = False) 
     page_class = "mq-stats-page mq-stats-embedded" if embedded else "mq-stats-page"
     if embedded:
         title_html = '  <h1 class="mq-page-title" id="statistics">Scan Information</h1>'
-    else:
-        title_html = '  <h1 class="mq-stats-title">Scan Information</h1>'
+        return f"""<div id="mq-scan-information">{_MQ_STATS_CSS}
+<div class="{page_class}">
+
+{title_html}
+{body_sections}
+
+</div>
+</div>"""
+    title_html = '  <h1 class="mq-stats-title">Scan Information</h1>'
     return f"""{_MQ_STATS_CSS}
 
 <div class="{page_class}">

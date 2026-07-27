@@ -109,5 +109,24 @@ Remove-IfExists $dsmCache {
     Remove-Item -LiteralPath $dsmCache -Recurse -Force
 }
 
+# 5. Local Temp ModelCHECK folders (current Windows user)
+Write-Step ''
+$localTemp = Join-Path $env:LOCALAPPDATA 'Temp'
+Write-Step "[5] Removing ModelCHECK folders under $localTemp..."
+$mcTempFolders = @(
+    'mc_reports',
+    'MC_Metrics',
+    'mc_preview',
+    'mc_dup_read',
+    'mc_dup_write'
+)
+foreach ($name in $mcTempFolders) {
+    $dir = Join-Path $localTemp $name
+    Remove-IfExists $dir {
+        Write-Host "  removing $dir"
+        Remove-Item -LiteralPath $dir -Recurse -Force
+    }
+}
+
 Write-Step ''
 Write-Step 'Done.'
