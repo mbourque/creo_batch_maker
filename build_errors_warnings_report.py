@@ -964,8 +964,20 @@ def generate_model_gallery_fragment(
     return f"""<div class="mq-stats-page mq-stats-embedded mq-gallery-page" id="mq-model-gallery">
   <h1 class="mq-page-title" id="model-gallery">Model Gallery</h1>
   <div class="mq-gallery-toolbar">
-    <input type="search" id="mq-gallery-search" class="mq-gallery-search"
-           placeholder="Search models…" autocomplete="off" spellcheck="false"/>
+    <div class="mq-gallery-toolbar-row">
+      <input type="search" id="mq-gallery-search" class="mq-gallery-search"
+             placeholder="Search models…" autocomplete="off" spellcheck="false"/>
+      <div class="mq-gallery-type-toggles" role="group" aria-label="Model type filter">
+        <button type="button" class="mq-gallery-type-btn" data-mq-gallery-type="all"
+                aria-pressed="true">Show all</button>
+        <button type="button" class="mq-gallery-type-btn" data-mq-gallery-type="PRT"
+                aria-pressed="false">Parts</button>
+        <button type="button" class="mq-gallery-type-btn" data-mq-gallery-type="ASM"
+                aria-pressed="false">Assemblies</button>
+        <button type="button" class="mq-gallery-type-btn" data-mq-gallery-type="DRW"
+                aria-pressed="false">Drawings</button>
+      </div>
+    </div>
     <p id="mq-gallery-empty" class="mq-gallery-empty" hidden>No models match this search.</p>
   </div>
 {body}

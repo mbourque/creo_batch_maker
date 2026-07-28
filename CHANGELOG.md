@@ -2,6 +2,18 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-28 — v1.12.16
+
+- **Model Gallery**: rounded toggles next to search filter by Show all, Parts, Assemblies, or Drawings (one active at a time).
+
+## 2026-07-27 — v1.12.15
+
+- **Automatic Thumbnails**: fixed getting stuck on Waiting… after assembly when the drawing pass did not start.
+
+## 2026-07-27 — v1.12.14
+
+- **Automatic Thumbnails**: fixed a loop that could keep re-running a finished pass when some models failed (common with chunk size 1).
+
 ## 2026-07-27 — v1.12.13
 
 - **Purge cache**: also removes Local Temp ModelCHECK folders (`mc_reports`, `MC_Metrics`, `mc_preview`, `mc_dup_read`, `mc_dup_write`).

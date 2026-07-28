@@ -1942,6 +1942,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         ):
             if _WIZARD_THUMBNAILS_PHASE_ORDER.get(phase, -1) <= min_order:
                 continue
+            if self._wizard_thumbnails_phase_is_done(phase):
+                continue
             if not self._wizard_thumbnails_phase_applicable(phase, wd_str):
                 continue
             if self._wizard_thumbnails_phase_has_pending(wd, phase):
@@ -3104,9 +3106,15 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             def apply() -> None:
                 if self._wizard_step != WIZARD_STEP_JPEG_3D:
                     return
-                self._wizard_thumbnails_part_phase_done = part
-                self._wizard_thumbnails_assembly_phase_done = asm
-                self._wizard_thumbnails_drawing_phase_done = drawing
+                # Only mark done when outputs are complete. Never clear a session
+                # "attempted" flag — leftover failures must not restart a finished pass
+                # (especially after a slow disk scan finishes late during Automatic mode).
+                if part:
+                    self._wizard_thumbnails_part_phase_done = True
+                if asm:
+                    self._wizard_thumbnails_assembly_phase_done = True
+                if drawing:
+                    self._wizard_thumbnails_drawing_phase_done = True
                 self._refresh_wizard_footer()
 
             try:
@@ -4272,7 +4280,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return False
         self._wizard_thumbnails_go_phase = phase
         self.task.set(task_display)
-        self._cancel_wizard_batch_output_watch(clear_go_snapshot=False)
+        # Do not cancel the current batch watch here. _on_go / _start_wizard_batch_output_watch
+        # replaces it when a new batch actually starts. Canceling early left Automatic mode
+        # stuck on Waiting… when the next pass failed to launch (e.g. drawing after assembly).
         self._wizard_thumbnails_sync_active_phase_ui(phase)
         self._close_batch_runner_window()
         if self._automatic_mode:
@@ -4567,6 +4577,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         except tk.TclError:
             pass
         if watch is None:
+            # Next-pass GO cleared the watch but did not start (or failed). Keep Automatic moving.
+            if self._automatic_mode and step == WIZARD_STEP_JPEG_3D:
+                self._sync_wizard_thumbnails_phase_done_from_disk()
+                self._schedule_automatic_wizard_advance()
             return
         if not thumbnails_continuing:
             step = watch.get("step")
@@ -5135,7 +5149,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             self._on_write_summary_report()
 
     def _on_wizard_automatic_thumbnails(self) -> None:
-        """Automatic mode on Thumbnails: chain part → assembly → drawing; never restart an finished pass."""
+        """Automatic mode on Thumbnails: chain part → assembly → drawing; never restart a finished pass."""
         step = WIZARD_STEP_JPEG_3D
         if self._wizard_batch_waiting_on_step(step) or self._go_in_progress:
             return
@@ -5146,9 +5160,19 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return
         if not self._wizard_thumbnails_all_phases_attempted():
             self._skip_timed_out_prompt_on_go = True
-            self._wizard_thumbnails_chain_next_subphase_auto()
+            if self._wizard_thumbnails_chain_next_subphase_auto():
+                return
+            # Mark completed-on-disk passes done, then advance or retry the next pending pass.
+            self._sync_wizard_thumbnails_phase_done_from_disk()
+            if self._wizard_thumbnails_all_phases_attempted():
+                self._wizard_advance_one_step_after_batch()
+            elif self._wizard_thumbnails_chain_next_subphase_auto():
+                return
             return
         if self._wizard_batch_ready_for_auto_advance(step):
+            self._wizard_advance_one_step_after_batch()
+        elif self._wizard_thumbnails_all_phases_attempted():
+            # Session flags say all passes ran; do not stay on Waiting… after leftover failures.
             self._wizard_advance_one_step_after_batch()
 
     def _on_wizard_open_report(self) -> None:
@@ -5720,6 +5744,19 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         )
         self._refresh_wizard_report_batch_failures()
 
+    def _wizard_thumbnails_recover_stalled_post_ready(self) -> None:
+        """If rename/chain was never scheduled after 100%, run it (avoids permanent Waiting…)."""
+        watch = self._wizard_batch_watch
+        if watch is None or watch.get("step") != WIZARD_STEP_JPEG_3D:
+            return
+        if not watch.get("batch_finish_painted") or watch.get("batch_post_ready_done"):
+            return
+        if self._wizard_batch_watch_job is not None or self._go_in_progress:
+            return
+        if not self._wizard_batch_pass_complete(watch):
+            return
+        self._wizard_batch_watch_job = self.after(0, self._wizard_batch_finish_post_ready)
+
     def _refresh_wizard_footer(self) -> None:
         back = getattr(self, "wizard_back_button", None)
         skip = getattr(self, "wizard_skip_button", None)
@@ -5727,6 +5764,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         nxt = getattr(self, "wizard_next_button", None)
         if back is None or skip is None or nxt is None:
             return
+        if self._wizard_step == WIZARD_STEP_JPEG_3D:
+            self._wizard_thumbnails_recover_stalled_post_ready()
         step = self._wizard_step
         batch_waiting = self._wizard_batch_waiting_on_step(step)
         if step > WIZARD_STEP_SETUP:

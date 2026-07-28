@@ -192,12 +192,29 @@
         body[data-mq-printing="1"] .mq-summary-panel { display: block !important; }
         .mq-gallery-page { max-width: 100%; }
         .mq-gallery-toolbar { margin: 0 0 16px 0; }
+        .mq-gallery-toolbar-row {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+        }
         .mq-gallery-search {
-            width: 100%; max-width: 28rem; box-sizing: border-box;
+            flex: 1 1 14rem; min-width: 10rem; max-width: 28rem; box-sizing: border-box;
             padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px;
             font: inherit; font-size: 0.95rem;
         }
         .mq-gallery-search:focus { outline: 2px solid #2563eb; outline-offset: 1px; }
+        .mq-gallery-type-toggles {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+        }
+        .mq-gallery-type-btn {
+            appearance: none; -webkit-appearance: none;
+            margin: 0; padding: 7px 14px; border: 1px solid #cbd5e1; border-radius: 999px;
+            background: #fff; color: #334155; font: inherit; font-size: 0.88rem; font-weight: 600;
+            cursor: pointer; line-height: 1.2;
+        }
+        .mq-gallery-type-btn:hover { background: #f8fafc; border-color: #94a3b8; }
+        .mq-gallery-type-btn[aria-pressed="true"] {
+            background: #2563eb; border-color: #2563eb; color: #fff;
+        }
+        .mq-gallery-type-btn:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
         .mq-gallery-empty { color: #64748b; font-size: 0.92rem; margin: 8px 0 0 0; }
         .mq-gallery-section { margin: 0 0 28px 0; }
         .mq-gallery-section h2 {
@@ -981,19 +998,32 @@
             root.setAttribute('data-mq-gallery-bound', '1');
             var input = root.querySelector('#mq-gallery-search');
             var empty = root.querySelector('#mq-gallery-empty');
-            if (!input) { return; }
+            var typeBtns = root.querySelectorAll('.mq-gallery-type-btn[data-mq-gallery-type]');
+            var typeFilter = 'all';
             function applyFilter() {
-                var q = (input.value || '').trim().toLowerCase();
+                var q = (input ? (input.value || '').trim().toLowerCase() : '');
                 var cards = root.querySelectorAll('[data-mq-gallery-name]');
                 var visible = 0;
                 for (var i = 0; i < cards.length; i++) {
-                    var name = (cards[i].getAttribute('data-mq-gallery-name') || '').toLowerCase();
-                    var show = !q || name.indexOf(q) !== -1;
-                    cards[i].hidden = !show;
+                    var card = cards[i];
+                    var section = card.closest ? card.closest('.mq-gallery-section') : null;
+                    var sectionType = section
+                        ? (section.getAttribute('data-mq-gallery-type') || '')
+                        : '';
+                    var typeOk = typeFilter === 'all' || sectionType === typeFilter;
+                    var name = (card.getAttribute('data-mq-gallery-name') || '').toLowerCase();
+                    var nameOk = !q || name.indexOf(q) !== -1;
+                    var show = typeOk && nameOk;
+                    card.hidden = !show;
                     if (show) { visible++; }
                 }
                 var sections = root.querySelectorAll('.mq-gallery-section');
                 for (var s = 0; s < sections.length; s++) {
+                    var sectionType2 = sections[s].getAttribute('data-mq-gallery-type') || '';
+                    if (typeFilter !== 'all' && sectionType2 !== typeFilter) {
+                        sections[s].hidden = true;
+                        continue;
+                    }
                     var sectionCards = sections[s].querySelectorAll('[data-mq-gallery-name]');
                     var shown = 0;
                     for (var j = 0; j < sectionCards.length; j++) {
@@ -1005,7 +1035,21 @@
                 }
                 if (empty) { empty.hidden = visible > 0; }
             }
-            input.addEventListener('input', applyFilter);
+            function setTypeFilter(next) {
+                typeFilter = next || 'all';
+                for (var b = 0; b < typeBtns.length; b++) {
+                    var pressed = typeBtns[b].getAttribute('data-mq-gallery-type') === typeFilter;
+                    typeBtns[b].setAttribute('aria-pressed', pressed ? 'true' : 'false');
+                }
+                applyFilter();
+            }
+            if (input) { input.addEventListener('input', applyFilter); }
+            for (var t = 0; t < typeBtns.length; t++) {
+                typeBtns[t].addEventListener('click', function () {
+                    setTypeFilter(this.getAttribute('data-mq-gallery-type') || 'all');
+                });
+            }
+            setTypeFilter('all');
         }
 
         function mqSummaryPanelFromHash(hash) {
