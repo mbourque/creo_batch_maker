@@ -186,7 +186,6 @@
         .mq-summary-panel { display: none; }
         body[data-mq-summary-panel="score"] .mq-summary-panel[data-mq-panel="score"],
         body[data-mq-summary-panel="statistics"] .mq-summary-panel[data-mq-panel="statistics"],
-        body[data-mq-summary-panel="template"] .mq-summary-panel[data-mq-panel="template"],
         body[data-mq-summary-panel="gallery"] .mq-summary-panel[data-mq-panel="gallery"] { display: block; }
         body[data-mq-printing="1"] .summary { display: block !important; }
         body[data-mq-printing="1"] .mq-summary-panel { display: block !important; }
@@ -1054,8 +1053,7 @@
 
         function mqSummaryPanelFromHash(hash) {
             var h = (hash || '').replace(/^#/, '');
-            if (h === 'statistics') { return 'statistics'; }
-            if (h === 'template-information') { return 'template'; }
+            if (h === 'statistics' || h === 'template-information') { return 'statistics'; }
             if (h === 'model-gallery') { return 'gallery'; }
             if (h === 'summary' || h === 'mq-page-title') { return 'score'; }
             return '';
@@ -2059,7 +2057,7 @@
                 initPersistedReportState();
                 restoreViewFilterFromDom();
                 // Bind sidebar clicks before the slow section registry walk so
-                // Score / Scan / Template / check links work on the first click.
+                // Score / Scan / Gallery / check links work on the first click.
                 var persistedSummary = document.body.getAttribute('data-mq-summary-panel') || 'score';
                 var persistedFilter = document.body.getAttribute('data-mq-view-filter');
                 var persistedActive = document.body.getAttribute('data-mq-active-section') || '';
@@ -2169,9 +2167,6 @@
     <ul>
         <li class="sidebar-top-nav" data-mq-panel="score"><a href="#summary" id="mq-sidebar-score-link">Score</a></li>
         <li class="sidebar-top-nav" data-mq-panel="statistics"><a href="#statistics">Scan Information</a></li>
-        {% if template_information_div %}
-        <li class="sidebar-top-nav" data-mq-panel="template"><a href="#template-information">Template Information</a></li>
-        {% endif %}
         {% if model_gallery_div %}
         <li class="sidebar-top-nav" data-mq-panel="gallery"><a href="#model-gallery">Model Gallery</a></li>
         {% endif %}
@@ -2200,11 +2195,6 @@
         <template id="mq-statistics-store" class="mq-statistics-store">
             {{ statistics_div | safe }}
         </template>
-        {% if template_information_div %}
-        <div class="mq-summary-panel" data-mq-panel="template">
-            {{ template_information_div | safe }}
-        </div>
-        {% endif %}
         {% if model_gallery_div %}
         <div class="mq-summary-panel" data-mq-panel="gallery" id="mq-gallery-host"></div>
         <template id="mq-gallery-store" class="mq-gallery-store">

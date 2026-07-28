@@ -2,6 +2,22 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-28 — v1.12.20
+
+- **Scan Information**: removed the extra Template Information heading above the template cards.
+
+## 2026-07-28 — v1.12.19
+
+- **Model Gallery**: type filter buttons only appear for model types that are in the gallery.
+
+## 2026-07-28 — v1.12.18
+
+- **Report**: Template Information is now under Family table detail in Scan Information (removed from the sidebar).
+
+## 2026-07-28 — v1.12.17
+
+- **Scan Information**: Top level assembly information now appears directly above Family table detail.
+
 ## 2026-07-28 — v1.12.16
 
 - **Model Gallery**: rounded toggles next to search filter by Show all, Parts, Assemblies, or Drawings (one active at a time).

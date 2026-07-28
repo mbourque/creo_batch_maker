@@ -22,7 +22,7 @@ import markdown
 from jinja2 import Environment, FileSystemLoader
 from PIL import Image, ImageDraw
 
-from make_html_statistics import generate_statistics_fragment, generate_template_information_fragment
+from make_html_statistics import generate_statistics_fragment
 from make_html_summary import (
     generate_adjusted_summary_shell,
     get_category_descriptions,
@@ -961,22 +961,31 @@ def generate_model_gallery_fragment(
         )
 
     body = "".join(sections)
+    type_buttons: list[str] = []
+    for pro_type in ("PRT", "ASM", "DRW"):
+        if not by_type[pro_type]:
+            continue
+        label = _GALLERY_TYPE_LABELS[pro_type]
+        type_buttons.append(
+            f'<button type="button" class="mq-gallery-type-btn" '
+            f'data-mq-gallery-type="{pro_type}" aria-pressed="false">'
+            f"{html.escape(label)}</button>"
+        )
+    toggles_html = ""
+    if len(type_buttons) >= 2:
+        toggles_html = f"""
+      <div class="mq-gallery-type-toggles" role="group" aria-label="Model type filter">
+        <button type="button" class="mq-gallery-type-btn" data-mq-gallery-type="all"
+                aria-pressed="true">Show all</button>
+        {"".join(type_buttons)}
+      </div>"""
     return f"""<div class="mq-stats-page mq-stats-embedded mq-gallery-page" id="mq-model-gallery">
   <h1 class="mq-page-title" id="model-gallery">Model Gallery</h1>
   <div class="mq-gallery-toolbar">
     <div class="mq-gallery-toolbar-row">
       <input type="search" id="mq-gallery-search" class="mq-gallery-search"
              placeholder="Search models…" autocomplete="off" spellcheck="false"/>
-      <div class="mq-gallery-type-toggles" role="group" aria-label="Model type filter">
-        <button type="button" class="mq-gallery-type-btn" data-mq-gallery-type="all"
-                aria-pressed="true">Show all</button>
-        <button type="button" class="mq-gallery-type-btn" data-mq-gallery-type="PRT"
-                aria-pressed="false">Parts</button>
-        <button type="button" class="mq-gallery-type-btn" data-mq-gallery-type="ASM"
-                aria-pressed="false">Assemblies</button>
-        <button type="button" class="mq-gallery-type-btn" data-mq-gallery-type="DRW"
-                aria-pressed="false">Drawings</button>
-      </div>
+{toggles_html}
     </div>
     <p id="mq-gallery-empty" class="mq-gallery-empty" hidden>No models match this search.</p>
   </div>
@@ -1021,10 +1030,6 @@ def create_html_report(
         master_root,
         working_dir,
         master_path=master_xml_path,
-        embedded=True,
-    )
-    template_information_div = generate_template_information_fragment(
-        working_dir,
         embedded=True,
     )
 
@@ -1148,7 +1153,6 @@ def create_html_report(
         summary=summary,
         summary_div=summary_div,
         statistics_div=statistics_div,
-        template_information_div=template_information_div,
         model_gallery_div=model_gallery_div,
     )
 

@@ -2467,17 +2467,24 @@ def _template_block_html(
   </div>"""
 
 
-def generate_template_information_html(working_dir: str, *, embedded: bool = False) -> str:
-    """Template scan details from ``templates\\*.xml``; empty when no template XML exists."""
+def _template_information_sections_html(working_dir: str) -> str:
+    """Template scan cards for Scan Information (empty when no ``templates\\*.xml``)."""
     wd = os.path.normpath(os.path.abspath(working_dir))
     templates_dir = Path(wd) / "templates"
     blocks = collect_template_scan_report_blocks(templates_dir)
     if not blocks:
         return ""
-    body = "".join(
+    return "".join(
         _template_block_html(title, categories)
         for title, _model_file, categories in blocks
     )
+
+
+def generate_template_information_html(working_dir: str, *, embedded: bool = False) -> str:
+    """Standalone Template Information page; empty when no template XML exists."""
+    body = _template_information_sections_html(working_dir)
+    if not body.strip():
+        return ""
     page_class = "mq-stats-page mq-stats-embedded" if embedded else "mq-stats-page"
     if embedded:
         title_html = '  <h1 class="mq-page-title" id="template-information">Template Information</h1>'
@@ -2500,7 +2507,12 @@ def generate_template_information_fragment(working_dir: str, *, embedded: bool =
 
 
 
-def generate_statistics_html(stats: BatchStatistics, *, embedded: bool = False) -> str:
+def generate_statistics_html(
+    stats: BatchStatistics,
+    *,
+    embedded: bool = False,
+    working_dir: str = "",
+) -> str:
 
     skipped_section = _skipped_models_section(stats.skipped_models)
 
@@ -2628,7 +2640,19 @@ def generate_statistics_html(stats: BatchStatistics, *, embedded: bool = False) 
 
 
 
-    body_sections = skipped_section + summary_grid + bom_section + health_section + complexity_snapshot_section + family_section
+    body_sections = (
+        skipped_section
+        + summary_grid
+        + health_section
+        + complexity_snapshot_section
+        + bom_section
+        + family_section
+        + (
+            _template_information_sections_html(working_dir)
+            if (working_dir or "").strip()
+            else ""
+        )
+    )
 
     if not body_sections.strip():
 
@@ -2685,7 +2709,9 @@ def generate_statistics_fragment(
             master_root=master_root,
             model_checks_xml_path=str(_model_checks_xml_path()),
         )
-    return generate_statistics_html(stats, embedded=embedded)
+    return generate_statistics_html(
+        stats, embedded=embedded, working_dir=working_dir
+    )
 
 
 
@@ -2715,7 +2741,9 @@ def write_statistics_html_file(master_xml_path: str, output_path: str) -> str:
             model_checks_xml_path=str(_model_checks_xml_path()),
         )
 
-    fragment = generate_statistics_html(stats, embedded=False)
+    fragment = generate_statistics_html(
+        stats, embedded=False, working_dir=working_dir
+    )
 
     doc = (
 
