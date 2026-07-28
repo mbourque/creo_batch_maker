@@ -290,10 +290,6 @@
         }
         .mq-dsumm-dialog li { margin-bottom: 4px; }
         .mq-dsumm-empty { margin: 0 0 8px; color: #64748b; line-height: 1.45; }
-        .mq-dsumm-footer {
-            margin: 14px 0 0; padding-top: 10px; border-top: 1px solid #e2e8f0;
-            font-size: 0.82rem; color: #64748b;
-        }
         .mq-dsumm-close {
             position: absolute;
             top: 12px;
@@ -309,8 +305,6 @@
             cursor: pointer;
         }
         .mq-dsumm-close:hover { background: #e2e8f0; }
-        .mq-dsumm-actions { text-align: right; margin-top: 14px; }
-        .mq-dsumm-actions .button { margin: 0; }
         body[data-mq-view-filter="flagged"] .file-row:not(:has(.mq-issue-row.flagged)) { display: none !important; }
         body[data-mq-view-filter="flagged"] .check-section-wrapper:not(:has(.file-row .mq-issue-row.flagged)) { display: none !important; }
         body[data-mq-view-filter="unflagged"] .file-row:has(.mq-issue-row.flagged) { display: none !important; }
@@ -1129,10 +1123,6 @@
                 if (!errors.length && !warnings.length && (nErr > 0 || nWrn > 0)) {
                     parts.push('<p class="mq-dsumm-empty">Counts are present, but no detail lines were listed in the summary.</p>');
                 }
-            }
-            if (data && data.last_saved) {
-                parts.push('<p class="mq-dsumm-footer">Last saved: '
-                    + mqEscapeHtml(data.last_saved) + '</p>');
             }
             bodyEl.innerHTML = parts.join('');
             overlay.classList.add('open');
@@ -2508,9 +2498,6 @@
         <button class="mq-dsumm-close" type="button" aria-label="Close" onclick="mqCloseGalleryDsumm()">&times;</button>
         <h2 id="mq-dsumm-title">Model</h2>
         <div id="mq-dsumm-body"></div>
-        <div class="mq-dsumm-actions">
-            <button class="button" type="button" onclick="mqCloseGalleryDsumm()">Close</button>
-        </div>
     </div>
 </div>
 </body>

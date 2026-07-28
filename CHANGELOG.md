@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-28 — v1.12.27
+
+- **Model Gallery**: summary popup no longer shows last-saved date or a second Close button.
+
 ## 2026-07-28 — v1.12.26
 
 - **Model Gallery**: click summaries come from `*.dsumm.xml` again (fixed parsing when ModelCHECK writes bare `&`, e.g. GD&T); master.xml is not used for popup text.

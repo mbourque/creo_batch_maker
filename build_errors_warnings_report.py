@@ -906,7 +906,6 @@ def parse_dsumm_summary(path: str) -> dict | None:
         "num_warnings": num_warnings,
         "errors": errors,
         "warnings": warnings,
-        "last_saved": _first_xml_text(root, "lastsavedate"),
     }
 
 
@@ -996,7 +995,6 @@ def collect_model_gallery_items(
                 "num_warnings": 0,
                 "errors": [],
                 "warnings": [],
-                "last_saved": "",
                 "missing": True,
             }
         else:
