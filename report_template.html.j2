@@ -232,6 +232,7 @@
         }
         a.mq-gallery-card { cursor: grab; }
         a.mq-gallery-card:active { cursor: grabbing; }
+        .mq-gallery-card-plain { cursor: pointer; }
         .mq-gallery-card img, .mq-gallery-card-plain img {
             display: block; width: 100%; height: auto; aspect-ratio: 1 / 1;
             object-fit: contain; background: #f8fafc; border-radius: 6px;
@@ -241,6 +242,75 @@
             font-size: 0.8rem; line-height: 1.3; word-break: break-all; text-align: center;
         }
         .mq-gallery-card[hidden], .mq-gallery-section[hidden] { display: none !important; }
+        .mq-dsumm-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            background: rgba(15, 23, 42, 0.45);
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .mq-dsumm-overlay.open { display: flex; }
+        .mq-dsumm-dialog {
+            position: relative;
+            max-width: 480px;
+            width: 100%;
+            max-height: min(80vh, 640px);
+            overflow: auto;
+            background: #fff;
+            color: #1a1a1a;
+            border-radius: 8px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+            padding: 20px 22px 18px;
+        }
+        .mq-dsumm-dialog h2 {
+            margin: 0 36px 10px 0;
+            font-size: 1.1rem;
+            color: #0f172a;
+            word-break: break-word;
+        }
+        .mq-dsumm-badges {
+            display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px 0;
+        }
+        .mq-dsumm-badge {
+            display: inline-block; padding: 3px 10px; border-radius: 999px;
+            font-size: 0.82rem; font-weight: 600;
+        }
+        .mq-dsumm-badge-err { background: #fee2e2; color: #991b1b; }
+        .mq-dsumm-badge-wrn { background: #fef3c7; color: #92400e; }
+        .mq-dsumm-badge-ok { background: #dcfce7; color: #166534; }
+        .mq-dsumm-dialog h3 {
+            margin: 14px 0 6px; font-size: 0.92rem; color: #334155;
+        }
+        .mq-dsumm-dialog ul {
+            margin: 0 0 4px; padding-left: 1.2rem; line-height: 1.45;
+        }
+        .mq-dsumm-dialog li { margin-bottom: 4px; }
+        .mq-dsumm-empty { margin: 0 0 8px; color: #64748b; line-height: 1.45; }
+        .mq-dsumm-footer {
+            margin: 14px 0 0; padding-top: 10px; border-top: 1px solid #e2e8f0;
+            font-size: 0.82rem; color: #64748b;
+        }
+        .mq-dsumm-close {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 28px;
+            height: 28px;
+            border: none;
+            border-radius: 4px;
+            background: #f0f0f0;
+            color: #475569;
+            font-size: 18px;
+            line-height: 1;
+            cursor: pointer;
+        }
+        .mq-dsumm-close:hover { background: #e2e8f0; }
+        .mq-dsumm-actions { text-align: right; margin-top: 14px; }
+        .mq-dsumm-actions .button { margin: 0; }
         body[data-mq-view-filter="flagged"] .file-row:not(:has(.mq-issue-row.flagged)) { display: none !important; }
         body[data-mq-view-filter="flagged"] .check-section-wrapper:not(:has(.file-row .mq-issue-row.flagged)) { display: none !important; }
         body[data-mq-view-filter="unflagged"] .file-row:has(.mq-issue-row.flagged) { display: none !important; }
@@ -413,7 +483,7 @@
         }
         .save-help-actions .button { margin: 0; }
         @media print {
-            .save-help-overlay { display: none !important; }
+            .save-help-overlay, .mq-dsumm-overlay { display: none !important; }
             .sidebar, .sidebar-edge, .hide-button, .check-buttons, .print-button, .button { display: none; }
             body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: #1a1a1a; }
             .container { margin: 0; max-width: none; box-shadow: none; font-size: 0.95rem; }
@@ -989,6 +1059,85 @@
             if (exceptPanel !== 'statistics') { mqParkStatistics(); }
         }
 
+        function mqEscapeHtml(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function mqCloseGalleryDsumm() {
+            var overlay = document.getElementById('mq-dsumm-overlay');
+            if (overlay) { overlay.classList.remove('open'); }
+        }
+
+        function mqOpenGalleryDsumm(card) {
+            var overlay = document.getElementById('mq-dsumm-overlay');
+            var titleEl = document.getElementById('mq-dsumm-title');
+            var bodyEl = document.getElementById('mq-dsumm-body');
+            if (!overlay || !titleEl || !bodyEl || !card) { return; }
+            var data = null;
+            var raw = card.getAttribute('data-mq-dsumm');
+            if (raw) {
+                try { data = JSON.parse(raw); } catch (err) { data = null; }
+            }
+            var name = (data && data.title)
+                || card.getAttribute('data-mq-gallery-name')
+                || 'Model';
+            titleEl.textContent = name;
+            var nErr = data && typeof data.num_errors === 'number' ? data.num_errors : 0;
+            var nWrn = data && typeof data.num_warnings === 'number' ? data.num_warnings : 0;
+            var errors = (data && data.errors) || [];
+            var warnings = (data && data.warnings) || [];
+            var missing = !!(data && data.missing);
+            var parts = [];
+            parts.push('<div class="mq-dsumm-badges">');
+            if (missing) {
+                parts.push('<span class="mq-dsumm-badge mq-dsumm-badge-ok">No summary file</span>');
+            } else {
+                if (nErr > 0) {
+                    parts.push('<span class="mq-dsumm-badge mq-dsumm-badge-err">'
+                        + nErr + (nErr === 1 ? ' Error' : ' Errors') + '</span>');
+                }
+                if (nWrn > 0) {
+                    parts.push('<span class="mq-dsumm-badge mq-dsumm-badge-wrn">'
+                        + nWrn + (nWrn === 1 ? ' Warning' : ' Warnings') + '</span>');
+                }
+                if (nErr === 0 && nWrn === 0) {
+                    parts.push('<span class="mq-dsumm-badge mq-dsumm-badge-ok">No errors or warnings</span>');
+                }
+            }
+            parts.push('</div>');
+            if (missing) {
+                parts.push('<p class="mq-dsumm-empty">No ModelCHECK detail summary (*.dsumm.xml) was found for this model.</p>');
+            } else {
+                if (errors.length) {
+                    parts.push('<h3>Errors</h3><ul>');
+                    for (var i = 0; i < errors.length; i++) {
+                        parts.push('<li>' + mqEscapeHtml(errors[i]) + '</li>');
+                    }
+                    parts.push('</ul>');
+                }
+                if (warnings.length) {
+                    parts.push('<h3>Warnings</h3><ul>');
+                    for (var w = 0; w < warnings.length; w++) {
+                        parts.push('<li>' + mqEscapeHtml(warnings[w]) + '</li>');
+                    }
+                    parts.push('</ul>');
+                }
+                if (!errors.length && !warnings.length && (nErr > 0 || nWrn > 0)) {
+                    parts.push('<p class="mq-dsumm-empty">Counts are present, but no detail lines were listed in the summary.</p>');
+                }
+            }
+            if (data && data.last_saved) {
+                parts.push('<p class="mq-dsumm-footer">Last saved: '
+                    + mqEscapeHtml(data.last_saved) + '</p>');
+            }
+            bodyEl.innerHTML = parts.join('');
+            overlay.classList.add('open');
+        }
+
         function mqInitModelGallerySearch() {
             var root = mqGalleryEntry && mqGalleryEntry.root
                 ? mqGalleryEntry.root
@@ -1048,6 +1197,45 @@
                     setTypeFilter(this.getAttribute('data-mq-gallery-type') || 'all');
                 });
             }
+            var ptrDown = false;
+            var ptrMoved = false;
+            var ptrX = 0;
+            var ptrY = 0;
+            var dragOccurred = false;
+            root.addEventListener('pointerdown', function (ev) {
+                var card = ev.target.closest
+                    ? ev.target.closest('[data-mq-gallery-name]')
+                    : null;
+                if (!card || !root.contains(card)) { return; }
+                ptrDown = true;
+                ptrMoved = false;
+                dragOccurred = false;
+                ptrX = ev.clientX;
+                ptrY = ev.clientY;
+            });
+            root.addEventListener('pointermove', function (ev) {
+                if (!ptrDown) { return; }
+                var dx = ev.clientX - ptrX;
+                var dy = ev.clientY - ptrY;
+                if ((dx * dx + dy * dy) > 25) { ptrMoved = true; }
+            });
+            root.addEventListener('pointerup', function () { ptrDown = false; });
+            root.addEventListener('pointercancel', function () { ptrDown = false; });
+            root.addEventListener('dragstart', function (ev) {
+                var card = ev.target.closest
+                    ? ev.target.closest('[data-mq-gallery-name]')
+                    : null;
+                if (card && root.contains(card)) { dragOccurred = true; }
+            });
+            root.addEventListener('click', function (ev) {
+                var card = ev.target.closest
+                    ? ev.target.closest('[data-mq-gallery-name]')
+                    : null;
+                if (!card || !root.contains(card)) { return; }
+                if (ptrMoved || dragOccurred) { return; }
+                ev.preventDefault();
+                mqOpenGalleryDsumm(card);
+            });
             setTypeFilter('all');
         }
 
@@ -2033,12 +2221,24 @@
             }
             function initSaveHelpDialog() {
                 var overlay = document.getElementById('save-help-overlay');
-                if (!overlay) { return; }
-                overlay.addEventListener('click', function (ev) {
-                    if (ev.target === overlay) { closeSaveHelp(); }
-                });
+                if (overlay) {
+                    overlay.addEventListener('click', function (ev) {
+                        if (ev.target === overlay) { closeSaveHelp(); }
+                    });
+                }
+                var dsumm = document.getElementById('mq-dsumm-overlay');
+                if (dsumm) {
+                    dsumm.addEventListener('click', function (ev) {
+                        if (ev.target === dsumm) { mqCloseGalleryDsumm(); }
+                    });
+                }
                 document.addEventListener('keydown', function (ev) {
-                    if (ev.key === 'Escape' && overlay.classList.contains('open')) {
+                    if (ev.key !== 'Escape') { return; }
+                    if (dsumm && dsumm.classList.contains('open')) {
+                        mqCloseGalleryDsumm();
+                        return;
+                    }
+                    if (overlay && overlay.classList.contains('open')) {
                         closeSaveHelp();
                     }
                 });
@@ -2300,6 +2500,16 @@
         <div class="save-help-actions">
             <button class="button" type="button" onclick="saveAdjustedReport()">Save index.html</button>
             <button class="button" type="button" onclick="closeSaveHelp()">Close</button>
+        </div>
+    </div>
+</div>
+<div class="mq-dsumm-overlay" id="mq-dsumm-overlay" role="dialog" aria-modal="true" aria-labelledby="mq-dsumm-title">
+    <div class="mq-dsumm-dialog">
+        <button class="mq-dsumm-close" type="button" aria-label="Close" onclick="mqCloseGalleryDsumm()">&times;</button>
+        <h2 id="mq-dsumm-title">Model</h2>
+        <div id="mq-dsumm-body"></div>
+        <div class="mq-dsumm-actions">
+            <button class="button" type="button" onclick="mqCloseGalleryDsumm()">Close</button>
         </div>
     </div>
 </div>

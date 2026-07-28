@@ -2,6 +2,30 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-28 — v1.12.26
+
+- **Model Gallery**: click summaries come from `*.dsumm.xml` again (fixed parsing when ModelCHECK writes bare `&`, e.g. GD&T); master.xml is not used for popup text.
+
+## 2026-07-28 — v1.12.25
+
+- **Model Gallery**: click summary now comes from the same ModelCHECK results as the report (master.xml), so part popups show errors and warnings reliably.
+
+## 2026-07-28 — v1.12.24
+
+- **Model Gallery**: during Create Report, pairs each ModelCHECK `*.p.xml` / `*.a.xml` / `*.d.xml` with its sibling `*.dsumm.xml` so part summaries bake correctly.
+
+## 2026-07-28 — v1.12.23
+
+- **Model Gallery**: part summary popups now match ModelCHECK `*.dsumm.xml` by the model name inside the file (fixes `0-RING.PRT` / `0-ring.p.dsumm.xml` and similar).
+
+## 2026-07-28 — v1.12.22
+
+- **Model Gallery**: fixed part summary popups when ModelCHECK wrote lowercase `*.p.dsumm.xml` names (for example `19_T_COG.PRT` → `19_t_cog.p.dsumm.xml`).
+
+## 2026-07-28 — v1.12.21
+
+- **Model Gallery**: click a card for a ModelCHECK error/warning summary popup (drag into Creo still works).
+
 ## 2026-07-28 — v1.12.20
 
 - **Scan Information**: removed the extra Template Information heading above the template cards.

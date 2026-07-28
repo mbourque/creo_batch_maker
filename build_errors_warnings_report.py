@@ -11,6 +11,7 @@ import argparse
 import glob
 import hashlib
 import html
+import json
 import os
 import re
 import sys
@@ -825,19 +826,146 @@ def thumbnail_src_for_report(
 
 _GALLERY_TYPE_ORDER = {"PRT": 0, "ASM": 1, "DRW": 2}
 _GALLERY_TYPE_LABELS = {"PRT": "Parts", "ASM": "Assemblies", "DRW": "Drawings"}
+_EMPTY_DSUMM_PHRASES = frozenset(
+    {
+        "no errors found.",
+        "no warnings found.",
+    }
+)
+_DSUMM_SUFFIX_TO_EXT = {
+    ".p.dsumm.xml": ".prt",
+    ".a.dsumm.xml": ".asm",
+    ".d.dsumm.xml": ".drw",
+}
+
+
+def _fix_bare_ampersands(text: str) -> str:
+    """ModelCHECK often writes ``GD&T``; make bare ``&`` legal for XML parsers."""
+    return re.sub(r"&(?![#a-zA-Z0-9]+;)", "&amp;", text)
+
+
+def _xml_root_from_path(path: str) -> ET.Element | None:
+    try:
+        return ET.parse(path).getroot()
+    except (ET.ParseError, OSError):
+        pass
+    try:
+        with open(path, "rb") as f:
+            raw = f.read().decode("utf-8", errors="ignore")
+        raw = re.sub(r"[^\x20-\x7E\n\r\t]", "", raw)
+        raw = _fix_bare_ampersands(raw)
+        return ET.fromstring(raw)
+    except (ET.ParseError, OSError, ValueError):
+        return None
+
+
+def _first_xml_text(root: ET.Element, *tags: str) -> str:
+    for tag in tags:
+        el = root.find(tag)
+        if el is not None and (el.text or "").strip():
+            return (el.text or "").strip()
+        el = root.find(f".//{tag}")
+        if el is not None and (el.text or "").strip():
+            return (el.text or "").strip()
+    return ""
+
+
+def parse_dsumm_summary(path: str) -> dict | None:
+    """Read ModelCHECK detail-summary counts and error/warning lines from a dsumm XML."""
+    root = _xml_root_from_path(path)
+    if root is None:
+        return None
+
+    title = _first_xml_text(root, "mdlname", "hdrmodelname", "model")
+    try:
+        num_errors = int(_first_xml_text(root, "numerr") or "0")
+    except ValueError:
+        num_errors = 0
+    try:
+        num_warnings = int(_first_xml_text(root, "numwrn") or "0")
+    except ValueError:
+        num_warnings = 0
+
+    errors: list[str] = []
+    for err in root.findall(".//err-section/errdata"):
+        info = err.find("einfo")
+        text = (info.text or "").strip() if info is not None else ""
+        if text and text.casefold() not in _EMPTY_DSUMM_PHRASES:
+            errors.append(text)
+
+    warnings: list[str] = []
+    for wrn in root.findall(".//wrn-section/wrndata"):
+        info = wrn.find("winfo")
+        text = (info.text or "").strip() if info is not None else ""
+        if text and text.casefold() not in _EMPTY_DSUMM_PHRASES:
+            warnings.append(text)
+
+    return {
+        "title": title,
+        "num_errors": num_errors,
+        "num_warnings": num_warnings,
+        "errors": errors,
+        "warnings": warnings,
+        "last_saved": _first_xml_text(root, "lastsavedate"),
+    }
+
+
+def build_dsumm_summary_by_model(working_dir: str) -> dict[str, dict]:
+    """Load every ``*.p.dsumm.xml`` / ``*.a.dsumm.xml`` / ``*.d.dsumm.xml`` in ``working_dir``.
+
+    Keys are casefolded model names from the file (``mdlname``) and from the
+    filename (``0-ring.p.dsumm.xml`` → ``0-ring.prt``). Does not use master.xml.
+    """
+    out: dict[str, dict] = {}
+    wd = os.path.normpath(os.path.abspath(working_dir))
+    try:
+        names = os.listdir(wd)
+    except OSError:
+        return {}
+
+    for name in names:
+        low = name.lower()
+        ext = None
+        for suffix, model_ext in _DSUMM_SUFFIX_TO_EXT.items():
+            if low.endswith(suffix):
+                ext = model_ext
+                stem = name[: -len(suffix)]
+                break
+        if ext is None:
+            continue
+        path = os.path.join(wd, name)
+        try:
+            if not os.path.isfile(path):
+                continue
+        except OSError:
+            continue
+        summary = parse_dsumm_summary(path)
+        if not summary:
+            continue
+        title = (summary.get("title") or "").strip()
+        file_model = f"{stem}{ext}"
+        if not title:
+            summary = dict(summary)
+            summary["title"] = file_model
+            title = file_model
+        out[title.casefold()] = summary
+        out[file_model.casefold()] = summary
+    return out
 
 
 def collect_model_gallery_items(
     files_info: dict,
     report_assets_dir: str,
     working_dir: str,
-) -> list[dict[str, str]]:
+) -> list[dict]:
     """Unique scanned models for the gallery, ordered PRT → ASM → DRW, then name.
 
     Missing thumbs use the shared blank placeholder (same as issue rows).
+    Popup text comes only from sibling ``*.dsumm.xml`` files (not master.xml).
     """
     seen: set[tuple[str, str]] = set()
-    items: list[dict[str, str]] = []
+    items: list[dict] = []
+    dsumm_by_model = build_dsumm_summary_by_model(working_dir)
     for file_path, file_info in files_info.items():
         display = (file_info.get("report_display_name") or get_display_name(file_path) or "").strip()
         if not display:
@@ -856,12 +984,32 @@ def collect_model_gallery_items(
         src = thumbnail_src_for_report(
             report_assets_dir, working_dir, display, pro_type=pro_type
         )
+        dsumm = dsumm_by_model.get(display.casefold())
+        if dsumm is None:
+            model_tag = (file_info.get("model") or "").strip()
+            if model_tag:
+                dsumm = dsumm_by_model.get(model_tag.casefold())
+        if dsumm is None:
+            dsumm = {
+                "title": display,
+                "num_errors": 0,
+                "num_warnings": 0,
+                "errors": [],
+                "warnings": [],
+                "last_saved": "",
+                "missing": True,
+            }
+        else:
+            dsumm = dict(dsumm)
+            if not dsumm.get("title"):
+                dsumm["title"] = display
         items.append(
             {
                 "name": display,
                 "pro_type": pro_type,
                 "href": href,
                 "image_url": src,
+                "dsumm": dsumm,
             }
         )
     items.sort(
@@ -871,6 +1019,41 @@ def collect_model_gallery_items(
         )
     )
     return items
+
+
+def _gallery_card_html(row: dict) -> str:
+    name_esc = html.escape(row["name"])
+    name_attr = html.escape(row["name"], quote=True)
+    src_esc = html.escape(row["image_url"], quote=True)
+    tip = "Click for ModelCHECK summary · Drag into Creo"
+    tip_attr = html.escape(tip, quote=True)
+    dsumm_json = html.escape(
+        json.dumps(row.get("dsumm") or {}, ensure_ascii=False, separators=(",", ":")),
+        quote=True,
+    )
+    img = (
+        f'<img loading="lazy" decoding="async" draggable="false" '
+        f'title="{tip_attr}" src="{src_esc}" alt=""/>'
+    )
+    name_html = f'<span class="mq-gallery-name">{name_esc}</span>'
+    if row["href"]:
+        href_esc = html.escape(row["href"], quote=True)
+        return (
+            f'<a class="mq-gallery-card" href="{href_esc}" '
+            f'data-mq-gallery-name="{name_attr}" data-mq-dsumm="{dsumm_json}" '
+            f'title="{tip_attr}" onclick="void(0); return false;">'
+            f"{img}{name_html}</a>"
+        )
+    plain_tip = html.escape(
+        "Click for ModelCHECK summary. No file link: session-style model name "
+        "(not used as a file URL).",
+        quote=True,
+    )
+    return (
+        f'<div class="mq-gallery-card mq-gallery-card-plain" '
+        f'data-mq-gallery-name="{name_attr}" data-mq-dsumm="{dsumm_json}" '
+        f'title="{plain_tip}">{img}{name_html}</div>'
+    )
 
 
 def generate_model_gallery_fragment(
@@ -884,8 +1067,8 @@ def generate_model_gallery_fragment(
     if not items:
         return ""
 
-    by_type: dict[str, list[dict[str, str]]] = {"PRT": [], "ASM": [], "DRW": []}
-    other: list[dict[str, str]] = []
+    by_type: dict[str, list[dict]] = {"PRT": [], "ASM": [], "DRW": []}
+    other: list[dict] = []
     for item in items:
         bucket = by_type.get(item["pro_type"])
         if bucket is None:
@@ -899,30 +1082,7 @@ def generate_model_gallery_fragment(
         if not rows:
             continue
         label = _GALLERY_TYPE_LABELS[pro_type]
-        cards: list[str] = []
-        for row in rows:
-            name_esc = html.escape(row["name"])
-            name_attr = html.escape(row["name"], quote=True)
-            src_esc = html.escape(row["image_url"], quote=True)
-            img = (
-                f'<img loading="lazy" decoding="async" draggable="false" '
-                f'title="Drag this into Creo" src="{src_esc}" alt=""/>'
-            )
-            name_html = f'<span class="mq-gallery-name">{name_esc}</span>'
-            if row["href"]:
-                href_esc = html.escape(row["href"], quote=True)
-                cards.append(
-                    f'<a class="mq-gallery-card" href="{href_esc}" '
-                    f'data-mq-gallery-name="{name_attr}" title="Drag this into Creo" '
-                    f'onclick="void(0); return false;">{img}{name_html}</a>'
-                )
-            else:
-                cards.append(
-                    f'<div class="mq-gallery-card mq-gallery-card-plain" '
-                    f'data-mq-gallery-name="{name_attr}" '
-                    f'title="No file link: session-style model name (not used as a file URL).">'
-                    f"{img}{name_html}</div>"
-                )
+        cards = [_gallery_card_html(row) for row in rows]
         sections.append(
             f'<section class="mq-gallery-section" data-mq-gallery-type="{pro_type}">'
             f'<h2><span class="mq-gallery-count">{len(rows)}</span> {html.escape(label)}</h2>'
@@ -931,28 +1091,7 @@ def generate_model_gallery_fragment(
         )
 
     if other:
-        cards = []
-        for row in other:
-            name_esc = html.escape(row["name"])
-            name_attr = html.escape(row["name"], quote=True)
-            src_esc = html.escape(row["image_url"], quote=True)
-            img = (
-                f'<img loading="lazy" decoding="async" draggable="false" '
-                f'title="Drag this into Creo" src="{src_esc}" alt=""/>'
-            )
-            name_html = f'<span class="mq-gallery-name">{name_esc}</span>'
-            if row["href"]:
-                href_esc = html.escape(row["href"], quote=True)
-                cards.append(
-                    f'<a class="mq-gallery-card" href="{href_esc}" '
-                    f'data-mq-gallery-name="{name_attr}" title="Drag this into Creo" '
-                    f'onclick="void(0); return false;">{img}{name_html}</a>'
-                )
-            else:
-                cards.append(
-                    f'<div class="mq-gallery-card mq-gallery-card-plain" '
-                    f'data-mq-gallery-name="{name_attr}">{img}{name_html}</div>'
-                )
+        cards = [_gallery_card_html(row) for row in other]
         sections.append(
             '<section class="mq-gallery-section" data-mq-gallery-type="OTHER">'
             f'<h2><span class="mq-gallery-count">{len(other)}</span> Other</h2>'
@@ -979,7 +1118,10 @@ def generate_model_gallery_fragment(
                 aria-pressed="true">Show all</button>
         {"".join(type_buttons)}
       </div>"""
-    return f"""<div class="mq-stats-page mq-stats-embedded mq-gallery-page" id="mq-model-gallery">
+    # Bake-size marker so a rebuilt report can be distinguished from a stale index.html.
+    dsumm_hits = sum(1 for row in items if not (row.get("dsumm") or {}).get("missing"))
+    return f"""<div class="mq-stats-page mq-stats-embedded mq-gallery-page" id="mq-model-gallery" data-mq-dsumm-hits="{dsumm_hits}">
+  <!-- mq-dsumm-hits:{dsumm_hits} -->
   <h1 class="mq-page-title" id="model-gallery">Model Gallery</h1>
   <div class="mq-gallery-toolbar">
     <div class="mq-gallery-toolbar-row">
