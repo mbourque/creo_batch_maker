@@ -2419,7 +2419,10 @@ def _template_line_html(line: str) -> str:
     text = (line or "").strip()
     if not text:
         return ""
-    if ": " in text and "\n" not in text:
+    # Newline-joined lists (e.g. Start relations) stay plain text, one item per line.
+    if "\n" in text:
+        return f'<p class="mq-template-cat-body mq-template-cat-pre">{_esc(text)}</p>'
+    if ": " in text:
         prefix, rest = text.split(": ", 1)
         values = _template_split_tag_values(rest)
         if values:

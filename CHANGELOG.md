@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-29 — v1.12.31
+
+- **Report > Template Information**: **Start relations** show as plain text, one relation per line (not tags).
+
 ## 2026-07-29 — v1.12.30
 
 - **Batch settings**: **Defaults** restores chunk size 10, output wait 120 s, and xtop gone timeout 20 s.
