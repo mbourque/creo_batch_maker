@@ -7628,10 +7628,15 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         )
 
         btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
-        btn_row.pack(anchor="e", padx=20, pady=(0, 16))
+        btn_row.pack(fill="x", padx=20, pady=(0, 16))
 
         def close_dialog() -> None:
             dialog.destroy()
+
+        def on_defaults() -> None:
+            chunk_var.set(str(CREO_BATCH_CHUNK_SIZE_DEFAULT))
+            output_var.set(str(BATCH_OUTPUT_WAIT_TIMEOUT_DEFAULT))
+            xtop_var.set(str(BATCH_XTOP_GONE_TIMEOUT_SEC_DEFAULT))
 
         def on_ok() -> None:
             chunk_raw = chunk_var.get().strip()
@@ -7702,6 +7707,10 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 return
             close_dialog()
 
+        defaults_btn = self._mk_dialog_button(
+            btn_row, text="Defaults", width=90, primary=False, command=on_defaults
+        )
+        defaults_btn.pack(side="left")
         ok_btn = self._mk_dialog_button(
             btn_row, text="OK", width=80, primary=True, command=on_ok
         )
@@ -7727,7 +7736,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         self._run_modal_toplevel_wait(
             dialog,
             focus_widget=first_entry,
-            repaints=(ok_btn, cancel_btn),
+            repaints=(defaults_btn, ok_btn, cancel_btn),
         )
 
     def _condition_mcc_path(self) -> Path:

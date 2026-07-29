@@ -2,6 +2,14 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-29 — v1.12.30
+
+- **Batch settings**: **Defaults** restores chunk size 10, output wait 120 s, and xtop gone timeout 20 s.
+
+## 2026-07-29 — v1.12.29
+
+- **Model Gallery**: short how-to under the heading covers click for summary, drag into Creo, search, and type filters.
+
 ## 2026-07-29 — v1.12.28
 
 - **Model Gallery**: duplicate lines in the summary popup are now collapsed (e.g. "Missing 23 layers" shown once, not twice).

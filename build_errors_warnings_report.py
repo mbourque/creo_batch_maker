@@ -1127,6 +1127,7 @@ def generate_model_gallery_fragment(
     return f"""<div class="mq-stats-page mq-stats-embedded mq-gallery-page" id="mq-model-gallery" data-mq-dsumm-hits="{dsumm_hits}">
   <!-- mq-dsumm-hits:{dsumm_hits} -->
   <h1 class="mq-page-title" id="model-gallery">Model Gallery</h1>
+  <p class="mq-gallery-intro">Click a model for its ModelCHECK error and warning summary. Drag a card into Creo to open the file. Use search to find models by name, and the type filters to show all models or only parts, assemblies, or drawings.</p>
   <div class="mq-gallery-toolbar">
     <div class="mq-gallery-toolbar-row">
       <input type="search" id="mq-gallery-search" class="mq-gallery-search"

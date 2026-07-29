@@ -1566,11 +1566,12 @@ Suppressed features are appropriate if they are only used by particular instance
     <Check>
         <Name>Drawing Parameters Existence</Name>
         <Category>Consistency</Category>
-        <Description>Checks whether required parameters exist within the drawing and are properly defined according to company drafting and documentation standards. Drawing parameters are commonly used to store and display important metadata such as drawing numbers, descriptions, revisions, materials, approvals, project information, and manufacturing data. Missing or improperly defined parameters can lead to incomplete title blocks, incorrect BOM data, failed Windchill or ERP integration, and downstream manufacturing or inspection issues. This check helps ensure that all required drawing metadata is present, accurate, and consistently maintained throughout the documentation process. Required drawing parameter definitions are typically configured in the start.mcs file using DRW_PARAMETER and related entries, while check behavior and reporting are controlled by the PARAMS_EXIST settings in the check.mch configuration file.</Description>
+        <Description>Checks whether parameters exist within the drawing.</Description>
         <ModelCheckName>PARAMS_EXIST</ModelCheckName>
-        <ModelCheckOptions>YNEW W W N N Y</ModelCheckOptions>
+        <ModelCheckOptions>YNEW Y Y N N Y</ModelCheckOptions>
         <display>Y</display>
         <enabled>Y</enabled>         
+        <info_check>Y</info_check>
     </Check>
     <Check>
         <Name>Unused Drawing Parameters</Name>
