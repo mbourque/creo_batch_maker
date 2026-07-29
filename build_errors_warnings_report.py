@@ -887,18 +887,24 @@ def parse_dsumm_summary(path: str) -> dict | None:
         num_warnings = 0
 
     errors: list[str] = []
+    seen_err: set[str] = set()
     for err in root.findall(".//err-section/errdata"):
         info = err.find("einfo")
         text = (info.text or "").strip() if info is not None else ""
         if text and text.casefold() not in _EMPTY_DSUMM_PHRASES:
-            errors.append(text)
+            if text.casefold() not in seen_err:
+                seen_err.add(text.casefold())
+                errors.append(text)
 
     warnings: list[str] = []
+    seen_wrn: set[str] = set()
     for wrn in root.findall(".//wrn-section/wrndata"):
         info = wrn.find("winfo")
         text = (info.text or "").strip() if info is not None else ""
         if text and text.casefold() not in _EMPTY_DSUMM_PHRASES:
-            warnings.append(text)
+            if text.casefold() not in seen_wrn:
+                seen_wrn.add(text.casefold())
+                warnings.append(text)
 
     return {
         "title": title,

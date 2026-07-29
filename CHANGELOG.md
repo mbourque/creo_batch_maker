@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-29 — v1.12.28
+
+- **Model Gallery**: duplicate lines in the summary popup are now collapsed (e.g. "Missing 23 layers" shown once, not twice).
+
 ## 2026-07-28 — v1.12.27
 
 - **Model Gallery**: summary popup no longer shows last-saved date or a second Close button.
