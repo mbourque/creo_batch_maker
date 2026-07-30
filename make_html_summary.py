@@ -262,7 +262,6 @@ def generate_adjusted_summary_shell(
     baked_attr = ' data-mq-summary-baked="1"' if issue_summary else ""
     pass_attr = f' data-mq-pass-issues="{pass_issues}"' if issue_summary else ""
     parts = [
-        _MQ_DASHBOARD_CSS,
         f"""
 <div class="mq-dashboard"{baked_attr}{pass_attr}>
   <h1 class="mq-page-title" id="mq-page-title">Score</h1>
@@ -323,7 +322,7 @@ def generate_adjusted_summary_shell(
         parts.append(f"""
       <div class="mq-cat-card{empty_class}" id="{dom_id}" data-mq-category="{cat_esc}"{pass_attr_cat}>
         <div class="mq-cat-head">
-          <h3 class="mq-cat-title">{cat_esc}</h3>
+          <h2 class="mq-cat-title">{cat_esc}</h2>
           <div class="mq-cat-badge {grade_css_class(letter)}" data-mq-role="badge">{html.escape(letter)}</div>
         </div>
         <p class="mq-cat-desc">{desc_esc}</p>
@@ -440,7 +439,7 @@ def generate_summary_div(master_xml_path, model_checks_xml_path):
             parts.append(f"""
       <div class="mq-cat-card">
         <div class="mq-cat-head">
-          <h3 class="mq-cat-title">{cat_esc}</h3>
+          <h2 class="mq-cat-title">{cat_esc}</h2>
           <div class="mq-cat-badge {grade_css_class(grade)}">{html.escape(grade)}</div>
         </div>
         <p class="mq-cat-desc">{desc_esc}</p>

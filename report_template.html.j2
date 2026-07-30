@@ -121,6 +121,15 @@
         .sidebar a { display: block; padding: 5px 0; color: #007BFF; text-decoration: none; }
         .sidebar a:hover { text-decoration: underline; }
         .sidebar ul { list-style-type: none; padding-left: 0; padding-bottom: 20px }
+        .sidebar ul li.sidebar-nav-sep {
+            height: 0;
+            margin: 10px 0;
+            padding: 0;
+            border: none;
+            border-top: 1px solid #ccc;
+            overflow: hidden;
+            list-style: none;
+        }
         .sidebar ul li.sidebar-nav-active {
             background-color: #e8ecf1;
             border-radius: 4px;
@@ -487,7 +496,8 @@
             .container { margin: 0; max-width: none; box-shadow: none; font-size: 0.95rem; }
         }
     </style>
-    <script defer>
+    {{ report_panel_styles | safe }}
+    <script>
         let hiddenSections = [];
         let scoreViewAdjusted = false;
         let reportSessionDirty = false;
@@ -676,8 +686,8 @@
         function mqApplySidebarNavOrder(mode) {
             var ul = document.querySelector('.sidebar ul');
             if (!ul) { return; }
-            var hr = ul.querySelector('hr');
-            if (!hr) { return; }
+            var sep = ul.querySelector('.sidebar-nav-sep') || ul.querySelector('hr');
+            if (!sep) { return; }
             var navs = ul.querySelectorAll('.sidebar-check-nav');
             if (!navs.length) { return; }
             var sorted = [];
@@ -700,7 +710,7 @@
                     return oa - ob;
                 });
             }
-            var insertAfter = hr;
+            var insertAfter = sep;
             for (var j = 0; j < sorted.length; j++) {
                 insertAfter.parentNode.insertBefore(sorted[j], insertAfter.nextSibling);
                 insertAfter = sorted[j];
@@ -1299,6 +1309,8 @@
 
         function mqSectionMatchesFilter(wrapper, mode) {
             if (!wrapper) { return true; }
+            // Empty after Remove / Remove all like this — treat as gone for nav and browse.
+            if (mqCountSectionIssues(wrapper) === 0) { return false; }
             var stat = wrapper.getAttribute('data-mq-section-stat') || '';
             if (stat === 'INFO' && mode !== 'information') { return false; }
             if (mode === 'all' || isSortByIssueCountMode(mode)) { return true; }
@@ -1918,20 +1930,22 @@
         }
 
         function removeEmptyCheckSections() {
+            // Snapshot ids first — registry mutates while removing.
+            var emptyIds = [];
             var checkSections = mqAllSections();
             for (var i = 0; i < checkSections.length; i++) {
-                var checkSectionWrapper = checkSections[i];
-                var checkSection = checkSectionWrapper.getElementsByClassName('check-section')[0];
-                var fileLists = checkSection.getElementsByClassName('file-list');
-                var allHidden = true;
-                for (var j = 0; j < fileLists.length; j++) {
-                    if (fileLists[j].parentNode) { allHidden = false; break; }
+                var wrapper = checkSections[i];
+                if (!wrapper || !wrapper.id) { continue; }
+                if (mqCountSectionIssues(wrapper) === 0) {
+                    emptyIds.push(wrapper.id);
                 }
-                if (allHidden) {
-                    hiddenSections.push(checkSectionWrapper.id);
-                    mqRemoveSidebarNavForSection(checkSectionWrapper.id);
-                    mqRemoveSectionFromRegistry(checkSectionWrapper.id);
-                }
+            }
+            for (var j = 0; j < emptyIds.length; j++) {
+                var id = emptyIds[j];
+                if (!mqGetSection(id)) { continue; }
+                hiddenSections.push(id);
+                mqRemoveSidebarNavForSection(id);
+                mqRemoveSectionFromRegistry(id);
             }
         }
 
@@ -2364,7 +2378,7 @@
         {% if model_gallery_div %}
         <li class="sidebar-top-nav" data-mq-panel="gallery"><a href="#model-gallery">Model Gallery</a></li>
         {% endif %}
-        <hr>
+        <li class="sidebar-nav-sep" aria-hidden="true"></li>
         {% for section in check_sections %}
         <li title="{{ section.category }}" class="sidebar-check-nav wrapper-{{ section.class }}"
             data-mq-section-id="wrapper-{{ section.class }}"
@@ -2428,10 +2442,10 @@
                 {% if file.image_url %}
                     {% if file.model_href %}
                 <a class="model-thumb-wrap" href="{{ file.model_href | safe }}" title="Drag this into Creo" onclick="void(0); return false;">
-                    <img loading="lazy" decoding="async" draggable="false" title="Drag this into Creo" src="{{ file.image_url | e }}" alt="" onerror="this.onerror=null;this.style.display='none';"/></a>
+                    <img loading="lazy" decoding="async" draggable="false" title="Drag this into Creo" src="{{ file.image_url | e }}" alt="" onerror="this.onerror=null;this.style.display='none';"></a>
                     {% else %}
                 <span class="model-thumb-wrap" title="No file link: session-style model name (not used as a file URL).">
-                    <img loading="lazy" decoding="async" title="No file link for this model name" src="{{ file.image_url | e }}" alt="" onerror="this.onerror=null;this.style.display='none';"/></span>
+                    <img loading="lazy" decoding="async" title="No file link for this model name" src="{{ file.image_url | e }}" alt="" onerror="this.onerror=null;this.style.display='none';"></span>
                     {% endif %}
                 {% endif %}
                 <p>{% if file.model_href %}<a href="{{ file.model_href | safe }}" title="Drag this into Creo" onclick="void(0); return false;">{{ file.display_name_link_text | e }}</a>{% else %}<span class="model-name-plain">{{ file.display_name | e }}</span>{% endif %}&nbsp;

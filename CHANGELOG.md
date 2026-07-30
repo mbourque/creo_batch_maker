@@ -2,6 +2,22 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-30 — v1.12.35
+
+- **Report > Score**: category titles use heading level 2 (valid outline under the Score heading).
+
+## 2026-07-30 — v1.12.34
+
+- **Report**: gallery and check thumbnails use HTML5 void tags (no trailing `/` on `<img>` / `<input>`).
+
+## 2026-07-30 — v1.12.33
+
+- **Report**: **Remove all like this** drops an empty check card the same way **Remove this** does (sidebar entry goes too).
+
+## 2026-07-30 — v1.12.32
+
+- **Report**: cleaner HTML for validators (no inline `defer`, sidebar separator, health bars, Score/Scan styles in `<head>`).
+
 ## 2026-07-29 — v1.12.31
 
 - **Report > Template Information**: **Start relations** show as plain text, one relation per line (not tags).

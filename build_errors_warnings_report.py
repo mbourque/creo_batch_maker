@@ -23,8 +23,9 @@ import markdown
 from jinja2 import Environment, FileSystemLoader
 from PIL import Image, ImageDraw
 
-from make_html_statistics import generate_statistics_fragment
+from make_html_statistics import _MQ_STATS_CSS, generate_statistics_fragment
 from make_html_summary import (
+    _MQ_DASHBOARD_CSS,
     generate_adjusted_summary_shell,
     get_category_descriptions,
     scan_visible_issue_summary,
@@ -1037,7 +1038,7 @@ def _gallery_card_html(row: dict) -> str:
     )
     img = (
         f'<img loading="lazy" decoding="async" draggable="false" '
-        f'title="{tip_attr}" src="{src_esc}" alt=""/>'
+        f'title="{tip_attr}" src="{src_esc}" alt="">'
     )
     name_html = f'<span class="mq-gallery-name">{name_esc}</span>'
     if row["href"]:
@@ -1131,7 +1132,7 @@ def generate_model_gallery_fragment(
   <div class="mq-gallery-toolbar">
     <div class="mq-gallery-toolbar-row">
       <input type="search" id="mq-gallery-search" class="mq-gallery-search"
-             placeholder="Search models…" autocomplete="off" spellcheck="false"/>
+             placeholder="Search models…" autocomplete="off" spellcheck="false">
 {toggles_html}
     </div>
     <p id="mq-gallery-empty" class="mq-gallery-empty" hidden>No models match this search.</p>
@@ -1301,6 +1302,7 @@ def create_html_report(
         summary_div=summary_div,
         statistics_div=statistics_div,
         model_gallery_div=model_gallery_div,
+        report_panel_styles=_MQ_DASHBOARD_CSS + "\n" + _MQ_STATS_CSS,
     )
 
     out_dir = os.path.dirname(os.path.abspath(output_file))

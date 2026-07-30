@@ -1459,7 +1459,7 @@ def generate_performance_table_html(
   <div class="mq-stats-grid">
     <div class="mq-stat-card mq-perf-card">
       <h2>CAD Assessment Summary</h2>
-      <table class="mq-perf-table" role="table">
+      <table class="mq-perf-table">
         <tbody>
 {table_body}
         </tbody>
@@ -1942,9 +1942,9 @@ _MQ_STATS_CSS = """
 
 .mq-health-label { flex: 1; min-width: 160px; }
 
-.mq-health-track { flex: 2; height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; max-width: 280px; }
+.mq-health-track { flex: 2; display: block; height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; max-width: 280px; }
 
-.mq-health-fill { height: 100%; background: #f59e0b; border-radius: 4px; }
+.mq-health-fill { display: block; height: 100%; background: #f59e0b; border-radius: 4px; }
 
 .mq-health-count { width: 48px; text-align: right; font-weight: 600; color: #0f172a; }
 
@@ -2557,9 +2557,9 @@ def generate_statistics_html(
         bar_w = (count / health_max * 100) if health_max else 0
 
         bar_inner = f"""
-          <div class="mq-health-label">{_esc(label)}</div>
-          <div class="mq-health-track"><div class="mq-health-fill" style="width:{bar_w:.0f}%"></div></div>
-          <div class="mq-health-count">{count}</div>"""
+          <span class="mq-health-label">{_esc(label)}</span>
+          <span class="mq-health-track"><span class="mq-health-fill" style="width:{bar_w:.0f}%"></span></span>
+          <span class="mq-health-count">{count}</span>"""
 
         if embedded:
 
@@ -2670,7 +2670,7 @@ def generate_statistics_html(
     page_class = "mq-stats-page mq-stats-embedded" if embedded else "mq-stats-page"
     if embedded:
         title_html = '  <h1 class="mq-page-title" id="statistics">Scan Information</h1>'
-        return f"""<div id="mq-scan-information">{_MQ_STATS_CSS}
+        return f"""<div id="mq-scan-information">
 <div class="{page_class}">
 
 {title_html}
