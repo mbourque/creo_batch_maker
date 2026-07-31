@@ -39,6 +39,7 @@ call :require kill.bat || exit /b 1
 call :require purge_cache.ps1 || exit /b 1
 call :require model_checks.xml || exit /b 1
 call :require report_template.html.j2 || exit /b 1
+call :require report_how_to.html || exit /b 1
 call :require version || exit /b 1
 call :require CHANGELOG.md || exit /b 1
 call :require README.md || exit /b 1
@@ -54,7 +55,7 @@ if exist "%ZIP%" (
 )
 
 echo Creating %ZIP%...
-tar -a -cf "%ZIP%" main.exe kill.bat purge_cache.ps1 model_checks.xml report_template.html.j2 version CHANGELOG.md README.md config
+tar -a -cf "%ZIP%" main.exe kill.bat purge_cache.ps1 model_checks.xml report_template.html.j2 report_how_to.html version CHANGELOG.md README.md config
 if errorlevel 1 (
     echo ERROR: Failed to create zip.
     exit /b 1

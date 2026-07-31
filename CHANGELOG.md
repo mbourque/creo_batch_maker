@@ -2,6 +2,38 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-30 — v1.12.43
+
+- **Report**: **Help** outline border shows again (same height as the other sidebar buttons).
+
+## 2026-07-30 — v1.12.42
+
+- **Report**: **Help** matches **Print This** / **Save** button height (shared border box).
+
+## 2026-07-30 — v1.12.41
+
+- **Report**: **Help** is first in the sidebar, with more button padding; reuses one `_HELP` window.
+
+## 2026-07-30 — v1.12.40
+
+- **Report**: sidebar **Help** opens the how-to guide in a new window (`report_how_to.html` next to `index.html`).
+
+## 2026-07-30 — v1.12.39
+
+- **Docs**: report how-to UI labels no longer sit alone on an indented line (Print This and similar).
+
+## 2026-07-30 — v1.12.38
+
+- **Docs**: report how-to footer shows author email, PDSVISION link, and copyright.
+
+## 2026-07-30 — v1.12.37
+
+- **Docs**: report how-to Quick tour rewritten for first-use flow; Save and print moved to the end.
+
+## 2026-07-30 — v1.12.36
+
+- **Docs**: draft HTML how-to for reading and using the Cad Assessment report (`report_how_to.html`).
+
 ## 2026-07-30 — v1.12.35
 
 - **Report > Score**: category titles use heading level 2 (valid outline under the Score heading).

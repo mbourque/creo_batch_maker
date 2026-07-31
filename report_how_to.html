@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How to use the Cad Assessment report</title>
+  <style>
+    :root {
+      --ink: #0f172a;
+      --muted: #475569;
+      --line: #d8dee8;
+      --paper: #f4f6f9;
+      --card: #ffffff;
+      --accent: #0b6bcb;
+      --accent-soft: #e8f2fc;
+      --warn: #b45309;
+      --err: #b91c1c;
+      --ok: #15803d;
+      --info: #0369a1;
+      --shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+      --font: "Segoe UI", "Candara", "Calibri", sans-serif;
+      --mono: "Cascadia Mono", "Consolas", monospace;
+      --max: 46rem;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 500px at 10% -10%, #dbeafe 0%, transparent 55%),
+        radial-gradient(900px 400px at 100% 0%, #e2e8f0 0%, transparent 50%),
+        var(--paper);
+      line-height: 1.55;
+      font-size: 1.02rem;
+    }
+
+    .wrap {
+      max-width: 52rem;
+      margin: 0 auto;
+      padding: 2.5rem 1.25rem 4rem;
+    }
+
+    header.hero {
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--line);
+    }
+    header.hero p.kicker {
+      margin: 0 0 0.4rem;
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    header.hero h1 {
+      margin: 0 0 0.75rem;
+      font-size: clamp(1.75rem, 4vw, 2.35rem);
+      line-height: 1.15;
+      font-weight: 750;
+      letter-spacing: -0.02em;
+    }
+    header.hero .lede {
+      margin: 0;
+      max-width: var(--max);
+      color: var(--muted);
+      font-size: 1.08rem;
+    }
+
+    nav.toc {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 1rem 1.15rem 1.1rem;
+      margin-bottom: 2.25rem;
+      box-shadow: var(--shadow);
+    }
+    nav.toc h2 {
+      margin: 0 0 0.65rem;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+    nav.toc ol {
+      margin: 0;
+      padding-left: 1.25rem;
+      columns: 1;
+    }
+    @media (min-width: 640px) {
+      nav.toc ol { columns: 2; column-gap: 2rem; }
+    }
+    nav.toc li { break-inside: avoid; margin: 0.25rem 0; }
+    nav.toc a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    nav.toc a:hover { text-decoration: underline; }
+
+    main section {
+      margin: 0 0 2.25rem;
+      max-width: var(--max);
+    }
+    main h2 {
+      margin: 0 0 0.75rem;
+      font-size: 1.35rem;
+      letter-spacing: -0.015em;
+      padding-top: 0.35rem;
+      border-top: 1px solid transparent;
+      scroll-margin-top: 1rem;
+    }
+    main h2::before {
+      content: "";
+      display: block;
+      height: 1px;
+      background: var(--line);
+      margin: 0 0 1.15rem -0.05rem;
+    }
+    main h3 {
+      margin: 1.25rem 0 0.45rem;
+      font-size: 1.05rem;
+    }
+    main p { margin: 0 0 0.85rem; }
+    main ul, main ol {
+      margin: 0 0 0.95rem;
+      padding-left: 1.3rem;
+    }
+    main li { margin: 0.28rem 0; }
+    main li::marker { color: var(--muted); }
+
+    .callout {
+      background: var(--accent-soft);
+      border-left: 4px solid var(--accent);
+      border-radius: 0 8px 8px 0;
+      padding: 0.85rem 1rem;
+      margin: 1rem 0;
+      color: #0f2744;
+    }
+    .callout strong { color: var(--ink); }
+    .callout.note {
+      background: #fff7ed;
+      border-left-color: var(--warn);
+      color: #7c2d12;
+    }
+    .callout.tip {
+      background: #ecfdf5;
+      border-left-color: var(--ok);
+      color: #14532d;
+    }
+
+    .grade-grid {
+      display: grid;
+      gap: 0.55rem;
+      margin: 0.75rem 0 1rem;
+    }
+    .grade-row {
+      display: grid;
+      grid-template-columns: 3.2rem 1fr;
+      gap: 0.75rem;
+      align-items: start;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.65rem 0.8rem;
+      box-shadow: var(--shadow);
+    }
+    .grade-badge {
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 800;
+      font-size: 1.05rem;
+    }
+    .g-a { background: #16a34a; }
+    .g-b { background: #65a30d; }
+    .g-c { background: #ca8a04; }
+    .g-d { background: #dc2626; }
+    .g-e { background: #7f1d1d; }
+    .g-f { background: #450a0a; }
+    .grade-row p { margin: 0; font-size: 0.95rem; }
+    .grade-row strong { display: block; margin-bottom: 0.15rem; }
+
+    .ui-name {
+      font-family: var(--mono);
+      font-size: 0.9em;
+      background: #eef2f7;
+      padding: 0.05em 0.3em;
+      border-radius: 4px;
+      display: inline;
+      white-space: normal;
+    }
+
+    .steps {
+      counter-reset: step;
+      list-style: none;
+      padding-left: 0;
+    }
+    .steps li {
+      position: relative;
+      padding-left: 2.6rem;
+      margin: 0.7rem 0;
+      min-height: 1.8rem;
+    }
+    .steps li::before {
+      counter-increment: step;
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1.75rem;
+      height: 1.75rem;
+      border-radius: 50%;
+      background: var(--ink);
+      color: #fff;
+      font-size: 0.85rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    footer {
+      max-width: var(--max);
+      margin: 2.5rem auto 0;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.92rem;
+      text-align: center;
+      line-height: 1.6;
+    }
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <p class="kicker">PDSVISION Cad Assessment Tool</p>
+      <h1>How to use this report</h1>
+      <p class="lede">
+        This guide explains how to read the Cad Assessment report, navigate findings,
+        use filters and the Model Gallery, and update the score as you clear issues.
+        Saving and printing are covered at the end.
+      </p>
+    </header>
+
+    <nav class="toc" aria-label="Contents">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#tour">Quick tour</a></li>
+        <li><a href="#score">Score</a></li>
+        <li><a href="#improve">Improve the score</a></li>
+        <li><a href="#filters">Filter view</a></li>
+        <li><a href="#checks">Check sections</a></li>
+        <li><a href="#scan">Scan Information</a></li>
+        <li><a href="#gallery">Model Gallery</a></li>
+        <li><a href="#creo">Open models in Creo</a></li>
+        <li><a href="#tips">Tips</a></li>
+        <li><a href="#save-print">Save and print</a></li>
+      </ol>
+    </nav>
+
+    <main>
+      <section id="tour">
+        <h2>Quick tour</h2>
+        <p>
+          This report is a browser view of your ModelCHECK batch. Use it to see overall quality,
+          open individual findings, and track progress as you clean up models.
+        </p>
+
+        <h3>What to do first</h3>
+        <ol class="steps">
+          <li>Open <strong>Score</strong> — overall grade, issue totals, and category cards.</li>
+          <li>Pick a category or a check in the sidebar — read what failed and which models are involved.</li>
+          <li>Use <span class="ui-name">Filter view</span> when the list is long (warnings only, parts only, one category, and so on).</li>
+          <li>Optionally open <strong>Model Gallery</strong> for a model-by-model view, or
+            <strong>Scan Information</strong> for batch statistics.</li>
+        </ol>
+
+        <h3>How the layout works</h3>
+        <ul>
+          <li><strong>Sidebar</strong> — jump between Score, Scan Information, Model Gallery (when present),
+            and each check that still has findings. The highlighted link is what you are viewing.</li>
+          <li><strong>Main area</strong> — shows one thing at a time: a summary page or the check you selected.</li>
+          <li><strong>Filter view</strong> — narrows which checks appear in the sidebar (details later in this guide).</li>
+        </ul>
+        <p>
+          On a narrow window the sidebar collapses to a thin strip; hover it to open navigation
+          without shrinking the main content.
+        </p>
+        <div class="callout tip">
+          <strong>Typical path:</strong> Score for the big picture → filters or sidebar checks for
+          detail → remove or flag items as you address them → Score becomes <strong>Adjusted Score</strong>.
+        </div>
+      </section>
+
+      <section id="score">
+        <h2>Score</h2>
+        <p>The Score page summarizes ModelCHECK results for this scan.</p>
+        <ul>
+          <li><strong>Total issues</strong> — warnings + errors still visible in the report.</li>
+          <li><strong>Models with warnings / errors</strong> — how many models still have those issue types.</li>
+          <li><strong>Overall grade</strong> — letter grade for the batch as it stands now.</li>
+          <li><strong>Category cards</strong> — one card per quality category that still has
+            warnings or errors (for example Consistency or Model Integrity), with a mini grade bar.</li>
+        </ul>
+
+        <h3>How grades work</h3>
+        <p>
+          PASS totals from the batch stay fixed. The letter grade is recalculated from those PASS
+          counts plus the <em>warning and error rows still shown</em>. If you remove items you have
+          fixed or decided not to chase, the score updates.
+        </p>
+        <div class="grade-grid">
+          <div class="grade-row">
+            <div class="grade-badge g-a" aria-hidden="true">A</div>
+            <p><strong>Grade A</strong> Warnings under 5% of checks (PASS + visible issues), and no errors.</p>
+          </div>
+          <div class="grade-row">
+            <div class="grade-badge g-b" aria-hidden="true">B</div>
+            <p><strong>Grade B</strong> Warnings are 5% to 25% of checks, and no errors.</p>
+          </div>
+          <div class="grade-row">
+            <div class="grade-badge g-c" aria-hidden="true">C</div>
+            <p><strong>Grade C</strong> Warnings are over 25% of checks, and no errors.</p>
+          </div>
+          <div class="grade-row">
+            <div class="grade-badge g-d" aria-hidden="true">D</div>
+            <p><strong>Grade D</strong> Any remaining errors.</p>
+          </div>
+          <div class="grade-row">
+            <div class="grade-badge g-e" aria-hidden="true">E</div>
+            <p><strong>Grade E</strong> Too many errors (shown on the scale for reference).</p>
+          </div>
+          <div class="grade-row">
+            <div class="grade-badge g-f" aria-hidden="true">F</div>
+            <p><strong>Grade F</strong> Too many errors and warnings (shown on the scale for reference).</p>
+          </div>
+        </div>
+        <div class="callout note">
+          <strong>Adjusted Score:</strong> after you remove or flag items, the sidebar may say
+          <strong>Adjusted Score</strong> instead of <strong>Score</strong>. That means the grade
+          reflects your edits, not only the raw batch output.
+        </div>
+      </section>
+
+      <section id="improve">
+        <h2>Improve the score</h2>
+        <p>
+          Removing items does not change the CAD files. It only hides findings from this report
+          so the score reflects work you have already done (or issues you are choosing to ignore
+          for this review).
+        </p>
+
+        <h3>On a check section</h3>
+        <ul>
+          <li><span class="ui-name">Remove this</span> — hide the whole check (all models in that card).</li>
+          <li><span class="ui-name">Remove only this</span> — hide one model’s row.</li>
+          <li><span class="ui-name">Remove all like this</span> — hide every row with the same finding text
+            (across models). When the last row in a check is gone, the empty card is removed too.</li>
+          <li><span class="ui-name">Flag this</span> — mark a row so you can filter to flagged or
+            unflagged items later. Flagging does not change the grade by itself.</li>
+        </ul>
+
+        <h3>Suggested workflow</h3>
+        <ol class="steps">
+          <li>Fix or accept issues in Creo (outside this report).</li>
+          <li>In the report, remove the matching warnings/errors (or whole checks you have cleared).</li>
+          <li>Watch Score / Adjusted Score update.</li>
+          <li>Use <span class="ui-name">Save</span> so your adjusted <span class="ui-name">index.html</span> is kept on disk.</li>
+        </ol>
+        <div class="callout">
+          <strong>Information</strong> checks (when Filter view is set to Show information) are
+          not part of the score. They have no remove or flag buttons.
+        </div>
+      </section>
+
+      <section id="filters">
+        <h2>Filter view</h2>
+        <p>Use the <span class="ui-name">Filter view</span> dropdown in the sidebar to narrow what you browse.</p>
+        <ul>
+          <li><strong>Show all</strong> — full list of checks; Score, Scan Information, and Model Gallery stay available.</li>
+          <li><strong>Show warnings</strong> / <strong>Show errors</strong> — only those check types.</li>
+          <li><strong>Show information</strong> — information-only checks (not scored).</li>
+          <li><strong>Show flagged</strong> / <strong>Show unflagged</strong> — based on Flag this.</li>
+          <li><strong>Sort by issue count</strong> — reorder sidebar checks by how many issues they still have.</li>
+          <li><strong>By model</strong> — Parts, Assemblies, or Drawings.</li>
+          <li><strong>By category</strong> — Consistency, Design Intent Strength, Geometry Quality,
+            Model Complexity, Model Integrity, MBD Readiness (only categories that still have issues).</li>
+        </ul>
+        <p>
+          Clicking a check in the sidebar loads only that check’s cards. Empty filters drop out of
+          the list as you clear issues. If nothing is left for the current filter, the report
+          returns to Show all.
+        </p>
+        <div class="callout note">
+          Filter view is hidden when the report has no warning, error, or information sections.
+        </div>
+      </section>
+
+      <section id="checks">
+        <h2>Check sections</h2>
+        <p>Each check card typically includes:</p>
+        <ul>
+          <li><strong>Heading</strong> — WARNINGS, ERRORS, or INFORMATION, with a count and check name.</li>
+          <li><strong>Category</strong> — which quality area this check belongs to.</li>
+          <li><strong>Description / why</strong> — what the check means and why it matters.</li>
+          <li><strong>Model rows</strong> — thumbnail, model name, finding text, optional details,
+            and who last saved the model.</li>
+        </ul>
+        <p>
+          Warning, error, and information rows may list up to five ModelCHECK item details, then
+          an ellipsis (…) when more exist. On Duplicate Models warnings, you can click a listed
+          model name to jump to that model elsewhere in the report when it appears.
+        </p>
+      </section>
+
+      <section id="scan">
+        <h2>Scan Information</h2>
+        <p>
+          Scan Information is a statistics page for the batch — not the scored issue list.
+          Open it from the sidebar link.
+        </p>
+        <ul>
+          <li><strong>CAD Assessment Summary</strong> — working folder, scan duration, model counts,
+            sizes, assembly structure metrics (for example maximum assembly depth), and related totals.
+            Duration covers ModelCHECK plus thumbnail passes; idle time between wizard steps is not counted.</li>
+          <li><strong>Biggest problems</strong> — ranked health-style bars; click a bar to jump to
+            that check when it exists in the report.</li>
+          <li><strong>Model Complexity</strong> — top parts by feature count or file size (when available).</li>
+          <li><strong>Models failed</strong> — top-level models in the working folder that did not
+            produce expected output (not items under <span class="ui-name">templates\</span>). Drag a name into Creo to open it.</li>
+          <li><strong>Family table detail</strong> and related sections — when the scan found them.
+            Long lists use <span class="ui-name">More...</span> / <span class="ui-name">Collapse</span>.</li>
+          <li><strong>Template Information</strong> — if you ran Scan Templates: datums, parameters,
+            layers, relations, symbols, units, and similar data from template XML.</li>
+        </ul>
+      </section>
+
+      <section id="gallery">
+        <h2>Model Gallery</h2>
+        <p>Open <strong>Model Gallery</strong> from the sidebar for a grid of unique scanned models
+          (parts, then assemblies, then drawings — alphabetical within each type).</p>
+        <ul>
+          <li><strong>Click</strong> a card — ModelCHECK error and warning summary for that model.</li>
+          <li><strong>Drag</strong> a card into Creo — open the file (same idea as other report thumbnails).</li>
+          <li><strong>Search</strong> — filter cards by model name.</li>
+          <li><strong>Type filters</strong> — Show all / Parts / Assemblies / Drawings when more than
+            one type is present.</li>
+        </ul>
+        <p>Missing thumbnails show a blank placeholder. Close the summary popup with × when finished.</p>
+      </section>
+
+      <section id="creo">
+        <h2>Open models in Creo</h2>
+        <p>
+          In check rows, Models failed, and the gallery, you can <strong>drag</strong> a thumbnail
+          or model name into Creo to open the file. A simple click does not open the model in Creo —
+          that avoids accidental opens while you browse.
+        </p>
+      </section>
+
+      <section id="tips">
+        <h2>Tips</h2>
+        <ul>
+          <li>Work top-down: Score → category or filter → individual checks → gallery for a model-centric view.</li>
+          <li>Clear errors before chasing large warning piles if you want the grade letter to move out of D.</li>
+          <li>Use Flag this to park items for a follow-up pass without removing them from the score.</li>
+          <li>Save often after removals so you do not lose Adjusted Score work when you close the browser.</li>
+          <li>Rebuild the report from the Cad Assessment Tool if you need a fresh, unedited scan;
+            your saved adjusted <span class="ui-name">index.html</span> is separate until you overwrite it.</li>
+        </ul>
+      </section>
+
+      <section id="save-print">
+        <h2>Save and print</h2>
+
+        <h3>Save</h3>
+        <p>
+          After you remove or flag items, <span class="ui-name">Save</span> appears in the sidebar.
+          Browser <strong>Ctrl+S</strong> often does <em>not</em> keep those edits for a local file.
+        </p>
+        <ol class="steps">
+          <li>Click <span class="ui-name">Save</span>, then <span class="ui-name">Save index.html</span>.</li>
+          <li>Choose the working folder and replace the existing <span class="ui-name">index.html</span>.</li>
+          <li>If no dialog appears, the file may download to Downloads — move it into the working
+            folder and replace <span class="ui-name">index.html</span>.</li>
+        </ol>
+
+        <h3>Print</h3>
+        <p>
+          Use <span class="ui-name">Print This</span> to open the browser print dialog.
+          For printing, the report temporarily shows every warning and error (and summary cards)
+          so the printout is complete. Sidebar chrome and action buttons are hidden on the printed page.
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      Created by
+      <a href="mailto:michael.bourque@pdsvision.com">Michael P. Bourque</a>
+      |
+      <a href="https://pdsvision.com" target="_blank" rel="noopener noreferrer">PDSVISION</a>
+      | &copy; 2026 All rights reserved.
+    </footer>
+  </div>
+</body>
+</html>

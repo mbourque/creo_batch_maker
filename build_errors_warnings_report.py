@@ -14,6 +14,7 @@ import html
 import json
 import os
 import re
+import shutil
 import sys
 import xml.etree.ElementTree as ET
 from collections import defaultdict
@@ -1310,6 +1311,12 @@ def create_html_report(
         os.makedirs(out_dir, exist_ok=True)
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(rendered_html)
+    how_to_src = os.path.join(bundle_dir, "report_how_to.html")
+    if out_dir and os.path.isfile(how_to_src):
+        try:
+            shutil.copy2(how_to_src, os.path.join(out_dir, "report_how_to.html"))
+        except OSError:
+            pass
     _remove_legacy_hash_placeholders(report_assets_dir)
     wd_norm = os.path.normcase(os.path.normpath(working_dir))
     if os.path.normcase(os.path.normpath(report_assets_dir)) != wd_norm:
