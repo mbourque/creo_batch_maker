@@ -1412,12 +1412,20 @@ def build_performance_table_rows(metrics: PerformanceMetrics) -> list[tuple[str,
     answers = performance_metrics_answers(metrics)
     rows: list[tuple[str, str | None, str, str | None]] = []
     for section, section_rows in PERFORMANCE_TABLE_SECTIONS:
-        rows.append(("section", None, section, None))
+        section_items: list[tuple[str, str | None, str, str | None]] = []
         for label, key in section_rows:
             if key == "_TOP_LEVEL_FEATURES":
                 label = _top_level_features_label(metrics)
             value, check = _resolve_performance_value(answers, key)
-            rows.append(("item", label, value, check if key and not key.startswith("_") else key))
+            if (value or "").strip() == "0":
+                continue
+            section_items.append(
+                ("item", label, value, check if key and not key.startswith("_") else key)
+            )
+        if not section_items:
+            continue
+        rows.append(("section", None, section, None))
+        rows.extend(section_items)
     return rows
 
 
@@ -2173,8 +2181,9 @@ def _comma_separated_list_html(
 def _family_table_row(generic: FamilyGenericRow, *, collapsed: bool = False) -> str:
     inst_html = _comma_separated_list_html(generic.instance_names, span_class="mq-inst-names")
     tr_attrs = ' class="mq-family-table-rest" hidden' if collapsed else ""
+    generic_html = _skipped_model_name_html(_model_display_lower(generic.model))
     return (
-        f"<tr{tr_attrs}><td>{_esc(_model_display_lower(generic.model))}</td>"
+        f"<tr{tr_attrs}><td>{generic_html}</td>"
         f"<td>{len(generic.instance_names)}</td><td>{inst_html}</td></tr>"
     )
 
@@ -2232,55 +2241,39 @@ def _family_table_section(generics: list[FamilyGenericRow]) -> str:
   </div>"""
 
 
-def _top_level_asm_name_html(assembly_name: str, *, embedded: bool) -> str:
-    """Assembly name in the BOM note; jump link in embedded report."""
-    asm_display = _esc(_model_display_lower(assembly_name))
-    if embedded:
-        return (
-            f'<button type="button" class="mq-bom-jump mq-inline-model-jump" '
-            f'data-mq-model-jump="{_esc(assembly_name)}">{asm_display}</button>'
-        )
-    return asm_display
+def _top_level_asm_name_html(assembly_name: str) -> str:
+    """Assembly name in the BOM note (plain text)."""
+    return _esc(_model_display_lower(assembly_name))
 
 
 def _bom_row(
     row: BomComponentRow,
     *,
-    embedded: bool,
     collapsed: bool = False,
     top_level_assembly: str | None = None,
 ) -> str:
-    display = _model_display_lower(row.name)
+    name_html = _skipped_model_name_html(_model_display_lower(row.name))
     if top_level_assembly and row.name.casefold() == top_level_assembly.casefold():
-        display = f"{display} (Top Level)"
-    display = _esc(display)
+        name_html = f"{name_html} (Top Level)"
     hidden_attr = " hidden" if collapsed else ""
     rest_cls = " mq-bom-table-rest" if collapsed else ""
-    inner = (
-        f'<span class="mq-bom-model">{display}</span>'
+    return (
+        f'<div class="mq-bom-row{rest_cls}"{hidden_attr}>'
+        f'<span class="mq-bom-model">{name_html}</span>'
         f'<span class="mq-bom-num">{row.errors}</span>'
         f'<span class="mq-bom-num">{row.warnings}</span>'
+        f"</div>"
     )
-    if embedded:
-        return (
-            f'<button type="button" class="mq-bom-jump{rest_cls}"{hidden_attr} '
-            f'data-mq-model-jump="{_esc(row.name)}">{inner}</button>'
-        )
-    return f'<div class="mq-bom-row{rest_cls}"{hidden_attr}>{inner}</div>'
 
 
-def _complexity_row(model: str, value_html: str, *, embedded: bool) -> str:
-    display = _esc(_model_display_lower(model))
-    inner = (
-        f'<span class="mq-complexity-model">{display}</span>'
+def _complexity_row(model: str, value_html: str) -> str:
+    name_html = _skipped_model_name_html(_model_display_lower(model))
+    return (
+        f'<div class="mq-complexity-row">'
+        f'<span class="mq-complexity-model">{name_html}</span>'
         f'<span class="mq-complexity-val">{value_html}</span>'
+        f"</div>"
     )
-    if embedded:
-        return (
-            f'<button type="button" class="mq-complexity-jump" '
-            f'data-mq-model-jump="{_esc(model)}">{inner}</button>'
-        )
-    return f'<div class="mq-complexity-row">{inner}</div>'
 
 
 def _complexity_table_block(
@@ -2310,17 +2303,16 @@ def _top_level_bom_section(
     bom_rows: list[BomComponentRow],
     *,
     assembly_name: str,
-    embedded: bool,
 ) -> str:
     if not bom_rows:
         return ""
     total = len(bom_rows)
     if total > _BOM_LIST_PREVIEW_LIMIT:
         rows_html = "".join(
-            _bom_row(row, embedded=embedded, top_level_assembly=assembly_name)
+            _bom_row(row, top_level_assembly=assembly_name)
             for row in bom_rows[:_BOM_LIST_PREVIEW_LIMIT]
         ) + "".join(
-            _bom_row(row, embedded=embedded, collapsed=True, top_level_assembly=assembly_name)
+            _bom_row(row, collapsed=True, top_level_assembly=assembly_name)
             for row in bom_rows[_BOM_LIST_PREVIEW_LIMIT:]
         )
         more_html = (
@@ -2342,15 +2334,13 @@ def _top_level_bom_section(
         )
     else:
         rows_html = "".join(
-            _bom_row(row, embedded=embedded, top_level_assembly=assembly_name)
+            _bom_row(row, top_level_assembly=assembly_name)
             for row in bom_rows
         )
         more_html = ""
 
-    asm_html = _top_level_asm_name_html(assembly_name, embedded=embedded)
+    asm_html = _top_level_asm_name_html(assembly_name)
     note = f"BOM from {asm_html} (Top Level) ({total} components)."
-    if embedded:
-        note += " Click a row to scroll to that model in the report."
 
     return f"""
 
@@ -2533,7 +2523,6 @@ def generate_statistics_html(
         bom_section = _top_level_bom_section(
             stats.top_level_assembly_bom,
             assembly_name=stats.top_level_assembly,
-            embedded=embedded,
         )
 
     health_max = max(stats.health_counts.values()) if stats.health_counts else 0
@@ -2594,12 +2583,12 @@ def generate_statistics_html(
 
 
     top_feat_rows = "".join(
-        _complexity_row(m, str(n), embedded=embedded)
+        _complexity_row(m, str(n))
         for m, n in stats.top_features_parts
     )
 
     top_size_rows = "".join(
-        _complexity_row(m, f"{sz:.2f} MB", embedded=embedded)
+        _complexity_row(m, f"{sz:.2f} MB")
         for m, sz in stats.top_size_parts
     )
 

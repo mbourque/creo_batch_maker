@@ -18,7 +18,7 @@ modelcheck_enabled yes
 display shaded
 regen_data_sharing_ref_models yes
 enable_auto_regen yes
-
+simprep_default_cnfg_asm no
 
 ! =========================================================
 ! HEADLESS / AUTOMATION STABILITY

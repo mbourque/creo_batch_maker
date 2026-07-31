@@ -364,11 +364,12 @@
         </p>
         <ul>
           <li><strong>CAD Assessment Summary</strong> — working folder, scan duration, model counts,
-            sizes, assembly structure metrics (for example maximum assembly depth), and related totals.</li>
+            sizes, assembly structure metrics (for example maximum assembly depth), and related totals.
+            Rows with a value of <strong>0</strong> are omitted.</li>
           <li><strong>Biggest problems</strong> — ranked health-style bars; click a bar to jump to
             that check when it exists in the report.</li>
           <li><strong>Model Complexity</strong> — top parts by feature count or file size (when available).</li>
-          <li><strong>Models failed</strong> — models that failed to be scanned. Drag a name into Creo to try and open it to see what is wrong.</li>
+          <li><strong>Models Failed</strong> — Models that could not be scanned. Drag a model name into Creo to try opening it and determine the cause of the failure. Common causes include bulk parts, harnesses, or files that cause Creo to crash.</li>
           <li><strong>Family table detail</strong> and related sections — when the scan found them.
             Long lists use <span class="ui-name">More...</span> / <span class="ui-name">Collapse</span>.</li>
           <li><strong>Template Information</strong> — if you provided Templates: datums, parameters,
@@ -416,9 +417,9 @@
       <section id="creo">
         <h2>Open models in Creo</h2>
         <p>
-          In check rows, Models failed, and the gallery, you can <strong>drag</strong> a thumbnail
-          or model name into Creo to open the file. A simple click does not open the model in Creo —
-          that avoids accidental opens while you browse.
+          In check rows, Models failed, Family table detail (Generic column), and the gallery, you can
+          <strong>drag</strong> a thumbnail or model name into Creo to open the file. A simple click
+          does not open the model in Creo — that avoids accidental opens while you browse.
         </p>
         <p>
           Open a model when you need to study a finding in context — for example to see the geometry,

@@ -2,6 +2,26 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-31 — v1.12.79
+
+- **Docs**: report how-to expands the **Models Failed** description (bulk parts, harnesses, Creo crashes).
+
+## 2026-07-31 — v1.12.78
+
+- **Report > Top level assembly information**: the assembly name in the BOM note is plain text again.
+
+## 2026-07-31 — v1.12.77
+
+- **Report > Scan Information**: Model Complexity and Top level assembly names drag into Creo instead of jumping to a section.
+
+## 2026-07-31 — v1.12.76
+
+- **Report > CAD Assessment Summary**: rows with a value of **0** are omitted.
+
+## 2026-07-31 — v1.12.75
+
+- **Report > Scan Information**: Family table detail Generic names can be dragged into Creo.
+
 ## 2026-07-31 — v1.12.74
 
 - **Report**: **Print This** leaves Model Gallery out of the printout.
