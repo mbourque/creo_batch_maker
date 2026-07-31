@@ -173,6 +173,11 @@
             border-bottom: 1px solid #ccc;
             content-visibility: auto; contain-intrinsic-size: auto 320px;
         }
+        body[data-mq-printing="1"] .check-section-wrapper,
+        body[data-mq-printing="1"] .check-section > .file-row {
+            content-visibility: visible;
+            contain-intrinsic-size: none;
+        }
         /* Information sections: only when Filter view is Show information. */
         body:not([data-mq-view-filter="information"]) .check-section-wrapper[data-mq-section-stat="INFO"],
         body:not([data-mq-view-filter="information"]) .sidebar-check-nav[data-mq-sidebar-stat="INFO"] { display: none !important; }
@@ -198,6 +203,9 @@
         body[data-mq-summary-panel="gallery"] .mq-summary-panel[data-mq-panel="gallery"] { display: block; }
         body[data-mq-printing="1"] .summary { display: block !important; }
         body[data-mq-printing="1"] .mq-summary-panel { display: block !important; }
+        body[data-mq-printing="1"] .mq-summary-panel[data-mq-panel="gallery"],
+        body[data-mq-printing="1"] #mq-model-gallery,
+        body[data-mq-printing="1"] .mq-gallery-page { display: none !important; }
         .mq-gallery-page { max-width: 100%; }
         .mq-gallery-intro {
             font-size: 0.92rem; color: #475569; margin: 0 0 14px 0; line-height: 1.45;
@@ -525,6 +533,14 @@
             .sidebar, .sidebar-edge, .hide-button, .check-buttons, .print-button, .help-button, .button { display: none; }
             body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: #1a1a1a; }
             .container { margin: 0; max-width: none; box-shadow: none; font-size: 0.95rem; }
+            .check-section-wrapper,
+            .check-section > .file-row {
+                content-visibility: visible !important;
+                contain-intrinsic-size: none !important;
+            }
+            .mq-summary-panel[data-mq-panel="gallery"],
+            #mq-model-gallery,
+            .mq-gallery-page { display: none !important; }
         }
     </style>
     {{ report_panel_styles | safe }}
@@ -2014,6 +2030,50 @@
         }
 
         var mqPrintSnapshot = null;
+        var mqPrintInFlight = false;
+
+        function mqPrepImagesForPrint() {
+            var imgs = document.querySelectorAll('img[src]');
+            for (var i = 0; i < imgs.length; i++) {
+                var img = imgs[i];
+                if (img.getAttribute('loading') === 'lazy') {
+                    img.setAttribute('loading', 'eager');
+                    img.setAttribute('data-mq-was-lazy', '1');
+                }
+                // Re-assign src so browsers that ignored loading=eager still fetch.
+                if (!img.complete) {
+                    var src = img.getAttribute('src');
+                    if (src) { img.setAttribute('src', src); }
+                }
+            }
+        }
+
+        function mqWaitForPrintImages(timeoutMs) {
+            timeoutMs = timeoutMs || 15000;
+            mqPrepImagesForPrint();
+            var imgs = document.querySelectorAll('img[src]');
+            var waiters = [];
+            for (var i = 0; i < imgs.length; i++) {
+                var img = imgs[i];
+                if (img.complete) { continue; }
+                waiters.push(new Promise(function(resolve) {
+                    var el = img;
+                    var done = function() { resolve(); };
+                    el.addEventListener('load', done, { once: true });
+                    el.addEventListener('error', done, { once: true });
+                    if (typeof el.decode === 'function') {
+                        el.decode().then(done, done);
+                    }
+                }));
+            }
+            if (!waiters.length) {
+                return Promise.resolve();
+            }
+            return Promise.race([
+                Promise.all(waiters),
+                new Promise(function(resolve) { setTimeout(resolve, timeoutMs); })
+            ]);
+        }
 
         function mqBeginPrintLayout() {
             if (mqPrintSnapshot) { return; }
@@ -2027,7 +2087,8 @@
             mqActiveSectionId = '';
             mqAttachAllIssueSections();
             mqAttachStatistics();
-            mqAttachGallery();
+            mqParkGallery();
+            mqPrepImagesForPrint();
         }
 
         function mqEndPrintLayout() {
@@ -2037,6 +2098,11 @@
             var prevSummary = mqPrintSnapshot.summaryPanel;
             mqPrintSnapshot = null;
             document.body.removeAttribute('data-mq-printing');
+            var lazyImgs = document.querySelectorAll('img[data-mq-was-lazy]');
+            for (var i = 0; i < lazyImgs.length; i++) {
+                lazyImgs[i].setAttribute('loading', 'lazy');
+                lazyImgs[i].removeAttribute('data-mq-was-lazy');
+            }
             var sel = document.getElementById('sidebar-view-filter');
             if (sel) { sel.value = prevMode === 'all' ? 'all' : prevMode; }
             if (prevMode === 'all') {
@@ -2062,8 +2128,16 @@
         }
 
         function printReport() {
+            if (mqPrintInFlight) { return; }
+            mqPrintInFlight = true;
             mqBeginPrintLayout();
-            window.print();
+            mqWaitForPrintImages(15000).then(function() {
+                try { window.print(); }
+                finally { mqPrintInFlight = false; }
+            }).catch(function() {
+                mqPrintInFlight = false;
+                try { window.print(); } catch (err) { /* ignore */ }
+            });
         }
 
         function openSaveHelp() {

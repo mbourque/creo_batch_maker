@@ -2,6 +2,14 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-31 — v1.12.74
+
+- **Report**: **Print This** leaves Model Gallery out of the printout.
+
+## 2026-07-31 — v1.12.73
+
+- **Report**: **Print This** waits for lazy thumbnails (and turns off content skipping) so images show in print.
+
 ## 2026-07-31 — v1.12.72
 
 - **Report > Score**: category cards hide when every warning/error in that category has been removed.
