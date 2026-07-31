@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-31 — v1.12.68
+
+- **Docs**: report how-to Open models in Creo covers analyzing issues with Feat # and Feat ID.
+
 ## 2026-07-31 — v1.12.67
 
 - **Docs**: report how-to trims the Improve the score intro parenthetical about Creo fixes.
