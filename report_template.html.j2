@@ -1788,7 +1788,11 @@
                 var w = counts.warn;
                 var e = counts.err;
                 var pass = mqPassBaseline.byCategory[catName] || 0;
-                refs.card.classList.remove('mq-cat-empty');
+                if (w + e > 0) {
+                    refs.card.classList.remove('mq-cat-empty');
+                } else {
+                    refs.card.classList.add('mq-cat-empty');
+                }
                 var letter = mqGradeFromCounts(pass, w, e);
                 var total = pass + w + e;
                 var gPct = total ? (pass / total) * 100 : 0;

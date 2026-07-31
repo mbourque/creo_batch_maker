@@ -2,6 +2,22 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-31 — v1.12.72
+
+- **Report > Score**: category cards hide when every warning/error in that category has been removed.
+
+## 2026-07-31 — v1.12.71
+
+- **Docs**: report how-to Template Information wording uses “provided Templates.”
+
+## 2026-07-31 — v1.12.70
+
+- **Docs**: report how-to drops the scan-duration footnote under CAD Assessment Summary.
+
+## 2026-07-31 — v1.12.69
+
+- **Docs**: report how-to Quick tour calls it a CAD Assessment (not ModelCHECK batch).
+
 ## 2026-07-31 — v1.12.68
 
 - **Docs**: report how-to Open models in Creo covers analyzing issues with Feat # and Feat ID.
