@@ -181,6 +181,8 @@ def grade_css_class(letter: str) -> str:
         "B": "mq-grade-b",
         "C": "mq-grade-c",
         "D": "mq-grade-d",
+        "E": "mq-grade-e",
+        "F": "mq-grade-f",
         "N/A": "mq-grade-na",
     }.get(letter, "mq-grade-na")
 
@@ -209,6 +211,8 @@ _MQ_DASHBOARD_CSS = """
 .mq-grade-b { background: #65a30d; }
 .mq-grade-c { background: #ca8a04; }
 .mq-grade-d { background: #dc2626; }
+.mq-grade-e { background: #7f1d1d; }
+.mq-grade-f { background: #450a0a; }
 .mq-grade-na { background: #94a3b8; }
 .mq-scale { margin-top: 18px; padding-top: 14px; border-top: 1px solid #e2e8f0; }
 .mq-scale-title { font-size: 0.8rem; font-weight: 600; color: #475569; margin-bottom: 10px; }
@@ -218,8 +222,8 @@ _MQ_DASHBOARD_CSS = """
 .mq-dot-b { background: #65a30d; }
 .mq-dot-c { background: #ca8a04; }
 .mq-dot-d { background: #dc2626; }
-.mq-dot-e { background: #dc2626; }
-.mq-dot-f { background: #dc2626; }
+.mq-dot-e { background: #7f1d1d; }
+.mq-dot-f { background: #450a0a; }
 .mq-scale-note { font-size: 0.82rem; line-height: 1.45; color: #475569; margin: 0 0 12px 0; }
 .mq-right { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
 @media (max-width: 700px) { .mq-right { grid-template-columns: 1fr; } }

@@ -246,12 +246,11 @@
 <body>
   <div class="wrap">
     <header class="hero">
-      <p class="kicker">PDSVISION Cad Assessment Tool</p>
+      <p class="kicker">PDSVISION Cad Assessment Report</p>
       <h1>How to use this report</h1>
       <p class="lede">
         This guide explains how to read the Cad Assessment report, navigate findings,
         use filters and the Model Gallery, and update the score as you clear issues.
-        Saving and printing are covered at the end.
       </p>
     </header>
 
@@ -260,14 +259,16 @@
       <ol>
         <li><a href="#tour">Quick tour</a></li>
         <li><a href="#score">Score</a></li>
-        <li><a href="#improve">Improve the score</a></li>
-        <li><a href="#filters">Filter view</a></li>
-        <li><a href="#checks">Check sections</a></li>
         <li><a href="#scan">Scan Information</a></li>
         <li><a href="#gallery">Model Gallery</a></li>
+        <li><a href="#checks">Check sections</a></li>
         <li><a href="#creo">Open models in Creo</a></li>
-        <li><a href="#tips">Tips</a></li>
+        <li><a href="#improve">Improve the score</a></li>
+        <li><a href="#flagging">Flagging issues</a></li>
+        <li><a href="#filters">Filter view</a></li>
+        <li><a href="#information">Show information</a></li>
         <li><a href="#save-print">Save and print</a></li>
+        <li><a href="#tips">Tips</a></li>
       </ol>
     </nav>
 
@@ -284,8 +285,8 @@
           <li>Open <strong>Score</strong> — overall grade, issue totals, and category cards.</li>
           <li>Pick a category or a check in the sidebar — read what failed and which models are involved.</li>
           <li>Use <span class="ui-name">Filter view</span> when the list is long (warnings only, parts only, one category, and so on).</li>
-          <li>Optionally open <strong>Model Gallery</strong> for a model-by-model view, or
-            <strong>Scan Information</strong> for batch statistics.</li>
+          <li>Use <strong>Model Gallery</strong> for a model-by-model view, or
+            <strong>Scan Information</strong> for statistics.</li>
         </ol>
 
         <h3>How the layout works</h3>
@@ -355,77 +356,6 @@
         </div>
       </section>
 
-      <section id="improve">
-        <h2>Improve the score</h2>
-        <p>
-          Removing items does not change the CAD files. It only hides findings from this report
-          so the score reflects work you have already done (or issues you are choosing to ignore
-          for this review).
-        </p>
-
-        <h3>On a check section</h3>
-        <ul>
-          <li><span class="ui-name">Remove this</span> — hide the whole check (all models in that card).</li>
-          <li><span class="ui-name">Remove only this</span> — hide one model’s row.</li>
-          <li><span class="ui-name">Remove all like this</span> — hide every row with the same finding text
-            (across models). When the last row in a check is gone, the empty card is removed too.</li>
-          <li><span class="ui-name">Flag this</span> — mark a row so you can filter to flagged or
-            unflagged items later. Flagging does not change the grade by itself.</li>
-        </ul>
-
-        <h3>Suggested workflow</h3>
-        <ol class="steps">
-          <li>Fix or accept issues in Creo (outside this report).</li>
-          <li>In the report, remove the matching warnings/errors (or whole checks you have cleared).</li>
-          <li>Watch Score / Adjusted Score update.</li>
-          <li>Use <span class="ui-name">Save</span> so your adjusted <span class="ui-name">index.html</span> is kept on disk.</li>
-        </ol>
-        <div class="callout">
-          <strong>Information</strong> checks (when Filter view is set to Show information) are
-          not part of the score. They have no remove or flag buttons.
-        </div>
-      </section>
-
-      <section id="filters">
-        <h2>Filter view</h2>
-        <p>Use the <span class="ui-name">Filter view</span> dropdown in the sidebar to narrow what you browse.</p>
-        <ul>
-          <li><strong>Show all</strong> — full list of checks; Score, Scan Information, and Model Gallery stay available.</li>
-          <li><strong>Show warnings</strong> / <strong>Show errors</strong> — only those check types.</li>
-          <li><strong>Show information</strong> — information-only checks (not scored).</li>
-          <li><strong>Show flagged</strong> / <strong>Show unflagged</strong> — based on Flag this.</li>
-          <li><strong>Sort by issue count</strong> — reorder sidebar checks by how many issues they still have.</li>
-          <li><strong>By model</strong> — Parts, Assemblies, or Drawings.</li>
-          <li><strong>By category</strong> — Consistency, Design Intent Strength, Geometry Quality,
-            Model Complexity, Model Integrity, MBD Readiness (only categories that still have issues).</li>
-        </ul>
-        <p>
-          Clicking a check in the sidebar loads only that check’s cards. Empty filters drop out of
-          the list as you clear issues. If nothing is left for the current filter, the report
-          returns to Show all.
-        </p>
-        <div class="callout note">
-          Filter view is hidden when the report has no warning, error, or information sections.
-        </div>
-      </section>
-
-      <section id="checks">
-        <h2>Check sections</h2>
-        <p>Each check card typically includes:</p>
-        <ul>
-          <li><strong>Heading</strong> — WARNINGS, ERRORS, or INFORMATION, with a count and check name.</li>
-          <li><strong>Category</strong> — which quality area this check belongs to.</li>
-          <li><strong>Description / why</strong> — what the check means and why it matters.</li>
-          <li><strong>Model rows</strong> — thumbnail, model name, finding text, optional details,
-            and who last saved the model.</li>
-        </ul>
-        <p>
-          Warning, error, and information rows may list up to five ModelCHECK item details, then
-          an ellipsis (…) when more exist. On Duplicate Models warnings, you can click a listed
-          model name to jump to that model elsewhere in the report when it appears.
-        </p>
-      </section>
-
       <section id="scan">
         <h2>Scan Information</h2>
         <p>
@@ -439,8 +369,7 @@
           <li><strong>Biggest problems</strong> — ranked health-style bars; click a bar to jump to
             that check when it exists in the report.</li>
           <li><strong>Model Complexity</strong> — top parts by feature count or file size (when available).</li>
-          <li><strong>Models failed</strong> — top-level models in the working folder that did not
-            produce expected output (not items under <span class="ui-name">templates\</span>). Drag a name into Creo to open it.</li>
+          <li><strong>Models failed</strong> — models that failed to be scanned. Drag a name into Creo to try and open it to see what is wrong.</li>
           <li><strong>Family table detail</strong> and related sections — when the scan found them.
             Long lists use <span class="ui-name">More...</span> / <span class="ui-name">Collapse</span>.</li>
           <li><strong>Template Information</strong> — if you ran Scan Templates: datums, parameters,
@@ -459,7 +388,30 @@
           <li><strong>Type filters</strong> — Show all / Parts / Assemblies / Drawings when more than
             one type is present.</li>
         </ul>
-        <p>Missing thumbnails show a blank placeholder. Close the summary popup with × when finished.</p>
+      </section>
+
+      <section id="checks">
+        <h2>Check sections</h2>
+        <p>
+          In the sidebar, each check link shows the check name and how many models had that
+          finding when the report was built, in the form
+          <span class="ui-name">Check name (count)</span> — for example
+          <span class="ui-name">Missing Layers (12)</span>. That number does not change when you
+          remove rows; if you clear the whole check, the sidebar link is removed.
+        </p>
+        <p>Each check card typically includes:</p>
+        <ul>
+          <li><strong>Heading</strong> — WARNINGS, ERRORS, or INFORMATION, with a count and check name.</li>
+          <li><strong>Category</strong> — which quality area this check belongs to.</li>
+          <li><strong>Description / why</strong> — what the check means and why it matters.</li>
+          <li><strong>Model rows</strong> — thumbnail, model name, finding text, optional details,
+            and who last saved the model.</li>
+        </ul>
+        <p>
+          Warning, error, and information rows may list up to five item details, then
+          an ellipsis (…) when more exist. On Duplicate Models warnings, you can click a listed
+          model name to jump to that model elsewhere in the report when it appears.
+        </p>
       </section>
 
       <section id="creo">
@@ -471,16 +423,107 @@
         </p>
       </section>
 
-      <section id="tips">
-        <h2>Tips</h2>
+      <section id="improve">
+        <h2>Improve the score</h2>
+        <p>
+          Removing checks or model rows that are not really problems for your review raises the
+          grade — the Score updates as those findings leave the report. That does not change the
+          CAD files; it only hides items here so the score matches what you still care about.
+        </p>
+
+        <h3>On a check section</h3>
         <ul>
-          <li>Work top-down: Score → category or filter → individual checks → gallery for a model-centric view.</li>
-          <li>Clear errors before chasing large warning piles if you want the grade letter to move out of D.</li>
-          <li>Use Flag this to park items for a follow-up pass without removing them from the score.</li>
-          <li>Save often after removals so you do not lose Adjusted Score work when you close the browser.</li>
-          <li>Rebuild the report from the Cad Assessment Tool if you need a fresh, unedited scan;
-            your saved adjusted <span class="ui-name">index.html</span> is separate until you overwrite it.</li>
+          <li><span class="ui-name">Remove this</span> — hide the whole check (all models in that card).</li>
+          <li><span class="ui-name">Remove only this</span> — hide one model’s row.</li>
+          <li><span class="ui-name">Remove all like this</span> — hide every row with the same finding text
+            (across models). When the last row in a check is gone, the empty card is removed too.</li>
+          <li><span class="ui-name">Flag this</span> — mark a row to come back to later (see Flagging issues below).
+            Flagging does not change the grade by itself.</li>
         </ul>
+
+        <h3>Suggested workflow</h3>
+        <ol class="steps">
+          <li>Fix or accept issues in Creo (outside this report).</li>
+          <li>In the report, remove the matching warnings/errors (or whole checks you have cleared).</li>
+          <li>Watch Score / Adjusted Score update.</li>
+          <li>Use <span class="ui-name">Save</span> so your adjusted <span class="ui-name">index.html</span> is kept on disk.</li>
+        </ol>
+        <div class="callout">
+          <strong>Information</strong> checks are not part of the score — see
+          <a href="#information">Show information</a>.
+        </div>
+      </section>
+
+      <section id="flagging">
+        <h2>Flagging issues</h2>
+        <p>
+          Use flags when you want a short list of findings to fix next — without removing them from
+          the score yet. A flagged row stays in the report and still counts toward the grade until
+          you remove it.
+        </p>
+        <ol class="steps">
+          <li>Open a check and click <span class="ui-name">Flag this</span> on each model row you plan to resolve.
+            The row highlights so you can see it was marked. Click again to clear the flag.</li>
+          <li>In the sidebar, set <span class="ui-name">Filter view</span> to <strong>Show flagged</strong>.
+            Only checks that still have flagged rows remain in the list, so you can work through your notes.</li>
+          <li>When a flagged issue is done in Creo, remove that row (or the whole check), or clear the flag
+            if you decided not to chase it.</li>
+          <li>Use <strong>Show unflagged</strong> if you want everything except what you already marked,
+            or <strong>Show all</strong> to return to the full list.</li>
+        </ol>
+        <div class="callout tip">
+          <strong>Tip:</strong> Save the report after flagging so your marks are still there the next time
+          you open <span class="ui-name">index.html</span>.
+        </div>
+      </section>
+
+      <section id="filters">
+        <h2>Filter view</h2>
+        <p>Use the <span class="ui-name">Filter view</span> dropdown in the sidebar to narrow what you browse.</p>
+        <ul>
+          <li><strong>Show all</strong> — full list of checks; Score, Scan Information, and Model Gallery stay available.</li>
+          <li><strong>Show warnings</strong> / <strong>Show errors</strong> — only those check types.</li>
+          <li><strong>Show information</strong> — information-only checks; see
+            <a href="#information">Show information</a>.</li>
+          <li><strong>Show flagged</strong> / <strong>Show unflagged</strong> — see
+            <a href="#flagging">Flagging issues</a>.</li>
+          <li><strong>Sort by issue count</strong> — reorder sidebar checks by how many issues they still have.</li>
+          <li><strong>By model</strong> — Parts, Assemblies, or Drawings.</li>
+          <li><strong>By category</strong> — Consistency, Design Intent Strength, Geometry Quality,
+            Model Complexity, Model Integrity, MBD Readiness (only categories that still have issues).</li>
+        </ul>
+        <p>
+          Clicking a check in the sidebar loads only that check’s cards. Empty filters drop out of
+          the list as you clear issues. If nothing is left for the current filter, the report
+          returns to Show all.
+        </p>
+      </section>
+
+      <section id="information">
+        <h2>Show information</h2>
+        <p>
+          Some ModelCHECK results are classified as <strong>information</strong>, not warnings or
+          errors. They describe what is in the models (counts, sizes, lists of items, and similar
+          facts) without failing a quality rule. Use them for insight into the scan, not for grading.
+        </p>
+        <p>
+          To browse them, set <span class="ui-name">Filter view</span> to
+          <strong>Show information</strong>. The sidebar then lists only those information checks.
+          In other filter modes they stay hidden so the scored issues stay easier to work through.
+        </p>
+        <ul>
+          <li><strong>Not scored</strong> — information checks do not add to Total issues and do not
+            change the Overall grade or category grades.</li>
+          <li><strong>Meaningful answers only</strong> — empty answers, zeros, and “not found” style
+            results are omitted so the list stays useful.</li>
+          <li><strong>Same card layout</strong> — each entry still has a description, model rows, and
+            optional details; the heading is labeled INFORMATION instead of WARNINGS or ERRORS.</li>
+        </ul>
+        <div class="callout tip">
+          <strong>Tip:</strong> Open Show information when you want context (for example feature or
+          file-size style facts). Switch back to Show all, Show warnings, or Show errors when you
+          return to cleaning up the score.
+        </div>
       </section>
 
       <section id="save-print">
@@ -503,7 +546,19 @@
           Use <span class="ui-name">Print This</span> to open the browser print dialog.
           For printing, the report temporarily shows every warning and error (and summary cards)
           so the printout is complete. Sidebar chrome and action buttons are hidden on the printed page.
+          On very large reports this may not work — the browser can run out of memory or stall when
+          building a full print layout.
         </p>
+      </section>
+
+      <section id="tips">
+        <h2>Tips</h2>
+        <ul>
+          <li>Work top-down: Score → category or filter → individual checks → gallery for a model-centric view.</li>
+          <li>Clear errors before chasing large warning piles if you want the grade letter to move out of D.</li>
+          <li>Use Flag this to park items for a follow-up pass without removing them from the score.</li>
+          <li>Save often after removals so you do not lose Adjusted Score work when you close the browser.</li>
+        </ul>
       </section>
     </main>
 

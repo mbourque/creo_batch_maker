@@ -2,6 +2,98 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-31 — v1.12.67
+
+- **Docs**: report how-to trims the Improve the score intro parenthetical about Creo fixes.
+
+## 2026-07-31 — v1.12.66
+
+- **Docs**: report how-to Improve the score intro stresses clearing non-problems to raise the grade.
+
+## 2026-07-31 — v1.12.65
+
+- **Docs**: report how-to shortens the item-details wording under Check sections.
+
+## 2026-07-31 — v1.12.64
+
+- **Docs**: report how-to clarifies dragging a failed model into Creo to diagnose it.
+
+## 2026-07-31 — v1.12.63
+
+- **Docs**: report how-to drops the rebuild-for-fresh-scan tip.
+
+## 2026-07-31 — v1.12.62
+
+- **Docs**: report how-to notes that **Print This** may fail on very large reports.
+
+## 2026-07-31 — v1.12.61
+
+- **Docs**: report how-to drops the no-remove/flag bullet from Show information.
+
+## 2026-07-31 — v1.12.60
+
+- **Docs**: report how-to drops the note about Filter view being hidden when empty.
+
+## 2026-07-31 — v1.12.59
+
+- **Docs**: report how-to drops placeholder and popup-close notes from Model Gallery.
+
+## 2026-07-31 — v1.12.58
+
+- **Docs**: report how-to moves **Model Gallery** to follow Scan Information.
+
+## 2026-07-31 — v1.12.57
+
+- **Docs**: report how-to moves **Scan Information** to follow Score.
+
+## 2026-07-31 — v1.12.56
+
+- **Docs**: report how-to moves **Check sections** (and Open models in Creo) to follow Score.
+
+## 2026-07-31 — v1.12.55
+
+- **Docs**: report how-to kicker says **PDSVISION Cad Assessment Report**.
+
+## 2026-07-31 — v1.12.54
+
+- **Docs**: report how-to keeps **Open models in Creo** as its own section, listed after Check sections.
+
+## 2026-07-31 — v1.12.53
+
+- **Docs**: report how-to places **Open models in Creo** under Check sections.
+
+## 2026-07-31 — v1.12.52
+
+- **Docs**: report how-to intro no longer mentions saving and printing up front.
+
+## 2026-07-31 — v1.12.51
+
+- **Docs**: report how-to Quick tour wording for Model Gallery and Scan Information.
+
+## 2026-07-31 — v1.12.50
+
+- **Docs**: report how-to shortens the **Models failed** description.
+
+## 2026-07-31 — v1.12.49
+
+- **Report > Score**: grade E/F scale colors match the how-to (darker reds; A–D unchanged).
+
+## 2026-07-31 — v1.12.48
+
+- **Docs**: report how-to adds a **Show information** section (insight checks that are not scored).
+
+## 2026-07-31 — v1.12.47
+
+- **Docs**: report how-to clarifies sidebar check counts are from the original scan (not live).
+
+## 2026-07-31 — v1.12.46
+
+- **Docs**: report how-to explains sidebar check counts; Tips moved to the end.
+
+## 2026-07-31 — v1.12.45
+
+- **Docs**: report how-to explains flagging issues and filtering to **Show flagged**.
+
 ## 2026-07-30 — v1.12.44
 
 - **Docs**: report how-to grade E/F text no longer says “shown on the scale for reference.”
