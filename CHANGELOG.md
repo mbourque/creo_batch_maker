@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-07-30 — v1.12.44
+
+- **Docs**: report how-to grade E/F text no longer says “shown on the scale for reference.”
+
 ## 2026-07-30 — v1.12.43
 
 - **Report**: **Help** outline border shows again (same height as the other sidebar buttons).
