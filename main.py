@@ -6934,6 +6934,16 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 return
             # "ready" — runner is held
 
+        # Stop leftover batch Creo (xtop) before telling the user interactive Creo is safe.
+        kill_ok, kill_err = self._run_kill_bat()
+        if not kill_ok:
+            messagebox.showwarning(
+                "Pause",
+                "Could not run kill.bat before pause hold:\n\n"
+                f"{kill_err}\n\n"
+                "Quit Creo (xtop) manually if it is still running, or Resume may be blocked.",
+            )
+
         ready_action = self._show_batch_pause_ready_dialog(step_label)
         if ready_action == "stop":
             handle_stop_choice()
@@ -7032,6 +7042,7 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
         message = (
             f"Paused on the {step_label} step.\n\n"
+            "Batch Creo processes were stopped (kill.bat).\n"
             "Safe to use interactive Creo now.\n"
             "When you are done, quit Creo and click Resume to continue the batch, or Stop to end it."
         )
@@ -8934,7 +8945,21 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             "        return $true",
             "    }",
             "    if (-not $script:pauseActive) {",
-            '        Write-ChLog "PAUSED: pause requested from app; waiting for resume."',
+            '        Write-ChLog "PAUSED: pause requested from app; running kill.bat before hold."',
+            "        if ($KillBat -and (Test-Path -LiteralPath $KillBat)) {",
+            "            try {",
+            "                $kp = Start-Process -FilePath $KillBat `",
+            "                    -WorkingDirectory ([System.IO.Path]::GetDirectoryName($KillBat)) `",
+            "                    -Wait -PassThru -WindowStyle Hidden -ErrorAction Stop",
+            '                Write-ChLog ("kill.bat exit code: " + $kp.ExitCode)',
+            "            } catch {",
+            '                Write-ChLog ("WARNING: kill.bat on pause failed: " + $_.Exception.Message)',
+            "            }",
+            f"            Start-Sleep -Seconds {int(BATCH_POST_KILL_SETTLE_SEC)}",
+            "        } else {",
+            '            Write-ChLog "WARNING: kill.bat not found; pause hold without kill."',
+            "        }",
+            '        Write-ChLog "PAUSED: waiting for resume."',
             "        Set-PauseActiveFlag",
             "    }",
             "    while (Test-PauseRequested) {",

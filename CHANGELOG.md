@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-01 — v1.12.81
+
+- **Pause**: runs **kill.bat** before the “safe to use Creo” dialog so leftover **xtop** does not block Resume.
+
 ## 2026-08-01 — v1.12.80
 
 - **Score weights**: added score weighting file

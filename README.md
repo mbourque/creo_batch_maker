@@ -138,7 +138,7 @@ Open **Settings** from the menu:
 | Action                     | When to use                                                                                                                                                                                                                                            |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Open Working Directory** | Open the current folder in File Explorer.                                                                                                                                                                                                              |
-| **Pause**                  | Pause a running Scan Templates / ModelCHECK / Thumbnails batch after the current chunk. First wait for the chunk to finish, then a second dialog when it is safe to use interactive Creo (**Resume**). Blocks automatic mode until you resume or stop. |
+| **Pause**                  | Pause a running Scan Templates / ModelCHECK / Thumbnails batch after the current chunk. First wait for the chunk to finish, then **kill.bat** runs and a second dialog appears when it is safe to use interactive Creo (**Resume**). Blocks automatic mode until you resume or stop. |
 | **Stop**                   | Stop the running batch (keeps outputs already written). Pauses automatic mode until you continue.                                                                                                                                                      |
 | **Start over…**            | Clear batch outputs in the working folder and return to Setup. Keeps your Creo models; also removes batch status files (`*-run.complete`, pause/stop flags, `.pvz`).                                                                                   |
 | **Purge cache…**           | Delete Creo/batch cache files (dbatch folders, mdlchk cache, Parametric logs, dsm_cache, and Local Temp ModelCHECK folders such as `mc_reports`). Confirm first; opens a PowerShell window that stays open so you can read what was removed.                                                                   |
@@ -153,7 +153,7 @@ Open **Settings** from the menu:
 
 - If using .exe, best if it is run as adminstrator.
 - Quit Creo before starting a batch — if **xtop** is running, GO warns you and does not start.
-- **Pause** waits for the current chunk to finish, then shows when it is safe to use interactive Creo; **Resume** continues the batch (warns if **xtop** is still running).
+- **Pause** waits for the current chunk to finish, runs **kill.bat** to clear leftover Creo processes, then shows when it is safe to use interactive Creo; **Resume** continues the batch (warns if **xtop** is still running).
 - During a large ModelCHECK or Thumbnails run, **Stop** / **Pause** stay clickable — progress uses chunk files, not a full folder rescan every tick.
 - **Skip** and step changes stay responsive on large folders; model counts may show **Checking models…** briefly while the folder is scanned in the background.
 - After **Stop**, run the same step again — models that already have output are skipped.
