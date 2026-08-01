@@ -1,0 +1,5 @@
+# Python placeholder check
+
+DEF_PY_ASSEMBLY_CUTS ASM_FEATURES
+CND_PY_ASSEMBLY_CUTS GTE 0
+MSG_PY_ASSEMBLY_CUTS Python-derived assembly cut check
