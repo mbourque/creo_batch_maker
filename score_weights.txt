@@ -1,0 +1,258 @@
+# Score weights
+# Name at left; weight starts at column 40; description comments start at column 44.
+# Each check appears once (info > error > warning > vda when listed in more than one .mch file).
+
+# ---------------------------------------------------------------------------
+# Information checks
+# ---------------------------------------------------------------------------
+ADD_CHK_PARAM                          0   # Reports whether extra parameters appear in ModelCHECK output.
+ASM_BOM                                0   # Lists components in the assembly BOM.
+BODY_INFO                              0   # Reports solid body info and metadata in the model.
+BULK_ITEMS                             0   # Finds bulk items such as grease, adhesive, or consumables in an assembly.
+CHILDREN_EXIST                         0   # Reports whether required child features exist with valid relationships.
+COSMETIC_FEAT                          0   # Finds cosmetic features such as threads, sketches, or welds.
+CREATE_VIEW                            0   # Reports whether standard template views are present.
+DATUM_RENAME                           0   # Checks datum features follow approved naming conventions.
+DEFAULT_CHILD                          0   # Checks that required default template child features are present.
+DESIGNATED_ATTR                        0   # Checks required attributes are designated for downstream systems.
+DIM_MODEL_SHOWN                        0   # Checks that model dimensions are shown rather than recreated on the drawing.
+DRAWING_LAYERS                         0   # Reports drawing layer names, visibility, and organization.
+DRIVEN_DIMENSIONS                      0   # Reports driven dimensions that reflect geometry but do not control it.
+DTM_AXES_INFO                          0   # Reports datum axes used in the model.
+DTM_CSYS_INFO                          0   # Reports coordinate systems used in the model.
+DTM_CURVE_INFO                         0   # Reports datum curves used in the model.
+DTM_PLANE_INFO                         0   # Reports datum planes used in the model.
+DTM_POINT_INFO                         0   # Reports datum points used in the model.
+FAMILY_INFO                            0   # Reports family table information for the model.
+FEATURE_INFO                           0   # Reports features and related parametric structure in the model.
+FILE_SIZE                              0   # Reports whether model file size is within acceptable limits.
+FLEX_COMPONENTS                        0   # Finds flexible components whose geometry can change by context.
+FREEFORM                               0   # Finds freeform or freestyle geometry features.
+GEOMETRIC_TOL                          0   # Reports geometric tolerance annotations in the model or drawing.
+IGNORE_ANNTN                           0   # Reports annotations marked to be ignored by ModelCHECK.
+IGNORE_FEAT                            0   # Reports features marked to be ignored by ModelCHECK.
+IGNORE_SHEETS                          0   # Reports drawing sheets marked to be ignored.
+LAYER_DISPSTAT                         0   # Reports layer display status in the model.
+LAYER_DTM_BLANK                        0   # Finds datum features that are not blanked on layers.
+LAYER_EXT_ITEMS                        0   # Finds external items placed on layers.
+LAYER_INFO                             0   # Reports layer information and organization.
+LAYER_MOVE                             0   # Reports whether items were moved onto required layers.
+LAYER_PLACE                            0   # Reports whether items are placed on the correct layers.
+LAYER_STATUS                           0   # Reports layer status settings in the model.
+LAYER_UNWANTED                         0   # Finds layers that are not part of the approved standard set.
+LAYOUT_INFO                            0   # Reports layout information associated with the model.
+MATERIAL_INFO                          0   # Reports material assignment information.
+MECH_COMPONENTS                        0   # Finds mechanism-related components in an assembly.
+MEMORY_SPACE                           0   # Reports memory space usage for the model.
+MINMAXTOL_INFO                         0   # Reports min/max linear tolerance information.
+MODEL_NAME                             0   # Checks model naming against company standards.
+MODEL_NAME_STR                         0   # Checks model name structure against approved patterns.
+MODELS_USED                            0   # Reports models referenced by the drawing.
+MULTIBODY_MODEL                        0   # Reports whether the part contains multiple solid bodies.
+NAMED_FEAT                             0   # Reports named features in the model.
+NOTE_CASE                              0   # Checks note text case against drafting standards.
+NOTE_FONT                              0   # Checks note fonts against approved drafting standards.
+NOTE_HEIGHT                            0   # Checks note text height against drafting standards.
+NOTE_INFO                              0   # Reports note content and placement in the drawing.
+NOTE_SPELL                             0   # Checks notes for spelling errors.
+NOTE_UNACCEPT                          0   # Finds notes with prohibited or nonstandard wording.
+NUM_COMPONENTS                         0   # Reports the number of components in an assembly.
+NUM_DRAW_SHEETS                        0   # Reports the number of sheets in a drawing.
+OVERALL_SIZE                           0   # Reports overall model size.
+PARAM_INFO                             0   # Reports parameter information in the model.
+PARAM_MAP                              0   # Checks parameters are mapped to approved standard names.
+PARAM_NOTE_REQ                         0   # Checks required parameter notes are present.
+PARAM_NOTE_UNACC                       0   # Finds unacceptable parameter notes.
+PARAM_RENAME                           0   # Checks parameters follow approved renaming rules.
+PARAM_SPELL                            0   # Checks parameter names and values for spelling issues.
+PARAM_UNWANTED                         0   # Finds parameters that are not part of the approved set.
+PRO_VERSION                            0   # Reports the Creo version the model was last saved in.
+REG_FEATURES                           0   # Reports regular (non-special) features in the model.
+RELATION_INFO                          0   # Reports relation information in the model.
+RELATION_UPDATE                        0   # Finds relations that need update for the current model state.
+REL_UNWANTED                           0   # Finds relations that are not permitted by company rules.
+RENAMED_SYMBOLS                        0   # Reports renamed symbols in the drawing or model.
+REPT_LAYR_ALWAYS                       0   # Reports whether required layers are always present.
+RULECHECK_INFO                         0   # Reports rule-check information for the model.
+SHEET_SIZE_INFO                        0   # Reports drawing sheet size information.
+SHTMTL_FBENDTAB                        0   # Reports the sheet metal feature bend table in use.
+SHTMTL_KFACTOR                         0   # Reports the sheet metal K-factor value.
+SHTMTL_YFACTOR                         0   # Reports the sheet metal Y-factor value.
+SIMPREP_INFO                           0   # Reports simplified representation information.
+STD_NOTES_MISSING                      0   # Finds missing required standard notes.
+SYMBOL_INFO                            0   # Reports symbol usage and definitions in the drawing.
+SYMBOL_SPELL                           0   # Checks symbol text for spelling errors.
+TABLE_CELLS                            0   # Reports table cell contents and formatting.
+TITLE_INFO                             0   # Reports title block information in the drawing.
+TITLE_SPELL                            0   # Checks title block text for spelling errors.
+UDF_INFO                               0   # Reports user-defined features (UDFs) in the model.
+UNITS_LENGTH                           0   # Reports length units used by the model.
+UNQ_COMPONENTS                         0   # Reports unique component instances in an assembly.
+VIEW_INFO                              0   # Reports saved view information in the model.
+XSEC_INFO                              0   # Reports cross-section information in the model.
+
+# ---------------------------------------------------------------------------
+# Error checks — weight
+# ---------------------------------------------------------------------------
+BURIED_FEAT                            5   # Finds features buried inside other geometry.
+CHILD_EXT_FAILED_COMPONENTS            1   # Finds children of externally failed components.
+CHILD_EXT_FAILED_FEATURES              1   # Finds children of externally failed features.
+CHILD_FAILED_COMPONENTS                1   # Finds children of failed components.
+CHILD_FAILED_FEATURES                  1   # Finds children of failed features.
+CIRCULAR_REFS                          10  # Finds circular reference loops in an assembly.
+DEF_DENSITY                            1   # Checks materials have a valid defined density.
+DIM_OVERWRITE                          10  # Finds dimensions overwritten with custom text.
+DIM_SHOWN_CREAT                        2   # Checks creation of shown model dimensions that stay associated with design intent.
+DRAFT_DIMENSIONS                       10  # Reports draft dimensions that are not inherited from the 3D model.
+FAILED_COMPONENTS                      10  # Finds assembly components in a failed state.
+FAILED_FEATURES                        10  # Finds features that failed to regenerate.
+FRZ_COMPONENTS                         5   # Finds frozen or suspended components in an assembly.
+GEOM_CHECKS                            2   # Finds geometry check errors in the model.
+GLOBAL_INTF                            1   # Checks whether a recent global interference analysis was run.
+INCOMPLETE_FEAT                        1   # Finds incomplete features that are not fully defined.
+INSERT_MODE                            5   # Reports whether insert mode is still active.
+MIS_COMPONENTS                         10  # Finds missing components in an assembly.
+PACK_COMPONENTS                        10  # Finds packaged (under-constrained) components.
+PRT_DENSITY                            1   # Checks part density is properly defined.
+RC_INCOMPLETED                         1   # Finds incomplete references in the model.
+REGEN_DIMS                             10  # Finds drawing dimensions that fail to regenerate.
+REGEN_ERRS                             10  # Finds regeneration errors in the model.
+REGEN_SREPS                            5   # Finds simplified reps that fail to regenerate.
+REGEN_XSEC                             2   # Finds cross-sections that fail to regenerate.
+RELATION_ERRS                          10  # Finds errors in model relations.
+SUP_COMPONENTS                         5   # Finds suppressed components in an assembly.
+UNITS_MASS                             1   # Checks mass units used by the model.
+UNUSED_MODELS                          10  # Finds drawing models that are not used in any view.
+UNUSED_SHEETS                          1   # Finds unused sheets in a drawing.
+WEAK_SKETCHER_DIMS                     10  # Finds weak (non-driving) sketcher dimensions.
+
+# ---------------------------------------------------------------------------
+# Warning checks — weight
+# ---------------------------------------------------------------------------
+ACCURACY_INFO                          .5  # Reports geometric accuracy settings used by the model.
+AE_GTOL_DUPLICATE                      .5  # Finds duplicate geometric tolerance annotations.
+AE_MISSINGREFS                         .5  # Finds missing or unresolved assembly references.
+AE_SF_DUPLICATE                        .5  # Finds duplicate surface-finish annotations.
+AF_INCOMPLETE                          .5  # Finds incomplete annotation features.
+ANNTN_INACTIVE                         .5  # Finds inactive or suppressed annotations.
+ANNTN_MISSING_SURF_REF                 .5  # Finds annotations that do not reference a surface.
+ANNTN_NOT_ON_COMB_STATE                .5  # Finds annotations missing from a combination state.
+ANNTN_ON_MULT_COMB_STATE               .5  # Finds annotations appearing on multiple combination states.
+ANNTN_SEM_REF_TEXT_VERIFY              .5  # Checks annotation semantic reference text is valid.
+ASM_FEATURES                           .5  # Finds assembly-level features in the model.
+BODY_INTF                              .5  # Finds interfering solid bodies in a multibody part.
+BOUND_INFO                             .5  # Finds drawing content outside the sheet boundary.
+BURIED_SUSPECT                         .5  # Finds features that may be buried without exposed surfaces.
+CHAMFER_CHILD                          .5  # Finds features that depend on chamfer parents.
+COMB_STATE_NAME                        .1  # Checks combined state names follow naming standards.
+CYL_CUT_SLOTS                          .5  # Finds cylindrical cuts or slots that should be holes.
+CYL_DIAMS                              .5  # Checks cylindrical diameters against approved standards.
+DEFAULT_VIEWS                          .1  # Checks drawings have the required default views.
+DEPENDENT_FEATURE                      .5  # Finds features with heavy parent-child dependency.
+DRAFT_ANGLES                           .1  # Checks draft angles against manufacturing standards.
+DRAFT_CHILD                            .5  # Finds features that depend on draft parents.
+DRAFT_GEOM                             .5  # Finds non-associative draft geometry on drawings.
+DRAWING_NAME                           .5  # Checks drawing names against company standards.
+DRAWING_PARAMS                         .5  # Checks required drawing parameters are present.
+DUPLICATE_MODELS                       .2  # Finds potentially duplicate models.
+EARLY_CHAMFER                          .5  # Finds chamfers created too early in the feature tree.
+EARLY_COSMETIC                         .5  # Finds cosmetic features created too early.
+EARLY_DRAFT                            .5  # Finds draft features created too early.
+EARLY_ROUND                            .5  # Finds rounds created too early in the feature tree.
+EDGE_REFERENCES                        1   # Finds features that use unstable edge references.
+EMPTY_LAYERS                           .5  # Reports layers that exist but contain no items.
+ERASED_DIMENSIONS                      .5  # Reports erased drawing dimensions that may leave design info undocumented.
+ERASED_VIEWS                           .5  # Finds erased views still stored in the drawing.
+EXTERNAL_DEPS                          .5  # Finds external dependencies outside the model.
+EXTRA_LAYERS                           .5  # Finds layers not part of the start-part standard set.
+EXTRA_PARAMS                           .5  # Finds parameters not part of the start-part standard set.
+FIXED_COMPONENTS                       1   # Finds fixed components in an assembly.
+FLEXIBLE_MODELING_FEATURES             1   # Finds flexible modeling features used in the part or assembly.
+FORMAT_NAME                            .5  # Checks drawing format names against standards.
+FT_DEF_VALS                            .5  # Checks family table or feature template default values.
+FT_STD_PARMS                           .5  # Checks feature templates have required standard parameters.
+GEN_COMPONENTS                         5   # Finds generic family-table components in an assembly.
+HOLE_DIAMS                             .5  # Checks hole diameters against approved standards.
+HOLE_LIGHTWT                           .5  # Finds lightweight hole features in the model.
+IMPORT_FEAT                            .5  # Finds imported features in the model.
+INSTANCE_NAME                          .5  # Checks instance naming against company standards.
+LAYER_ITEMS                            .5  # Finds items assigned to multiple layers.
+LAYER_SAVED_STATUS                     .5  # Reports saved layer status settings.
+LOW_TOLERANCE                          .5  # Finds tolerances that are too tight or low.
+MATERIAL_DENSITY                       .5  # Checks material density against approved material cards.
+MDL_STD_DTL_SETUP                      .5  # Checks the model uses the standard detail setup.
+MERGE_FEAT                             .5  # Finds merged or cutout features in the model.
+OVERLAP_INFO                           .2  # Finds overlapping drawing entities.
+PARAMCHECK                             .5  # Runs configured parameter validation checks.
+PARAM_UNUSED                           .5  # Finds unused part parameters.
+PARENT_DIFF                            .1  # Finds features whose parent references differ from intent.
+PLANE_CHILD                            .5  # Finds datum planes without child features.
+PLANE_PARENT                           .5  # Finds features that use plane parents inappropriately.
+REGEN_WRNS                             1   # Finds regeneration warnings in the model.
+RELATION_COMM                          1   # Finds relations that lack comments.
+RELATION_MISS                          .5  # Finds missing required relations.
+RELATION_MULT                          1   # Finds duplicate or multiple conflicting relations.
+ROUND_CHILD                            1   # Finds features that depend on round parents.
+SEARCH_DUP_MODELS                      .5  # Searches the database for duplicate models.
+SHARP_EDGES                            .5  # Finds sharp edges in the model.
+SHORT_EDGES                            .5  # Finds edges that are too short.
+SHTMTL_BENDTAB                         .5  # Checks the sheet metal bend table in use.
+SHTMTL_FLAT                            .5  # Checks sheet metal flat pattern definition.
+SHTMTL_OVERLAP_INFO                    1   # Reports overlapping sheet metal geometry that may break flat patterns.
+SHTMTL_RULE_CHECK                      .5  # Runs sheet metal rule checks.
+SHTMTL_THICK                           .5  # Checks sheet metal thickness against standards.
+SHTMTL_UNBENDS                         1   # Finds sheet metal unbend features.
+SIMPREP_MASTER                         .5  # Checks the simplified rep master is correctly defined.
+SIMPREP_NAME                           .5  # Checks simplified representation naming.
+SKETCH_ITEMS                           5   # Finds sketches with too many items.
+SMALL_CYLSRF                           .5  # Finds very small cylindrical surfaces.
+SO24_EXTRA_GEOM                        .5  # Finds extra or unnecessary geometry in the model.
+SO25_CAVITIES                          .5  # Finds unintentional internal cavities in solid bodies.
+SRF_EDGES                              .5  # Finds problematic surface edges.
+SRF_NOT_REF_BY_ANNTN                   .5  # Finds surfaces not referenced by any annotation.
+STARTCHECK                             .5  # Checks for missing required start-part items.
+STARTLAYR                              .5  # Checks start-part layers against the template.
+STARTPARM                              .5  # Checks required start parameters are present.
+STD_DTL_SETUP                          .5  # Checks the drawing uses the standard detail setup.
+STD_SYMBOLS                            .5  # Checks drawing symbols against approved libraries.
+SUP_FEATURES                           1   # Finds suppressed features in the model.
+T20_KNIFE_EDGES                        .5  # Finds knife-edge geometry that is too sharp.
+TEMPLATE_DATUM_PLANES                  .5  # Checks required template datum planes are present.
+TEMPLATE_LAYERS                        .5  # Checks required template layers are present.
+UNATTACHED_FEAT                        .5  # Finds features that are not attached to the model.
+VALIDATE_DIMENSIONS                    .5  # Validates dimension values and formatting.
+VALIDATE_GTOL_VALUES                   .5  # Validates geometric tolerance values.
+VALIDATE_SET_DATUM_AND_SDTA            .5  # Validates legacy set-datum and SDTA annotations.
+VALIDATE_VIEW_SCALE                    .5  # Validates drawing view scales against standards.
+VIEW_SCALE                             .5  # Finds views that use nonstandard scales.
+
+# ---------------------------------------------------------------------------
+# VDA checks — weight
+# ---------------------------------------------------------------------------
+C7_SELF_DIST                           .1  # Finds curves or surfaces that self-intersect.
+D28_IGES_TEXT                          .1  # Finds drawing text that is not IGES-compliant.
+F14_BOUND_DIST                         .1  # Finds boundaries that are too close together.
+F15_SURF_DIST                          .1  # Finds boundary curves too far from their surface.
+F16_SIM_ORIENT                         .1  # Checks that surfaces share a similar orientation.
+F17_NUM_SEG                            .1  # Finds faces with too many boundary segments.
+M1_TINY_ELMNT                          .1  # Finds tiny curve elements below quality thresholds.
+M2_IDENTICAL_ELMNT                     .1  # Finds identical duplicate curve elements.
+M3A_POSITION_CONT                      .1  # Finds positional gaps between connected curves or surfaces.
+M3B_TANG_CONT                          .1  # Finds tangent discontinuities between curves or surfaces.
+M3C_CURV_CONT                          .1  # Finds curvature discontinuities between curves or surfaces.
+M4_POLYN_DEG                           .1  # Finds curves or surfaces with excessive polynomial degree.
+M5_WAVINESS                            .1  # Finds wavy curves or surfaces.
+M6_KNOT_DIST                           .1  # Finds curves with knots that are too close together.
+SO21_DIST_VERT_EDGE                    .1  # Finds vertices not aligned with adjacent edges.
+SO22_DIST_VERT_FACE                    .1  # Finds vertices not aligned with adjacent faces.
+SO23_HIST_DELETE                       .1  # Finds features where history was deleted.
+SO26_MULT_BODY                         .1  # Finds multi-body merged solids in a part.
+SO27_MULT_SOLID                        .1  # Finds parts that contain multiple independent solids.
+SU10_BOUND_ANGLE                       .1  # Finds adjacent surfaces with out-of-range boundary angles.
+SU11_NORM_REVERSAL                     .1  # Finds surfaces with reversed normals.
+SU12_PATCH_DIST                        .1  # Finds surfaces with uneven or excessive patch spacing.
+SU13_UNOC_PATCH_ROW                    .1  # Finds surfaces with unoccupied patch rows.
+SU8_TINY_SEG_EDGE                      .1  # Finds face segments with tiny edges.
+SU9_TINY_CURV_RAD                      .1  # Finds surfaces with curvature radius below the limit.
+T18_NUM_FACE                           .1  # Finds edges shared by an unusual number of faces.
+T19_NORMAL_ORIENT                      .1  # Finds improperly oriented surface normals.
