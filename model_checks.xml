@@ -2807,4 +2807,15 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
 
 
+    <Check>
+        <Name>Assembly Cuts</Name>
+        <Category>Model Integrity</Category>
+        <Description>Checks assembly cuts that exist in the model. Using Assembly cuts cause regeneration to take longer and can cause performance issues.</Description>
+        <ModelCheckName>CHK_ASSEMBLY_CUTS</ModelCheckName>
+        <ModelCheckOptions>YNEW N W N N N</ModelCheckOptions>
+        <display>Y</display>
+        <enabled>Y</enabled>
+    </Check>
+
+
 </ModelChecks>

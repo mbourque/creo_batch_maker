@@ -6,6 +6,7 @@ from pathlib import Path
 import json
 import os
 import re
+import runpy
 import shutil
 import sys
 import subprocess
@@ -288,6 +289,146 @@ def _read_app_version() -> str:
 def _default_app_settings_path() -> Path:
     """``app_settings.json`` next to the app: only used to persist current form fields for the next run."""
     return _app_bundle_dir() / "app_settings.json"
+
+
+def _load_custom_check_def_names(path: Path) -> list[str]:
+    """
+    ``DEF_<name>`` lines from config/custom_checks.txt → ``<name>`` list.
+
+    Example: ``DEF_ASSEMBLY_CUTS …`` → ``ASSEMBLY_CUTS`` (script ``chk_assembly_cuts.py``).
+    """
+    if not path.is_file():
+        raise FileNotFoundError(f"custom checks file not found: {path}")
+
+    names: list[str] = []
+    seen: set[str] = set()
+    for raw in path.read_text(encoding="utf-8-sig").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or line.startswith("!"):
+            continue
+        token = line.split()[0]
+        if not token.upper().startswith("DEF_"):
+            continue
+        suffix = token[4:]
+        if not suffix:
+            continue
+        key = suffix.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        names.append(suffix)
+    return names
+
+
+def _iter_chk_python_scripts(bundle: Path) -> list[Path]:
+    """
+    ``chk_<def>.py`` scripts for each ``DEF_<def>`` in config/custom_checks.txt.
+
+    Case-insensitive match on the script filename next to the app.
+    """
+    checks_file = bundle / "config" / "custom_checks.txt"
+    def_names = _load_custom_check_def_names(checks_file)
+    if not def_names:
+        return []
+
+    by_name: dict[str, Path] = {}
+    try:
+        for path in bundle.iterdir():
+            if not path.is_file():
+                continue
+            name = path.name
+            if not name.casefold().endswith(".py"):
+                continue
+            if not name.casefold().startswith("chk_"):
+                continue
+            by_name[name.casefold()] = path
+    except OSError as exc:
+        raise OSError(f"Cannot list app folder {bundle}: {exc}") from exc
+
+    scripts: list[Path] = []
+    missing: list[str] = []
+    for def_name in def_names:
+        expected = f"chk_{def_name.casefold()}.py"
+        path = by_name.get(expected.casefold())
+        if path is None:
+            missing.append(expected)
+            continue
+        scripts.append(path)
+
+    if missing:
+        raise FileNotFoundError(
+            "config/custom_checks.txt lists DEF_ checks but these scripts "
+            "were not found next to the application:\n  "
+            + "\n  ".join(missing)
+        )
+    return scripts
+
+
+def _run_sidecar_python_script(script: Path) -> None:
+    """
+    Run a sidecar ``.py`` as ``__main__`` (same process; reads app_settings.json).
+
+    Raises ``RuntimeError`` on non-zero exit.
+    """
+    old_argv = sys.argv[:]
+    try:
+        sys.argv = [str(script)]
+        runpy.run_path(str(script), run_name="__main__")
+    except SystemExit as exc:
+        code = exc.code
+        if code in (None, 0):
+            return
+        if isinstance(code, int):
+            raise RuntimeError(f"{script.name} exited with code {code}") from None
+        raise RuntimeError(f"{script.name} exited: {code}") from None
+    finally:
+        sys.argv = old_argv
+
+
+def _run_custom_checks_before_master() -> tuple[bool, str | None]:
+    """
+    Before master.xml: if custom_checks.txt has active DEF_ entries, run matching
+    ``chk_<DEF>.py`` scripts then ``sync_modelcheck_checks.py``. Skip both when
+    there are no DEF_ lines (or all are commented out).
+    """
+    bundle = _app_bundle_dir()
+    checks_file = bundle / "config" / "custom_checks.txt"
+    try:
+        try:
+            def_names = _load_custom_check_def_names(checks_file)
+        except FileNotFoundError:
+            # No custom checks file → nothing to run.
+            return True, None
+        if not def_names:
+            return True, None
+
+        for script in _iter_chk_python_scripts(bundle):
+            _run_sidecar_python_script(script)
+        sync_script = bundle / "sync_modelcheck_checks.py"
+        if not sync_script.is_file():
+            return False, (
+                "sync_modelcheck_checks.py was not found next to the application.\n\n"
+                f"Expected:\n  {sync_script}"
+            )
+        _run_sidecar_python_script(sync_script)
+    except FileNotFoundError as exc:
+        return False, str(exc)
+    except RuntimeError as exc:
+        return False, (
+            "Custom ModelCHECK check scripts failed before building the report.\n\n"
+            f"{exc}"
+        )
+    except OSError as exc:
+        return False, (
+            "Could not run custom ModelCHECK check scripts before building the report.\n\n"
+            f"{exc}"
+        )
+    except Exception as exc:
+        return False, (
+            "An error occurred while running custom ModelCHECK check scripts.\n\n"
+            f"{exc}"
+        )
+    return True, None
 
 
 def _safe_report_zip_stem(folder_name: str) -> str:
@@ -10615,6 +10756,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 )
             elif kind == "master":
                 messagebox.showerror("Report Failed", str(error))
+            elif kind == "custom_check":
+                messagebox.showerror("Report Failed", str(error))
             elif kind == "notfound":
                 messagebox.showerror("Report Failed", str(error))
             elif kind == "os":
@@ -10681,15 +10824,20 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         def work() -> None:
             result: dict[str, object] = {"written": None, "error": None, "kind": None}
             try:
-                ok, build_err = self._build_master_xml_silent(working_dir)
+                ok, prep_err = _run_custom_checks_before_master()
                 if not ok:
-                    result["error"] = build_err or "Could not build master.xml."
-                    result["kind"] = "master"
+                    result["error"] = prep_err or "Custom check scripts failed."
+                    result["kind"] = "custom_check"
                 else:
-                    patch.run(settings_path=settings_path, quiet=True)
-                    result["written"] = build_errors_warnings_report.build_errors_warnings_html(
-                        wd
-                    )
+                    ok, build_err = self._build_master_xml_silent(working_dir)
+                    if not ok:
+                        result["error"] = build_err or "Could not build master.xml."
+                        result["kind"] = "master"
+                    else:
+                        patch.run(settings_path=settings_path, quiet=True)
+                        result["written"] = build_errors_warnings_report.build_errors_warnings_html(
+                            wd
+                        )
             except patch.PatchError as exc:
                 result["error"] = str(exc)
                 result["kind"] = "patch"

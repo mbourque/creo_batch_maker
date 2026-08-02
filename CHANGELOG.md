@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-02 — v1.12.82
+
+- **Added**: support for custom python checks.
+
 ## 2026-08-01 — v1.12.81
 
 - **Pause**: runs **kill.bat** before the “safe to use Creo” dialog so leftover **xtop** does not block Resume.
@@ -17,6 +21,8 @@ Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. 
 ## 2026-07-31 — v1.12.78
 
 - **Report > Top level assembly information**: the assembly name in the BOM note is plain text again.
+
+
 
 ## 2026-07-31 — v1.12.77
 

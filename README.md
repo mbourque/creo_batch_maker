@@ -104,7 +104,7 @@ Same ideas as ModelCHECK: **Waiting…**, **Failed (N)** (part + assembly + draw
 
 ### Create Report
 
-Click **Create Report**. A **Processing, please wait…** dialog stays open while the report builds. When finished, choose whether to open `index.html` in your browser.
+Click **Create Report**. Before building ``master.xml``, if ``config/custom_checks.txt`` has active ``DEF_<name>`` lines, the app runs matching ``chk_<name>.py`` scripts then ``sync_modelcheck_checks.py``; if there are none (or all are commented out), those steps are skipped. Then the report finishes as usual. A **Processing, please wait…** dialog stays open while the report builds. When finished, choose whether to open `index.html` in your browser.
 
 If the report already exists, **Open Report** opens it without rebuilding.
 
