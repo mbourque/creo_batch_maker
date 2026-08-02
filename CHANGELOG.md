@@ -2,6 +2,14 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-02 — v1.12.107
+
+- **Create Report**: skips custom check scripts and sync when the CHECK name is missing or commented out in the ``*.mch`` from ``condition.mcc``.
+
+## 2026-08-02 — v1.12.106
+
+- **Tools**: ``sync_modelcheck_checks.py`` uses CHECK ``_ASM`` / ``_PRT`` / ``_DRW`` to choose ``*.a.xml`` / ``*.p.xml`` / ``*.d.xml`` (same as assembly-cuts).
+
 ## 2026-08-02 — v1.12.82
 
 - **Added**: support for custom python checks.

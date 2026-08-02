@@ -8,14 +8,15 @@ Check names come from ``CHECK`` lines in ``config/custom_checks.txt``::
     CHECK CHK_<name>_ASM
 
 ``CHECK CHK_<name>_ASM`` (or ``_PRT`` / ``_DRW``) syncs the XML/JS check
-``CHK_<name>`` — the type suffix is stripped. Multiple ``CHECK`` lines are all
-synced. ``DEF_`` lines select which ``chk_<name>.py`` scripts run at report time;
-this sync tool keys off ``CHECK`` only.
+``CHK_<name>`` — the type suffix is stripped — and only scans matching reports
+(``_ASM`` → ``*.a.xml``, ``_PRT`` → ``*.p.xml``, ``_DRW`` → ``*.d.xml``).
+Multiple ``CHECK`` lines are all synced. ``DEF_`` lines select which
+``chk_<name>.py`` scripts run at report time; this sync tool keys off ``CHECK`` only.
 
 The report folder is ``working_directory`` from ``app_settings.json`` next to this script
 (no command-line path argument).
 
-- Scans only ``*.a.xml`` / ``*.p.xml`` / ``*.d.xml`` (no recurse).
+- Scans ``*.a.xml`` / ``*.p.xml`` / ``*.d.xml`` per CHECK type suffix (no recurse).
 - Ignores XML files that do not contain any configured check.
 - Updates only the companion ``.js`` file (e.g. ``model.a.xml`` → ``model.a.js``).
 - Does not modify XML or HTML.
@@ -28,12 +29,24 @@ import json
 import re
 import sys
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 from pathlib import Path
 
 
-_PRO_SUFFIXES = ("_ASM", "_PRT", "_DRW")
-_REPORT_SUFFIXES = (".a.xml", ".p.xml", ".d.xml")
+_PRO_SUFFIX_TO_XML = {
+    "_ASM": ".a.xml",
+    "_PRT": ".p.xml",
+    "_DRW": ".d.xml",
+}
 _DOCTYPE_RE = re.compile(r"<!DOCTYPE\b[\s\S]*?\]\s*>", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class SyncJob:
+    """One CHECK line: XML/JS check name plus which report files to scan."""
+
+    xml_name: str
+    file_suffix: str  # .a.xml / .p.xml / .d.xml
 
 
 def custom_checks_path() -> Path:
@@ -60,27 +73,33 @@ def load_working_directory(path: Path) -> Path:
     return Path(raw).expanduser().resolve()
 
 
-def xml_check_name_from_check_token(token: str) -> str:
-    """``CHK_<name>_ASM`` (or ``_PRT`` / ``_DRW``) → ``CHK_<name>``."""
+def split_check_token(token: str) -> tuple[str, str]:
+    """
+    ``CHK_<name>_ASM`` → (``CHK_<name>``, ``.a.xml``).
+
+    Requires a trailing ``_ASM`` / ``_PRT`` / ``_DRW`` suffix.
+    """
     name = token.strip()
     upper = name.upper()
-    for suf in _PRO_SUFFIXES:
+    for suf, file_suffix in _PRO_SUFFIX_TO_XML.items():
         if upper.endswith(suf):
-            return name[: -len(suf)]
-    return name
+            return name[: -len(suf)], file_suffix
+    raise ValueError(
+        f"CHECK name must end with _ASM, _PRT, or _DRW (got {token!r})"
+    )
 
 
-def load_check_names(path: Path) -> list[str]:
+def load_sync_jobs(path: Path) -> list[SyncJob]:
     """
-    Read ``CHECK <name>`` lines from custom_checks.txt → XML/JS check names.
+    Read ``CHECK <name>`` lines from custom_checks.txt.
 
-    Strips trailing ``_ASM`` / ``_PRT`` / ``_DRW`` so names match report XML.
-    Other lines (``DEF_``, ``CND_``, ``MSG_``, comments) are ignored.
+    Strips ``_ASM`` / ``_PRT`` / ``_DRW`` for the XML/JS name and records which
+    report files to scan. Other lines are ignored.
     """
     if not path.is_file():
         raise FileNotFoundError(f"custom checks file not found: {path}")
 
-    names: list[str] = []
+    jobs: list[SyncJob] = []
     seen: set[str] = set()
     for raw in path.read_text(encoding="utf-8-sig").splitlines():
         line = raw.strip()
@@ -89,19 +108,27 @@ def load_check_names(path: Path) -> list[str]:
         parts = line.split()
         if parts[0].upper() != "CHECK" or len(parts) < 2:
             continue
-        check_name = xml_check_name_from_check_token(parts[1])
-        if not check_name:
+        xml_name, file_suffix = split_check_token(parts[1])
+        if not xml_name:
             continue
-        key = check_name.casefold()
+        key = f"{xml_name.casefold()}|{file_suffix.casefold()}"
         if key in seen:
             continue
         seen.add(key)
-        names.append(check_name)
-    return names
+        jobs.append(SyncJob(xml_name=xml_name, file_suffix=file_suffix))
+    return jobs
 
 
-def iter_report_xml_files(report_dir: Path) -> list[Path]:
-    """List ``*.a.xml`` / ``*.p.xml`` / ``*.d.xml`` in report_dir (not recursive)."""
+def iter_report_xml_files(
+    report_dir: Path, suffixes: set[str] | None = None
+) -> list[Path]:
+    """
+    List ModelCHECK report XML in report_dir (not recursive).
+
+    ``suffixes`` is lower-case endings such as ``{".a.xml"}``.
+    When None, all ``.a.xml`` / ``.p.xml`` / ``.d.xml`` are included.
+    """
+    allowed = suffixes or {".a.xml", ".p.xml", ".d.xml"}
     found: dict[str, Path] = {}
     try:
         entries = list(report_dir.iterdir())
@@ -112,9 +139,15 @@ def iter_report_xml_files(report_dir: Path) -> list[Path]:
         if not path.is_file():
             continue
         name = path.name.casefold()
-        if name.endswith(_REPORT_SUFFIXES):
+        if any(name.endswith(suf) for suf in allowed):
             found[name] = path
     return sorted(found.values(), key=lambda p: p.name.casefold())
+
+
+def jobs_for_xml_file(xml_path: Path, jobs: list[SyncJob]) -> list[SyncJob]:
+    """Jobs whose CHECK type suffix matches this report file."""
+    name = xml_path.name.casefold()
+    return [job for job in jobs if name.endswith(job.file_suffix.casefold())]
 
 
 def read_xml_text(path: Path) -> str:
@@ -365,12 +398,12 @@ def main() -> int:
 
     checks_file = custom_checks_path()
     try:
-        check_names = load_check_names(checks_file)
-    except (OSError, UnicodeError) as exc:
+        jobs = load_sync_jobs(checks_file)
+    except (OSError, UnicodeError, ValueError) as exc:
         print(f"Could not read {checks_file}: {exc}", file=sys.stderr)
         return 2
 
-    if not check_names:
+    if not jobs:
         print(
             f"No CHECK entries found in {checks_file}",
             file=sys.stderr,
@@ -378,22 +411,26 @@ def main() -> int:
         return 2
 
     print(f"Custom checks file: {checks_file}")
-    print(f"Syncing: {', '.join(check_names)}")
+    for job in jobs:
+        print(f"Syncing: {job.xml_name}  (*{job.file_suffix})")
     print()
-
-    check_bytes = [name.encode("ascii", errors="ignore") for name in check_names]
 
     matched = 0
     synchronized = 0
     errors = 0
 
     try:
-        xml_files = iter_report_xml_files(report_dir)
+        needed = {job.file_suffix.casefold() for job in jobs}
+        xml_files = iter_report_xml_files(report_dir, needed)
     except OSError as exc:
         print(f"Could not list report folder: {exc}", file=sys.stderr)
         return 2
 
     for xml_path in xml_files:
+        file_jobs = jobs_for_xml_file(xml_path, jobs)
+        if not file_jobs:
+            continue
+
         try:
             text = read_xml_text(xml_path)
         except OSError as exc:
@@ -401,11 +438,8 @@ def main() -> int:
             errors += 1
             continue
 
-        raw_probe = text.encode("utf-8", errors="ignore")
-        if not any(needle and needle in raw_probe for needle in check_bytes):
-            # Also allow direct substring on decoded text (non-ASCII names).
-            if not any(name in text for name in check_names):
-                continue
+        if not any(job.xml_name in text for job in file_jobs):
+            continue
 
         try:
             root = parse_mc_xml(text)
@@ -414,14 +448,14 @@ def main() -> int:
             errors += 1
             continue
 
-        for check_name in check_names:
-            check = find_check(root, check_name)
+        for job in file_jobs:
+            check = find_check(root, job.xml_name)
             if check is None:
                 continue
 
             matched += 1
 
-            if update_report(xml_path, check, check_name):
+            if update_report(xml_path, check, job.xml_name):
                 synchronized += 1
             else:
                 errors += 1

@@ -320,14 +320,140 @@ def _load_custom_check_def_names(path: Path) -> list[str]:
     return names
 
 
-def _iter_chk_python_scripts(bundle: Path) -> list[Path]:
+def _load_custom_check_check_names(path: Path) -> list[str]:
     """
-    ``chk_<def>.py`` scripts for each ``DEF_<def>`` in config/custom_checks.txt.
+    Active ``CHECK <name>`` tokens from config/custom_checks.txt.
+
+    Example: ``CHECK CHK_ASSEMBLY_CUTS_ASM`` → ``CHK_ASSEMBLY_CUTS_ASM``.
+    """
+    if not path.is_file():
+        raise FileNotFoundError(f"custom checks file not found: {path}")
+
+    names: list[str] = []
+    seen: set[str] = set()
+    for raw in path.read_text(encoding="utf-8-sig").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or line.startswith("!"):
+            continue
+        parts = line.split()
+        if len(parts) < 2 or parts[0].upper() != "CHECK":
+            continue
+        name = parts[1].strip()
+        if not name:
+            continue
+        key = name.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        names.append(name)
+    return names
+
+
+def _resolve_condition_mch_path(condition_path: Path, config_dir: Path) -> Path | None:
+    """
+    ``*.mch`` from the first ``config=(….mch)`` in condition.mcc (prefer ELSE).
+
+    Returns None when the condition file or mch is missing / has no config=.
+    """
+    if not condition_path.is_file():
+        return None
+
+    else_mch: str | None = None
+    first_mch: str | None = None
+    try:
+        text = condition_path.read_text(encoding="utf-8-sig")
+    except OSError:
+        return None
+
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or line.startswith("!"):
+            continue
+        if "config=" not in line.casefold():
+            continue
+        found = re.findall(r"\(([^)]+\.mch)\)", line, flags=re.IGNORECASE)
+        if not found:
+            continue
+        name = found[0].strip()
+        if line.upper().startswith("ELSE"):
+            else_mch = name
+        elif first_mch is None:
+            first_mch = name
+
+    mch_name = else_mch or first_mch
+    if not mch_name:
+        return None
+
+    mch_path = config_dir / Path(mch_name).name
+    if not mch_path.is_file():
+        return None
+    return mch_path
+
+
+def _mch_active_check_tokens(mch_path: Path) -> set[str]:
+    """First token of each uncommented line in a ``*.mch`` (casefolded)."""
+    tokens: set[str] = set()
+    try:
+        text = mch_path.read_text(encoding="utf-8-sig")
+    except OSError:
+        return tokens
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or line.startswith("!"):
+            continue
+        token = line.split()[0]
+        if token:
+            tokens.add(token.casefold())
+    return tokens
+
+
+def _check_names_for_def(def_name: str, check_names: list[str]) -> list[str]:
+    """``CHECK`` names for a DEF (``CHK_<DEF>`` or ``CHK_<DEF>_*``)."""
+    prefix = f"CHK_{def_name}".casefold()
+    matched: list[str] = []
+    for name in check_names:
+        key = name.casefold()
+        if key == prefix or key.startswith(prefix + "_"):
+            matched.append(name)
+    return matched
+
+
+def _def_names_enabled_in_mch(
+    def_names: list[str],
+    check_names: list[str],
+    mch_path: Path | None,
+) -> list[str]:
+    """
+    DEF names whose derived CHECK appears uncommented in the active ``*.mch``.
+
+    If the mch cannot be resolved, none are enabled (scripts are skipped).
+    """
+    if mch_path is None or not def_names or not check_names:
+        return []
+
+    active = _mch_active_check_tokens(mch_path)
+    if not active:
+        return []
+
+    enabled: list[str] = []
+    for def_name in def_names:
+        for check_name in _check_names_for_def(def_name, check_names):
+            if check_name.casefold() in active:
+                enabled.append(def_name)
+                break
+    return enabled
+
+
+def _iter_chk_python_scripts(bundle: Path, def_names: list[str] | None = None) -> list[Path]:
+    """
+    ``chk_<def>.py`` scripts for each enabled ``DEF_<def>``.
 
     Case-insensitive match on the script filename next to the app.
+    When ``def_names`` is omitted, all DEF_ entries from custom_checks.txt are used.
     """
     checks_file = bundle / "config" / "custom_checks.txt"
-    def_names = _load_custom_check_def_names(checks_file)
+    if def_names is None:
+        def_names = _load_custom_check_def_names(checks_file)
     if not def_names:
         return []
 
@@ -387,22 +513,30 @@ def _run_sidecar_python_script(script: Path) -> None:
 
 def _run_custom_checks_before_master() -> tuple[bool, str | None]:
     """
-    Before master.xml: if custom_checks.txt has active DEF_ entries, run matching
-    ``chk_<DEF>.py`` scripts then ``sync_modelcheck_checks.py``. Skip both when
-    there are no DEF_ lines (or all are commented out).
+    Before master.xml: run ``chk_<DEF>.py`` then ``sync_modelcheck_checks.py`` only
+    when custom_checks.txt has DEF_/CHECK lines that appear uncommented in the
+    ``*.mch`` from condition.mcc ``config=``. Skip both when none are active there
+    (missing, commented with ``!``/``#``, or no DEF_/CHECK lines).
     """
     bundle = _app_bundle_dir()
-    checks_file = bundle / "config" / "custom_checks.txt"
+    config_dir = bundle / "config"
+    checks_file = config_dir / "custom_checks.txt"
     try:
         try:
             def_names = _load_custom_check_def_names(checks_file)
+            check_names = _load_custom_check_check_names(checks_file)
         except FileNotFoundError:
             # No custom checks file → nothing to run.
             return True, None
         if not def_names:
             return True, None
 
-        for script in _iter_chk_python_scripts(bundle):
+        mch_path = _resolve_condition_mch_path(config_dir / "condition.mcc", config_dir)
+        enabled = _def_names_enabled_in_mch(def_names, check_names, mch_path)
+        if not enabled:
+            return True, None
+
+        for script in _iter_chk_python_scripts(bundle, enabled):
             _run_sidecar_python_script(script)
         sync_script = bundle / "sync_modelcheck_checks.py"
         if not sync_script.is_file():
