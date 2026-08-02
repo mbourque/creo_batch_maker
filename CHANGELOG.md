@@ -2,6 +2,18 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-02 — v1.12.110
+
+- **Config**: VDA-style checks in ``all_checks.mch`` (M1 through SO27) use Warning (W) for Interactive and Batch.
+
+## 2026-08-02 — v1.12.109
+
+- **Config**: ``all_checks.mch`` no longer lists ``T20_KNIFE_EDGES``, ``SO24_EXTRA_GEOM``, and ``SO25_CAVITIES`` twice (keeps the Error severity rows).
+
+## 2026-08-02 — v1.12.108
+
+- **Custom checks**: assembly-cuts count now includes PATTERN along with CUT and HOLE.
+
 ## 2026-08-02 — v1.12.107
 
 - **Create Report**: skips custom check scripts and sync when the CHECK name is missing or commented out in the ``*.mch`` from ``condition.mcc``.

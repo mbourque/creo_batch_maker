@@ -21,7 +21,7 @@ The CHECK suffix selects which report files to edit:
 Feature matching is fixed in this script (not in custom_checks.txt):
 
 - Source check: FEATURE_INFO
-- Types: CUT, HOLE (sum ``info2`` → ``ans``; one ``<item>`` per type)
+- Types: CUT, HOLE, PATTERN (sum ``info2`` → ``ans``; one ``<item>`` per type)
 - When items exist, also sets ``<title1>Type</title1>`` / ``<title2>Count</title2>``
 
 Severity from ``condition.mcc`` → ``*.mch``. Does not modify companion ``.js``
@@ -43,7 +43,7 @@ ROOT = Path(__file__).resolve().parent
 THIS_DEF = "ASSEMBLY_CUTS"
 # Hard-coded FIND (not read from custom_checks.txt).
 SOURCE_CHECK = "FEATURE_INFO"
-KEYWORDS = ("CUT", "HOLE")
+KEYWORDS = ("CUT", "HOLE", "PATTERN")
 
 CHECK_OPEN_RE = re.compile(
     r"<check\b[^>]*\bname\s*=\s*(?P<q>['\"])(?P<name>[^'\"]+)(?P=q)[^>]*>",
@@ -126,7 +126,7 @@ def load_custom_jobs(path: Path) -> list[CustomJob]:
     """
     Load the CHECK name from the ``DEF_ASSEMBLY_CUTS`` section of custom_checks.txt.
 
-    FEATURE_INFO / CUT,HOLE are fixed in this script (not from a FIND line).
+    FEATURE_INFO / CUT,HOLE,PATTERN are fixed in this script (not from a FIND line).
     """
     if not path.is_file():
         raise FileNotFoundError(f"custom checks file not found: {path}")
