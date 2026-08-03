@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-03 — v1.12.113
+
+- **Package**: deploy zip requires ``chk_relation_mp_mass.py`` (with other ``chk_*.py`` custom check scripts).
+
 ## 2026-08-03 — v1.12.112
 
 - **Custom checks**: added part check for legacy ``mp_mass`` relations (``RELATION_INFO``; PASS when not found).

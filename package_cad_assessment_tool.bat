@@ -45,6 +45,8 @@ call :require version || exit /b 1
 call :require CHANGELOG.md || exit /b 1
 call :require README.md || exit /b 1
 call :require sync_modelcheck_checks.py || exit /b 1
+call :require chk_assembly_cuts.py || exit /b 1
+call :require chk_relation_mp_mass.py || exit /b 1
 call :require_dir config || exit /b 1
 
 rem Collect chk_*.py (case-insensitive on Windows) for Create Report custom checks.
