@@ -711,7 +711,6 @@ PERFORMANCE_TABLE_SECTIONS: list[tuple[str, list[tuple[str, str | None]]]] = [
         [
             ("Total components in all assemblies", "NUM_COMPONENTS"),
             ("Number of unique components", "UNQ_COMPONENTS"),
-            ("Number of components in master representation", "_MASTER_REP_COUNT"),
             ("Maximum assembly depth", "_MAX_ASSEMBLY_DEPTH"),
         ],
     ),
@@ -753,7 +752,6 @@ class PerformanceMetrics:
     total_num_components: int = 0
     unique_model_count: int = 0
     max_assembly_depth: int = 0
-    master_rep_component_count: int = 0
     report_issue_counts: dict[str, int] = field(
         default_factory=lambda: {k: 0 for k in PERFORMANCE_REPORT_ISSUE_ROW_CHECKS}
     )
@@ -887,14 +885,6 @@ def _batch_max_assembly_depth(asm_subassemblies: dict[str, list[str]]) -> int:
     if not asm_subassemblies:
         return 0
     return max(_max_subasm_depth(asm_subassemblies, key) for key in asm_subassemblies)
-
-
-def _master_rep_count_from_element(file_element: ET.Element) -> int:
-    simp = (_check_ans_text(file_element, "SIMPREP_MASTER") or "").upper()
-    num = _parse_int_metric(_check_ans_text(file_element, "NUM_COMPONENTS"))
-    if simp in ("YES", "Y", "TRUE", "1") and num is not None:
-        return num
-    return 0
 
 
 def _simprep_names_from(file_element: ET.Element) -> list[str]:
@@ -1067,7 +1057,6 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
         elif pro_type == "ASM":
             metrics.assembly_count += 1
             metrics.total_num_components += _parse_int_metric(_check_ans_text(file_element, "NUM_COMPONENTS")) or 0
-            metrics.master_rep_component_count += _master_rep_count_from_element(file_element)
             metrics.mech_components += (
                 _parse_int_metric(_check_ans_text(file_element, "MECH_COMPONENTS")) or 0
             )
@@ -1297,7 +1286,6 @@ def performance_metrics_answers(metrics: PerformanceMetrics) -> dict[str, str]:
         "_MAX_ASSEMBLY_DEPTH": str(metrics.max_assembly_depth),
         "_FAMILY_GENERIC_PART_COUNT": str(metrics.family_generic_part_count),
         "_FAMILY_INSTANCE_COUNT": str(metrics.family_instance_count),
-        "_MASTER_REP_COUNT": str(metrics.master_rep_component_count),
         "_SIMPREP_REPRESENTATIONS": str(metrics.simprep_unique_count),
         "_SHEETMETAL_PARTS": str(metrics.sheetmetal_parts),
         "_MULTIBODY_PARTS": str(metrics.multibody_parts),
@@ -1325,9 +1313,6 @@ def performance_metrics_answers(metrics: PerformanceMetrics) -> dict[str, str]:
 def _resolve_performance_value(answers: dict[str, str], key: str | None) -> tuple[str, str | None]:
     if key is None:
         return ("—", None)
-    if key == "_MASTER_REP_COUNT":
-        val = answers.get(key)
-        return (val if val is not None else "—", "SIMPREP_MASTER")
     if key == "_FAMILY_GENERIC_PART_COUNT":
         val = answers.get(key)
         return (val if val is not None else "—", "FAMILY_INFO")

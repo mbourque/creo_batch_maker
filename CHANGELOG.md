@@ -2,6 +2,14 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-03 — v1.12.112
+
+- **Custom checks**: added part check for legacy ``mp_mass`` relations (``RELATION_INFO``; PASS when not found).
+
+## 2026-08-03 — v1.12.111
+
+- **Scan Information**: removed the **Number of components in master representation** row.
+
 ## 2026-08-02 — v1.12.110
 
 - **Config**: VDA-style checks in ``all_checks.mch`` (M1 through SO27) use Warning (W) for Interactive and Batch.

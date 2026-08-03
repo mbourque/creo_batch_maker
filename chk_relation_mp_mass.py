@@ -1,28 +1,24 @@
 #!/usr/bin/env python3
 """
-Update custom ModelCHECK placeholder checks in report XML from FEATURE_INFO data.
+Update custom ModelCHECK placeholder checks in report XML from RELATION_INFO.
 
-Reads ``config/custom_checks.txt`` for the ``DEF_ASSEMBLY_CUTS`` section::
+Reads ``config/custom_checks.txt`` for the ``DEF_RELATION_MP_MASS`` section::
 
-    DEF_ASSEMBLY_CUTS ASM_FEATURES
-    CND_ASSEMBLY_CUTS GTE 0
-    CHECK CHK_ASSEMBLY_CUTS_ASM
-    MSG_ASSEMBLY_CUTS Number of assembly cuts:
+    DEF_RELATION_MP_MASS RELATION_INFO
+    CND_RELATION_MP_MASS GTE 0
+    CHECK CHK_RELATION_MP_MASS_PRT
+    MSG_RELATION_MP_MASS Legacy relation setting for mp_mass("")
 
 ``CHECK`` is the ``*.mch`` row name (4th column W/E). The report XML check is
-without the ``_ASM`` / ``_PRT`` / ``_DRW`` suffix (``CHK_ASSEMBLY_CUTS``).
+without the ``_PRT`` suffix (``CHK_RELATION_MP_MASS``).
 
-The CHECK suffix selects which report files to edit:
+Only part reports are updated (``_PRT`` → ``*.p.xml``).
 
-- ``_ASM`` → ``*.a.xml``
-- ``_PRT`` → ``*.p.xml``
-- ``_DRW`` → ``*.d.xml``
+Matching is fixed in this script (not in custom_checks.txt):
 
-Feature matching is fixed in this script (not in custom_checks.txt):
-
-- Source check: FEATURE_INFO
-- Types: CUT, HOLE (sum ``info2`` → ``ans``; one ``<item>`` per type)
-- When items exist, also sets ``<title1>Type</title1>`` / ``<title2>Count</title2>``
+- Source check: RELATION_INFO
+- Look for ``mp_mass`` in ``info1`` / ``info2`` (case-insensitive)
+- Found → ``ans=1`` and severity from ``*.mch``; not found → PASS / ``ans=0``
 
 Severity from ``condition.mcc`` → ``*.mch``. Does not modify companion ``.js``
 (use ``sync_modelcheck_checks.py`` afterward).
@@ -39,11 +35,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 
-# Owned DEF_ section in config/custom_checks.txt (DEF_ASSEMBLY_CUTS).
-THIS_DEF = "ASSEMBLY_CUTS"
-# Hard-coded FIND (not read from custom_checks.txt).
-SOURCE_CHECK = "FEATURE_INFO"
-KEYWORDS = ("CUT", "HOLE")
+# Owned DEF_ section in config/custom_checks.txt (DEF_RELATION_MP_MASS).
+THIS_DEF = "RELATION_MP_MASS"
+SOURCE_CHECK = "RELATION_INFO"
+SEARCH_TOKEN = "mp_mass"
+FILE_SUFFIX = ".p.xml"
 
 CHECK_OPEN_RE = re.compile(
     r"<check\b[^>]*\bname\s*=\s*(?P<q>['\"])(?P<name>[^'\"]+)(?P=q)[^>]*>",
@@ -65,37 +61,28 @@ TITLE_BLOCK_RE = re.compile(
 
 @dataclass(frozen=True)
 class CustomJob:
-    """CHECK line may be CHK_…_ASM (MCH row); XML check is usually without the type suffix."""
+    """CHECK line is CHK_…_PRT (MCH row); XML check is without the type suffix."""
 
     mch_name: str
     xml_name: str
-    file_suffix: str  # .a.xml / .p.xml / .d.xml
+    file_suffix: str  # .p.xml
     source_check: str
-    keywords: tuple[str, ...]
-
-
-_PRO_SUFFIX_TO_XML = {
-    "_ASM": ".a.xml",
-    "_PRT": ".p.xml",
-    "_DRW": ".d.xml",
-}
 
 
 def split_check_names(check_token: str) -> tuple[str, str, str]:
     """
     CHECK token → (mch_name, xml_name, file_suffix).
 
-    ``CHK_ASSEMBLY_CUTS_ASM`` → mch row that name, XML check ``CHK_ASSEMBLY_CUTS``,
-    files ``*.a.xml``. ``_PRT`` → ``*.p.xml``, ``_DRW`` → ``*.d.xml``.
+    ``CHK_RELATION_MP_MASS_PRT`` → mch that name, XML ``CHK_RELATION_MP_MASS``,
+    files ``*.p.xml`` only.
     """
     mch_name = check_token.strip()
     upper = mch_name.upper()
-    for suf, file_suffix in _PRO_SUFFIX_TO_XML.items():
-        if upper.endswith(suf):
-            return mch_name, mch_name[: -len(suf)], file_suffix
-    raise ValueError(
-        f"CHECK name must end with _ASM, _PRT, or _DRW (got {check_token!r})"
-    )
+    if not upper.endswith("_PRT"):
+        raise ValueError(
+            f"CHECK name must end with _PRT for this script (got {check_token!r})"
+        )
+    return mch_name, mch_name[:-4], FILE_SUFFIX
 
 
 def app_settings_path() -> Path:
@@ -123,11 +110,7 @@ def load_working_directory(path: Path) -> Path:
 
 
 def load_custom_jobs(path: Path) -> list[CustomJob]:
-    """
-    Load the CHECK name from the ``DEF_ASSEMBLY_CUTS`` section of custom_checks.txt.
-
-    FEATURE_INFO / CUT,HOLE are fixed in this script (not from a FIND line).
-    """
+    """Load the CHECK name from the ``DEF_RELATION_MP_MASS`` section."""
     if not path.is_file():
         raise FileNotFoundError(f"custom checks file not found: {path}")
 
@@ -168,7 +151,6 @@ def load_custom_jobs(path: Path) -> list[CustomJob]:
             xml_name=xml_name,
             file_suffix=file_suffix,
             source_check=SOURCE_CHECK,
-            keywords=KEYWORDS,
         )
     ]
 
@@ -208,7 +190,7 @@ def resolve_mch_path(condition_path: Path) -> Path:
 
 def severity_from_mch(mch_path: Path, mch_name: str) -> str:
     """
-    Look up CHECK name in ``*.mch`` (e.g. CHK_ASSEMBLY_CUTS_ASM).
+    Look up CHECK name in ``*.mch`` (e.g. CHK_RELATION_MP_MASS_PRT).
 
     4th column (Batch): E→ERROR, W→WARNING, else PASS.
     """
@@ -248,42 +230,28 @@ def find_check_span(raw_xml: str, check_name: str) -> tuple[int, int, int, int] 
     return None
 
 
-def feature_counts_in_check_inner(
-    inner: str, keywords: tuple[str, ...]
-) -> list[tuple[str, int]]:
+def mp_mass_items_in_check_inner(inner: str) -> list[tuple[str, str]]:
     """
-    Per-type counts from FEATURE_INFO-style items, in FIND keyword order.
+    RELATION_INFO items whose info1 or info2 contains ``mp_mass``.
 
-    Only types with qty > 0 are returned.
+    Returns (info1, info2) pairs; presence alone matters (ans is always 1).
     """
-    want_order = [k.strip().upper() for k in keywords if k.strip()]
-    want = set(want_order)
-    if not want:
-        return []
-
-    found: dict[str, int] = {}
+    needle = SEARCH_TOKEN.casefold()
+    found: list[tuple[str, str]] = []
     for m in ITEM_RE.finditer(inner):
-        type_name = m.group(1).strip().upper()
-        if type_name not in want:
-            continue
-        count_raw = m.group(2).strip()
-        try:
-            qty = int(float(count_raw)) if count_raw else 1
-        except ValueError:
-            qty = 1
-        found[type_name] = found.get(type_name, 0) + qty
-
-    return [(name, found[name]) for name in want_order if found.get(name, 0) > 0]
+        info1 = m.group(1).strip()
+        info2 = m.group(2).strip()
+        if needle in info1.casefold() or needle in info2.casefold():
+            found.append((info1, info2))
+    return found
 
 
-def feature_counts_from_source(
-    raw_xml: str, source_check: str, keywords: tuple[str, ...]
-) -> list[tuple[str, int]]:
+def mp_mass_items_from_source(raw_xml: str, source_check: str) -> list[tuple[str, str]]:
     span = find_check_span(raw_xml, source_check)
     if span is None:
         return []
     _bs, inner_start, inner_end, _be = span
-    return feature_counts_in_check_inner(raw_xml[inner_start:inner_end], keywords)
+    return mp_mass_items_in_check_inner(raw_xml[inner_start:inner_end])
 
 
 def update_check_block(
@@ -291,7 +259,7 @@ def update_check_block(
     check_name: str,
     stat: str,
     ans: str,
-    items: list[tuple[str, int]],
+    items: list[tuple[str, str]],
 ) -> str:
     """Rewrite <stat>, <ans>, optional title1/title2, and <item> rows."""
     span = find_check_span(raw_xml, check_name)
@@ -307,7 +275,6 @@ def update_check_block(
     if n_ans == 0:
         raise ValueError(f"No <ans> inside check name={check_name!r}")
 
-    # Drop previous titles/items, then insert after </ans> when there are rows.
     new_inner = TITLE_BLOCK_RE.sub("", new_inner)
     new_inner = ITEM_BLOCK_RE.sub("", new_inner)
     indent_m = re.search(r"\n([ \t]+)<", new_inner)
@@ -315,12 +282,12 @@ def update_check_block(
     extra = ""
     if items:
         extra += (
-            f"\n{indent}<title1>Type</title1>"
-            f"\n{indent}<title2>Count</title2>"
+            f"\n{indent}<title1>Scope</title1>"
+            f"\n{indent}<title2>Relation</title2>"
         )
         extra += "".join(
-            f"\n{indent}<item><info1>{typ}</info1><info2>{qty}</info2></item>"
-            for typ, qty in items
+            f"\n{indent}<item><info1>{info1}</info1><info2>{info2}</info2></item>"
+            for info1, info2 in items
         )
     ans_close = re.search(r"</ans\s*>", new_inner, re.IGNORECASE)
     if ans_close is None:
@@ -334,13 +301,8 @@ def update_check_block(
 def iter_report_xml_files(
     report_dir: Path, suffixes: set[str] | None = None
 ) -> list[Path]:
-    """
-    List ModelCHECK report XML in report_dir (not recursive).
-
-    ``suffixes`` is a set of lower-case endings such as ``{".a.xml"}``.
-    When None, all ``.a.xml`` / ``.p.xml`` / ``.d.xml`` are included.
-    """
-    allowed = suffixes or {".a.xml", ".p.xml", ".d.xml"}
+    """List ModelCHECK report XML in report_dir (not recursive)."""
+    allowed = suffixes or {FILE_SUFFIX}
     found: dict[str, Path] = {}
     try:
         entries = list(report_dir.iterdir())
@@ -357,7 +319,6 @@ def iter_report_xml_files(
 
 
 def jobs_for_xml_file(xml_path: Path, jobs: list[CustomJob]) -> list[CustomJob]:
-    """Jobs whose CHECK suffix matches this report file type."""
     name = xml_path.name.casefold()
     return [job for job in jobs if name.endswith(job.file_suffix.casefold())]
 
@@ -414,22 +375,21 @@ def process_xml_file(
                 errors += 1
                 continue
 
-            items = feature_counts_from_source(out, job.source_check, job.keywords)
+            items = mp_mass_items_from_source(out, job.source_check)
             if find_check_span(out, job.source_check) is None:
                 print(
                     f"NOTE      {xml_path.name}: {job.source_check} not found; "
-                    f"count=0 for {job.xml_name}"
+                    f"PASS for {job.xml_name}"
                 )
 
-            count = sum(qty for _typ, qty in items)
-            if count <= 0:
+            if not items:
                 stat = "PASS"
                 ans = "0"
                 items = []
             else:
                 sev = severity_from_mch(mch_path, job.mch_name)
                 stat = "PASS" if sev == "PASS" else sev
-                ans = str(count)
+                ans = "1"
 
             new_out = update_check_block(out, job.xml_name, stat, ans, items)
             if new_out == out:
@@ -440,7 +400,7 @@ def process_xml_file(
                 unchanged += 1
             else:
                 out = new_out
-                detail = ",".join(f"{t}={q}" for t, q in items) or "none"
+                detail = "; ".join(f"{a}={b}" for a, b in items) or "none"
                 print(
                     f"UPDATED   {xml_path.name}: {job.xml_name} "
                     f"stat={stat} ans={ans} items={detail} (mch {job.mch_name})"
@@ -463,7 +423,7 @@ def process_xml_file(
 def resolve_report_dir(argv: list[str]) -> Path:
     if len(argv) > 2:
         raise ValueError(
-            "Usage: python chk_assembly_cuts.py [report_dir]\n"
+            "Usage: python chk_relation_mp_mass.py [report_dir]\n"
             "  report_dir optional; default is working_directory from app_settings.json"
         )
     if len(argv) == 2:
@@ -502,7 +462,7 @@ def main() -> int:
     for job in jobs:
         print(
             f"Job: XML {job.xml_name} ← {job.source_check} "
-            f"({','.join(job.keywords)}); mch {job.mch_name}; "
+            f"(find {SEARCH_TOKEN!r}); mch {job.mch_name}; "
             f"files *{job.file_suffix}"
         )
     print()
