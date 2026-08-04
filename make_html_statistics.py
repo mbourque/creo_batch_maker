@@ -725,7 +725,7 @@ PERFORMANCE_TABLE_SECTIONS: list[tuple[str, list[tuple[str, str | None]]]] = [
         ],
     ),
     (
-        "Representations and Advanced Assembly Usage",
+        "Advanced Assembly Usage",
         [
             ("Number of created simplified representations", "_SIMPREP_REPRESENTATIONS"),
             ("Number of mechanism components", "_MECH_COMPONENTS"),

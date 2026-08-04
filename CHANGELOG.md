@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-04 — v1.12.128
+
+- **Scan Information**: CAD Assessment Summary section is renamed to **Advanced Assembly Usage**.
+
 ## 2026-08-04 — v1.12.127
 
 - **Scan Information**: CAD Assessment Summary shows **Inseparable assemblies** under Representations and Advanced Assembly Usage when any are found.

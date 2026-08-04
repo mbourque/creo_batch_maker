@@ -40,6 +40,7 @@ allow_mfg_in_assem_mode yes
 ! =========================================================
 
 retrieve_data_sharing_ref_parts yes
+retrieve_instance_dependencies instance_and_generic_deps
 
 ! =========================================================
 ! DRAWING / MODEL CLEANUP
