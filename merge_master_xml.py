@@ -79,7 +79,12 @@ def extract_check_content(file_path):
                 if text.isdigit():
                     file_size = round(int(text) / (1024 * 1024), 2)
         elif name == 'REG_FEATURES':
-            num_features = check.find('ans').text if check.find('ans') is not None else 0
+            ans_el = _direct_ans(check)
+            if ans_el is not None and ans_el.text:
+                text = ans_el.text.strip()
+                # Creo: resumed feature count as decimal digits; keep 0 if missing/non-numeric.
+                if text.isdigit():
+                    num_features = int(text)
         elif name == 'OVERALL_SIZE':
             overall_size = check.find('ans').text if check.find('ans') is not None else 'Unknown'
         elif name == 'UNITS_LENGTH':

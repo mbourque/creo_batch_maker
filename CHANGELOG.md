@@ -2,6 +2,62 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-04 — v1.12.127
+
+- **Scan Information**: CAD Assessment Summary shows **Inseparable assemblies** under Representations and Advanced Assembly Usage when any are found.
+
+## 2026-08-04 — v1.12.126
+
+- **Report / Gallery**: inseparable ``parent<<child>>.prt`` shows as ``parent.prt``; drag and thumb stay on ``child.asm``.
+
+## 2026-08-04 — v1.12.125
+
+- **Report / Gallery**: inseparable ``parent<<child>>.prt`` shows and thumbs as ``parent.prt``; drag uses ``child.asm`` (no ``<<>>`` in the link).
+
+## 2026-08-04 — v1.12.124
+
+- **Report / Gallery**: only inseparable ``<<>>`` names are remapped (``parent<<child>>.…`` → ``<<child>>.asm`` for drag and thumb); family tables stay on the existing generic fallback.
+
+## 2026-08-04 — v1.12.123
+
+- **Report / Gallery**: inseparable names ``parent<<child>>.prt`` drag and thumb as ``<<child>>.asm``; bare ``<<name>>.ext`` stays a family-table session link.
+
+## 2026-08-04 — v1.12.122
+
+- **Model Gallery** / report: family-table names like ``outer<<inner>>.prt`` are draggable again (thumb from outer file, drag opens inner name).
+
+## 2026-08-04 — v1.12.121
+
+- **Checks**: ``REG_FEATURES`` is present in every ``.mch`` (including ``vda_checks`` and Scan Templates).
+
+## 2026-08-04 — v1.12.120
+
+- **Checks / Model Complexity**: ``large_assy_checks.mch`` includes ``REG_FEATURES`` so **Top parts by features** can show real counts again.
+
+## 2026-08-04 — v1.12.119
+
+- **Scan Information**: top-level feature count label is **Total number of features in Top level assembly** … (with assembly name).
+
+## 2026-08-04 — v1.12.118
+
+- **Scan Information**: CAD Assessment Summary shows **Models failed** (count) under **Models scanned** when any models failed.
+
+## 2026-08-04 — v1.12.117
+
+- **Scan Information**: family-table-instances row label is **Total number of family table instances**.
+
+## 2026-08-04 — v1.12.116
+
+- **Scan Information**: packaged-components row label is **Models using packaged components**.
+
+## 2026-08-04 — v1.12.115
+
+- **Scan Information**: renamed packaged-components and family-table-generics rows to **Total number of…** labels.
+
+## 2026-08-04 — v1.12.114
+
+- **Setup → Next**: if ModelCHECK checks are not ``default_checks.mch``, warn with **OK** (keep) or **Use default** (restore).
+
 ## 2026-08-03 — v1.12.113
 
 - **Package**: deploy zip requires ``chk_relation_mp_mass.py`` (with other ``chk_*.py`` custom check scripts).

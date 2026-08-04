@@ -625,13 +625,121 @@ def name_has_creo_path_ref(display_name: str) -> bool:
     return False
 
 
+# Inseparable assemblies use double angle brackets (``<<>>``).
+# Family-table instances use single brackets (``<>``) / FAMILY_INFO — not handled here.
+_CREO_BARE_INSEP_RE = re.compile(
+    r"^<<(?P<inner>.+?)>>(?P<ext>\.(?:prt|asm|drw))$",
+    re.IGNORECASE,
+)
+_CREO_COMPOUND_INSEP_RE = re.compile(
+    r"^(?P<outer>.+?)<<(?P<inner>.+?)>>(?P<ext>\.(?:prt|asm|drw))$",
+    re.IGNORECASE,
+)
+
+
+def creo_angle_file_target(display_name: str) -> str | None:
+    """
+    Drag / open basename for an inseparable-assembly ``<<>>`` name.
+
+    - ``parent<<child>>.ext`` → ``child.asm`` (no angle brackets)
+    - ``<<child>>.ext`` → ``child.asm``
+    - otherwise ``None`` (family-table single ``<>`` is not handled here)
+    """
+    parsed = inseparable_angle_names(display_name)
+    return parsed[1] if parsed else None
+
+
+def inseparable_angle_names(display_name: str) -> tuple[str, str] | None:
+    """
+    ``(label_file, drag_file)`` for inseparable ``<<>>`` names.
+
+    - ``parent<<child>>.prt`` → ``(parent.prt, child.asm)``
+    - ``<<child>>.ext`` → ``(child.asm, child.asm)``
+    """
+    raw = (display_name or "").strip()
+    if not raw:
+        return None
+    bare = _CREO_BARE_INSEP_RE.match(raw)
+    if bare:
+        inner = (bare.group("inner") or "").strip()
+        if inner:
+            target = f"{inner}.asm"
+            return (target, target)
+        return None
+    compound = _CREO_COMPOUND_INSEP_RE.match(raw)
+    if compound:
+        outer = (compound.group("outer") or "").strip()
+        inner = (compound.group("inner") or "").strip()
+        ext = compound.group("ext").lower()
+        if outer and inner:
+            return (outer + ext, f"{inner}.asm")
+    return None
+
+
+def split_creo_angle_session_name(display_name: str) -> tuple[str, str] | None:
+    """
+    ``parent<<child>>.ext`` → ``(parent.ext, child.ext)``.
+
+    Prefer ``inseparable_angle_names`` / ``creo_angle_file_target`` for report links.
+    """
+    m = _CREO_COMPOUND_INSEP_RE.match((display_name or "").strip())
+    if not m:
+        return None
+    outer = (m.group("outer") or "").strip()
+    inner = (m.group("inner") or "").strip()
+    ext = m.group("ext").lower()
+    if not outer or not inner:
+        return None
+    return (outer + ext, inner + ext)
+
+
+def resolve_drag_and_image_names(
+    *,
+    file_path: str,
+    file_info: dict,
+) -> tuple[str, str, str]:
+    """
+    ``(label_name, drag_name, image_name)`` for issue rows and Model Gallery.
+
+    Inseparable ``parent<<child>>.ext`` → label ``parent.ext``; drag and thumb
+    ``child.asm``. Otherwise use ``report_display_name`` (family-table generic
+    fallback via FAMILY_INFO).
+    """
+    path_display = (get_display_name(file_path) or "").strip()
+    model_display = model_tag_to_display_name((file_info.get("model") or "").strip())
+    report_display = (file_info.get("report_display_name") or path_display or "").strip()
+
+    session = ""
+    for candidate in (model_display, path_display, report_display):
+        if candidate and inseparable_angle_names(candidate):
+            session = candidate
+            break
+
+    if session:
+        parts = inseparable_angle_names(session)
+        if parts:
+            label_file, drag_file = parts
+            return (label_file, drag_file, drag_file)
+
+    label = report_display or path_display or model_display
+    return (label, label, label)
+
+
 def build_model_href(display_name: str) -> str:
     """URL path for the Creo model link (percent-encoded)."""
     return "./" + quote(display_name)
 
 
 def model_file_link_href(display_name: str) -> str | None:
-    """``None`` when the name has Creo session-style ``<<>>`` or ``[[]]`` segments."""
+    """
+    Relative ``./`` link for drag-into-Creo.
+
+    Inseparable ``<<>>`` names use ``creo_angle_file_target``. Other session-style
+    names (``[[]]``) return ``None``. Family-table single ``<>`` is not mapped here.
+    """
+    target = creo_angle_file_target(display_name)
+    if target:
+        return build_model_href(target)
     if name_has_creo_path_ref(display_name):
         return None
     return build_model_href(display_name)
@@ -643,12 +751,28 @@ def display_name_link_text(original_display_name: str, drag_image_display_name: 
 
     When family-table fallback swaps drag/image behavior to a generic model, show
     ``instance<generic>`` so readers can tell the row is an instance.
+
+    Inseparable rows use label ``parent.ext`` with thumb/drag ``child.asm`` — show
+    the label only (not ``parent.ext<child.asm>``).
     """
     if (
         original_display_name
         and drag_image_display_name
         and original_display_name.casefold() != drag_image_display_name.casefold()
     ):
+        orig_ext = re.search(
+            r"\.(prt|asm|drw)$", original_display_name, flags=re.IGNORECASE
+        )
+        img_ext = re.search(
+            r"\.(prt|asm|drw)$", drag_image_display_name, flags=re.IGNORECASE
+        )
+        if (
+            orig_ext
+            and img_ext
+            and orig_ext.group(1).lower() != img_ext.group(1).lower()
+            and "<<" not in original_display_name
+        ):
+            return original_display_name
         return f"{original_display_name}<{drag_image_display_name}>"
     return original_display_name
 
@@ -794,7 +918,10 @@ def thumbnail_src_for_report(
     """
     Return a value suitable for ``<img src="…">`` (relative to the report HTML).
 
-    - Models with Creo session refs (``<<`` / ``>>``) use the shared placeholder (Windows-safe).
+    - Inseparable thumbs use ``child.asm`` (same as drag); label text is ``parent.ext``.
+      If a session ``<<>>`` name is passed, lookup uses ``creo_angle_file_target`` /
+      bracket-stripped basenames.
+    - Other session refs (``[[]]``) use the shared placeholder.
     - Parts use ``stem.part.jpg``; assemblies ``stem.assembly.jpg``; drawings ``stem.drawing.jpg``.
     - Legacy ``stem.model.jpg`` is used when type-specific files are missing.
     - If no thumbnail exists, use the same shared placeholder so the report always shows a thumb.
@@ -806,22 +933,37 @@ def thumbnail_src_for_report(
         ensure_shared_placeholder_jpeg(report_assets_dir)
         return "./" + quote(_SHARED_PLACEHOLDER_JPEG)
 
-    if name_has_creo_path_ref(display_name):
+    lookup_names: list[str] = []
+    angle_target = creo_angle_file_target(display_name)
+    if angle_target:
+        lookup_names.append(angle_target)
+        stripped = angle_target.replace("<<", "").replace(">>", "")
+        if stripped and stripped not in lookup_names:
+            lookup_names.append(stripped)
+        # Inseparable targets are assemblies even when the session label ends in .prt
+        if angle_target.lower().endswith(".asm"):
+            pro_type = "ASM"
+    elif name_has_creo_path_ref(display_name):
         return _placeholder_src()
+    else:
+        lookup_names.append(display_name)
+        # Remapped inseparable thumb is already ``child.asm`` (no brackets).
+        if display_name.lower().endswith(".asm"):
+            pro_type = "ASM"
 
-    jpg_candidates = _thumbnail_report_candidates(display_name, pro_type)
-    if not jpg_candidates:
-        return _placeholder_src()
-
-    for jpg_base in jpg_candidates:
-        for folder in (report_assets_dir, working_dir):
-            full = os.path.join(folder, jpg_base)
-            if not os.path.isfile(full):
-                continue
-            if os.path.normcase(os.path.normpath(folder)) == os.path.normcase(report_assets_dir):
-                return "./" + quote(jpg_base)
-            rel = os.path.relpath(full, report_assets_dir).replace("\\", "/")
-            return "./" + quote(rel, safe="/")
+    for lookup in lookup_names:
+        jpg_candidates = _thumbnail_report_candidates(lookup, pro_type)
+        for jpg_base in jpg_candidates:
+            for folder in (report_assets_dir, working_dir):
+                full = os.path.join(folder, jpg_base)
+                if not os.path.isfile(full):
+                    continue
+                if os.path.normcase(os.path.normpath(folder)) == os.path.normcase(
+                    report_assets_dir
+                ):
+                    return "./" + quote(jpg_base)
+                rel = os.path.relpath(full, report_assets_dir).replace("\\", "/")
+                return "./" + quote(rel, safe="/")
 
     return _placeholder_src()
 
@@ -974,31 +1116,39 @@ def collect_model_gallery_items(
     items: list[dict] = []
     dsumm_by_model = build_dsumm_summary_by_model(working_dir)
     for file_path, file_info in files_info.items():
-        display = (file_info.get("report_display_name") or get_display_name(file_path) or "").strip()
-        if not display:
+        label_name, drag_name, image_name = resolve_drag_and_image_names(
+            file_path=file_path, file_info=file_info
+        )
+        if not label_name:
             continue
         pro_type = (file_info.get("pro_type") or "").strip().upper()
         if not pro_type:
-            m = re.search(r"\.(prt|asm|drw)$", display, flags=re.IGNORECASE)
+            m = re.search(r"\.(prt|asm|drw)$", label_name, flags=re.IGNORECASE)
+            if not m:
+                m = re.search(r"\.(prt|asm|drw)$", image_name, flags=re.IGNORECASE)
             pro_type = m.group(1).upper() if m else ""
         if pro_type not in _GALLERY_TYPE_ORDER:
             continue
-        key = (display.casefold(), pro_type)
+        key = (label_name.casefold(), pro_type)
         if key in seen:
             continue
         seen.add(key)
-        href = model_file_link_href(display) or ""
+        href = model_file_link_href(drag_name) or ""
         src = thumbnail_src_for_report(
-            report_assets_dir, working_dir, display, pro_type=pro_type
+            report_assets_dir, working_dir, image_name, pro_type=pro_type
         )
-        dsumm = dsumm_by_model.get(display.casefold())
+        dsumm = dsumm_by_model.get(label_name.casefold())
+        if dsumm is None:
+            dsumm = dsumm_by_model.get(drag_name.casefold())
+        if dsumm is None:
+            dsumm = dsumm_by_model.get(image_name.casefold())
         if dsumm is None:
             model_tag = (file_info.get("model") or "").strip()
             if model_tag:
                 dsumm = dsumm_by_model.get(model_tag.casefold())
         if dsumm is None:
             dsumm = {
-                "title": display,
+                "title": label_name,
                 "num_errors": 0,
                 "num_warnings": 0,
                 "errors": [],
@@ -1008,10 +1158,10 @@ def collect_model_gallery_items(
         else:
             dsumm = dict(dsumm)
             if not dsumm.get("title"):
-                dsumm["title"] = display
+                dsumm["title"] = label_name
         items.append(
             {
-                "name": display,
+                "name": label_name,
                 "pro_type": pro_type,
                 "href": href,
                 "image_url": src,
@@ -1203,8 +1353,9 @@ def create_html_report(
     thumbnail_cache: dict[str, str] = {}
     jump_display_names = collect_report_model_jump_names(files_info)
     for file_path, file_info in files_info.items():
-        original_display_name = get_display_name(file_path)
-        drag_image_display_name = file_info.get("report_display_name") or original_display_name
+        original_display_name, drag_name, image_name = resolve_drag_and_image_names(
+            file_path=file_path, file_info=file_info
+        )
         for check in file_info["checks"]:
             check_name = check["name"]
             description_data = descriptions.get(check_name)
@@ -1223,12 +1374,12 @@ def create_html_report(
                 continue
 
             pro_type = (file_info.get("pro_type") or "").strip()
-            thumb_key = (drag_image_display_name, pro_type.casefold())
+            thumb_key = (image_name, pro_type.casefold())
             if thumb_key not in thumbnail_cache:
                 thumbnail_cache[thumb_key] = thumbnail_src_for_report(
                     report_assets_dir,
                     working_dir,
-                    drag_image_display_name,
+                    image_name,
                     pro_type=pro_type,
                 )
             image_url = thumbnail_cache[thumb_key]
@@ -1256,16 +1407,24 @@ def create_html_report(
                     "num_features": file_info["num_features"],
                     "overall_size": file_info["overall_size"],
                     "units_length": file_info["units_length"],
-                    # Keep report text on the original model, but allow drag/image fallback.
+                    # Label uses parent file; thumb/drag may be inseparable child.asm.
                     "display_name": original_display_name,
                     "display_name_link_text": display_name_link_text(
-                        original_display_name, drag_image_display_name
+                        original_display_name, image_name
                     ),
-                    "model_href": model_file_link_href(drag_image_display_name),
+                    "model_href": model_file_link_href(drag_name),
                     "image_url": image_url,
-                    # Keep detail HTML lookup tied to the original model entry.
+                    # Detail HTML may be keyed to the session ``<<>>`` name, not the label.
                     "more_info_link": resolve_more_info_link(
-                        working_dir, original_display_name, more_info_index
+                        working_dir,
+                        (
+                            model_tag_to_display_name(
+                                (file_info.get("model") or "").strip()
+                            )
+                            or get_display_name(file_path)
+                            or original_display_name
+                        ),
+                        more_info_index,
                     ),
                     "file_list_id": safe_file_list_id(check_name, file_info.get("model") or ""),
                     "category": description_data["category"],

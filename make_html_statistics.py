@@ -681,6 +681,7 @@ PERFORMANCE_TABLE_SECTIONS: list[tuple[str, list[tuple[str, str | None]]]] = [
             ("Scan date", "_SCAN_DATE"),
             ("Working directory", "_WORKING_DIRECTORY"),
             ("Models scanned", "_FILES_SCANNED"),
+            ("Models failed", "_MODELS_FAILED"),
             ("Total size of scanned models", "_TOTAL_SCANNED_SIZE"),
             ("Model checks", "_MODEL_CHECKS"),
             ("Scan duration", "_SCAN_DURATION"),
@@ -718,7 +719,7 @@ PERFORMANCE_TABLE_SECTIONS: list[tuple[str, list[tuple[str, str | None]]]] = [
         "Assembly State / Placement Health",
         [
             ("Total number of suppressed components", "_SUPPRESSED_COMPONENTS"),
-            ("Number of packaged components", "_PACKAGED_COMPONENTS"),
+            ("Models using packaged components", "_PACKAGED_COMPONENTS"),
             ("Total number of fixed components", "_FIXED_COMPONENTS"),
             ("Number of flexible components", "_FLEXIBLE_COMPONENTS"),
         ],
@@ -728,19 +729,20 @@ PERFORMANCE_TABLE_SECTIONS: list[tuple[str, list[tuple[str, str | None]]]] = [
         [
             ("Number of created simplified representations", "_SIMPREP_REPRESENTATIONS"),
             ("Number of mechanism components", "_MECH_COMPONENTS"),
+            ("Inseparable assemblies", "_INSEPARABLE_ASSEMBLIES"),
         ],
     ),
     (
         "Family Table Usage",
         [
-            ("Number of family table generics", "_FAMILY_GENERIC_PART_COUNT"),
-            ("Number of family table instances", "_FAMILY_INSTANCE_COUNT"),
+            ("Total number of family table generics used", "_FAMILY_GENERIC_PART_COUNT"),
+            ("Total number of family table instances", "_FAMILY_INSTANCE_COUNT"),
         ],
     ),
     ("Metadata", [("Last saved by", "_USERS")]),
     (
         "Notable Model Findings",
-        [("Total number of features in top level assembly", "_TOP_LEVEL_FEATURES")],
+        [("Total number of features in Top level assembly", "_TOP_LEVEL_FEATURES")],
     ),
 ]
 
@@ -758,6 +760,7 @@ class PerformanceMetrics:
     mech_components: int = 0
     flexible_components: int = 0
     simprep_unique_count: int = 0
+    inseparable_assemblies: int = 0
     sheetmetal_parts: int = 0
     multibody_parts: int = 0
     freeform_parts: int = 0
@@ -769,6 +772,7 @@ class PerformanceMetrics:
     suppressed_components: int = 0
     files_seen: int = 0
     files_scanned: int = 0
+    models_failed: int = 0
     part_count: int = 0
     assembly_count: int = 0
     drawing_count: int = 0
@@ -995,11 +999,20 @@ def _username_from_last_saved(last_saved: str) -> str | None:
     return user or None
 
 
+def _inseparable_identity_key(name: str) -> str | None:
+    """Casefold ``child.asm`` key for an inseparable ``<<>>`` name, else ``None``."""
+    parts = _inseparable_angle_names(name)
+    if not parts:
+        return None
+    return parts[1].casefold()
+
+
 def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
     """Batch-wide performance table metrics from every ``File`` entry in master.xml."""
     metrics = PerformanceMetrics()
     unique_models: set[str] = set()
     simprep_names: set[str] = set()
+    inseparable_keys: set[str] = set()
     skeleton_keys: set[str] = set()
     bulk_part_keys: set[str] = set()
     asm_subassemblies: dict[str, list[str]] = {}
@@ -1029,6 +1042,14 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
 
         for unq_name in _unq_model_names_from(file_element):
             unique_models.add(unq_name.casefold())
+            insep = _inseparable_identity_key(unq_name)
+            if insep:
+                inseparable_keys.add(insep)
+
+        for candidate in (model, os.path.basename(path) if path else ""):
+            insep = _inseparable_identity_key(candidate)
+            if insep:
+                inseparable_keys.add(insep)
 
         for simp_name in _simprep_names_from(file_element):
             simprep_names.add(simp_name.casefold())
@@ -1075,6 +1096,7 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
     metrics.unique_model_count = len(unique_models)
     metrics.max_assembly_depth = _batch_max_assembly_depth(asm_subassemblies)
     metrics.simprep_unique_count = len(simprep_names)
+    metrics.inseparable_assemblies = len(inseparable_keys)
     metrics.skeleton_models = len(skeleton_keys)
     metrics.bulk_parts = len(bulk_part_keys)
     family_generics = collect_family_generics_detail(
@@ -1278,6 +1300,7 @@ def performance_metrics_answers(metrics: PerformanceMetrics) -> dict[str, str]:
         "_SCAN_DURATION": metrics.scan_duration or "—",
         "_USERS": ", ".join(metrics.users) if metrics.users else "—",
         "_FILES_SCANNED": str(metrics.files_scanned),
+        "_MODELS_FAILED": str(metrics.models_failed),
         "_PART_COUNT": str(metrics.part_count),
         "_ASSEMBLY_COUNT": str(metrics.assembly_count),
         "_DRAWING_COUNT": str(metrics.drawing_count),
@@ -1287,6 +1310,7 @@ def performance_metrics_answers(metrics: PerformanceMetrics) -> dict[str, str]:
         "_FAMILY_GENERIC_PART_COUNT": str(metrics.family_generic_part_count),
         "_FAMILY_INSTANCE_COUNT": str(metrics.family_instance_count),
         "_SIMPREP_REPRESENTATIONS": str(metrics.simprep_unique_count),
+        "_INSEPARABLE_ASSEMBLIES": str(metrics.inseparable_assemblies),
         "_SHEETMETAL_PARTS": str(metrics.sheetmetal_parts),
         "_MULTIBODY_PARTS": str(metrics.multibody_parts),
         "_FREEFORM_PARTS": str(metrics.freeform_parts),
@@ -1326,6 +1350,7 @@ def _resolve_performance_value(answers: dict[str, str], key: str | None) -> tupl
         "_SCAN_DURATION",
         "_USERS",
         "_FILES_SCANNED",
+        "_MODELS_FAILED",
         "_PART_COUNT",
         "_ASSEMBLY_COUNT",
         "_DRAWING_COUNT",
@@ -1353,6 +1378,9 @@ def _resolve_performance_value(answers: dict[str, str], key: str | None) -> tupl
     if key == "_SIMPREP_REPRESENTATIONS":
         val = answers.get(key)
         return (val if val is not None else "—", "SIMPREP_INFO")
+    if key == "_INSEPARABLE_ASSEMBLIES":
+        val = answers.get(key)
+        return (val if val is not None else "—", None)
     if key == "_FLEXIBLE_COMPONENTS":
         val = answers.get(key)
         return (val if val is not None else "—", "FLEX_COMPONENTS")
@@ -1389,8 +1417,8 @@ def _resolve_performance_value(answers: dict[str, str], key: str | None) -> tupl
 def _top_level_features_label(metrics: PerformanceMetrics) -> str:
     name = (metrics.top_level_assembly_name or "").strip()
     if name:
-        return f"Total number of features in {name}"
-    return "Total number of features in top level assembly"
+        return f"Total number of features in Top level assembly {name}"
+    return "Total number of features in Top level assembly"
 
 
 def build_performance_table_rows(metrics: PerformanceMetrics) -> list[tuple[str, str | None, str, str | None]]:
@@ -2116,8 +2144,55 @@ def _name_has_creo_path_ref(display_name: str) -> bool:
     return False
 
 
+_CREO_BARE_INSEP_RE = re.compile(
+    r"^<<(?P<inner>.+?)>>(?P<ext>\.(?:prt|asm|drw))$",
+    re.IGNORECASE,
+)
+_CREO_COMPOUND_INSEP_RE = re.compile(
+    r"^(?P<outer>.+?)<<(?P<inner>.+?)>>(?P<ext>\.(?:prt|asm|drw))$",
+    re.IGNORECASE,
+)
+
+
+def _creo_angle_file_target(display_name: str) -> str | None:
+    """Inseparable ``<<>>`` drag basename → ``child.asm`` (no brackets)."""
+    parsed = _inseparable_angle_names(display_name)
+    return parsed[1] if parsed else None
+
+
+def _inseparable_angle_names(display_name: str) -> tuple[str, str] | None:
+    """``(label_file, drag_file)``: ``parent<<child>>.prt`` → ``(parent.prt, child.asm)``."""
+    raw = (display_name or "").strip()
+    if not raw:
+        return None
+    bare = _CREO_BARE_INSEP_RE.match(raw)
+    if bare:
+        inner = (bare.group("inner") or "").strip()
+        if inner:
+            target = f"{inner}.asm"
+            return (target, target)
+        return None
+    compound = _CREO_COMPOUND_INSEP_RE.match(raw)
+    if compound:
+        outer = (compound.group("outer") or "").strip()
+        inner = (compound.group("inner") or "").strip()
+        ext = compound.group("ext").lower()
+        if outer and inner:
+            return (outer + ext, f"{inner}.asm")
+    return None
+
+
 def _skipped_model_name_html(name: str) -> str:
-    """Draggable link for Creo drop (click does nothing); plain span for session-style names."""
+    """Draggable link for Creo drop (click does nothing); plain span for other session-style names."""
+    parts = _inseparable_angle_names(name)
+    if parts:
+        label_file, drag_file = parts
+        href = "./" + quote(drag_file)
+        return (
+            f'<a class="mq-skipped-drag" href="{_esc(href)}" '
+            f'onclick="void(0); return false;" title="Drag this into Creo">'
+            f"{_esc(label_file)}</a>"
+        )
     if _name_has_creo_path_ref(name):
         return f'<span class="mq-skipped-name-plain">{_esc(name)}</span>'
     href = "./" + quote(name)
@@ -2679,6 +2754,8 @@ def generate_statistics_fragment(
         master_path=master_path,
     )
     stats.skipped_models = scan_skipped_models(working_dir, master_root)
+    if stats.performance_metrics is not None:
+        stats.performance_metrics.models_failed = len(stats.skipped_models)
     if stats.top_level_assembly:
         stats.top_level_assembly_bom = load_top_level_assembly_bom(
             working_dir,
@@ -2710,6 +2787,8 @@ def write_statistics_html_file(master_xml_path: str, output_path: str) -> str:
         master_path=master_xml_path,
     )
     stats.skipped_models = scan_skipped_models(working_dir, root)
+    if stats.performance_metrics is not None:
+        stats.performance_metrics.models_failed = len(stats.skipped_models)
     if stats.top_level_assembly:
         stats.top_level_assembly_bom = load_top_level_assembly_bom(
             working_dir,

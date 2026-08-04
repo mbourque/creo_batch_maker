@@ -216,6 +216,8 @@ DEBUG_MODE_DEFAULT = False
 SCAN_PARTS_DEFAULT = True
 SCAN_ASSEMBLIES_DEFAULT = True
 SCAN_DRAWINGS_DEFAULT = True
+# Settings → Checks… / condition.mcc default ModelCHECK checks file.
+DEFAULT_CHECKS_MCH = "default_checks.mch"
 _RECENT_SCANS_MAX = 10
 # When no Creo loadpoint / no .ttd list yet, File → New uses this default task (filename + UI label).
 DEFAULT_MODELCHECK_TTD = "modelcheck.ttd"
@@ -5380,6 +5382,8 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             self._persist_working_directory_and_loadpoint()
             if self._warn_wizard_working_directory_missing_models():
                 return
+            if not self._confirm_checks_file_on_setup_next():
+                return
             self._refresh_task_options()
             self._set_wizard_step(WIZARD_STEP_SCAN)
             return
@@ -8113,7 +8117,9 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
 
         current = self._current_mch_from_condition_mcc()
         initial = current if current in mch_files else (
-            "checks.mch" if "checks.mch" in mch_files else mch_files[0]
+            DEFAULT_CHECKS_MCH if DEFAULT_CHECKS_MCH in mch_files else (
+                "checks.mch" if "checks.mch" in mch_files else mch_files[0]
+            )
         )
 
         dialog = self._create_modal_toplevel("Checks")
@@ -8171,6 +8177,93 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             focus_widget=ok_btn,
             repaints=(ok_btn, cancel_btn),
         )
+
+    def _ask_non_default_checks_choice(self, current_mch: str) -> str | None:
+        """Warn when checks file is not the default.
+
+        Returns ``\"ok\"`` (keep current), ``\"default\"`` (switch to default), or
+        ``None`` (cancel / stay on Setup).
+        """
+        anchor = self
+        dialog = ctk.CTkToplevel(anchor)
+        dialog.withdraw()
+        dialog.title("Checks")
+        dialog.resizable(False, False)
+        dialog.transient(anchor)
+
+        result: dict[str, str | None] = {"value": None}
+
+        def close(value: str | None) -> None:
+            result["value"] = value
+            dialog.destroy()
+
+        message = (
+            f"ModelCHECK is set to use {current_mch}, not the default "
+            f"{DEFAULT_CHECKS_MCH}.\n\n"
+            f"OK — continue with {current_mch}.\n"
+            f"Use default — set checks back to {DEFAULT_CHECKS_MCH}."
+        )
+        ctk.CTkLabel(dialog, text=message, justify="left", wraplength=440).pack(
+            anchor="w", padx=16, pady=(16, 12)
+        )
+        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_row.pack(anchor="e", padx=16, pady=(0, 16))
+
+        default_btn = self._mk_dialog_button(
+            btn_row,
+            text="Use default",
+            width=110,
+            primary=False,
+            command=lambda: close("default"),
+        )
+        ok_btn = self._mk_dialog_button(
+            btn_row, text="OK", width=80, primary=True, command=lambda: close("ok")
+        )
+        ok_btn.pack(side="right", padx=(8, 0))
+        default_btn.pack(side="right")
+
+        dialog.bind("<Escape>", lambda _e: close(None))
+        dialog.bind("<Return>", lambda _e: close("ok"))
+        dialog.protocol("WM_DELETE_WINDOW", lambda: close(None))
+
+        self._run_modal_toplevel_wait(
+            dialog,
+            anchor=anchor,
+            focus_widget=ok_btn,
+            repaints=(default_btn, ok_btn),
+        )
+        return result["value"]
+
+    def _confirm_checks_file_on_setup_next(self) -> bool:
+        """On Setup → Next, warn if checks are not default_checks.mch.
+
+        Returns False when the user cancels (stay on Setup).
+        """
+        current = self._current_mch_from_condition_mcc()
+        if current and current.casefold() == DEFAULT_CHECKS_MCH.casefold():
+            return True
+        label = current or "(none found in condition.mcc)"
+        default_path = (self._config_dir / DEFAULT_CHECKS_MCH).resolve()
+        if not default_path.is_file():
+            if not messagebox.askokcancel(
+                "Checks",
+                f"ModelCHECK is set to use {label}, not the default "
+                f"{DEFAULT_CHECKS_MCH}.\n\n"
+                f"{DEFAULT_CHECKS_MCH} was not found in the config folder.\n\n"
+                "OK — continue anyway.\n"
+                "Cancel — stay on Setup.",
+            ):
+                return False
+            return True
+        choice = self._ask_non_default_checks_choice(label)
+        if choice is None:
+            return False
+        if choice == "default":
+            err = self._set_condition_mcc_checks_file(DEFAULT_CHECKS_MCH)
+            if err:
+                messagebox.showerror("Checks", err)
+                return False
+        return True
 
     def _start_templates_dir(self) -> Path | None:
         wd = (self.working_directory.get() or "").strip()
