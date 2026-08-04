@@ -119,6 +119,72 @@ def _format_file_size_bytes(raw_bytes: str) -> str | None:
     return f"{size_bytes / (1024**2):.2f} MB"
 
 
+_ISSUE_SORT_NON_NUMERIC = frozenset(
+    {"NA", "NO", "NOT FOUND", "YES", "PASS", "Y", "N", "TRUE", "FALSE"}
+)
+_ISSUE_SORT_SIZE_RE = re.compile(
+    r"^(?P<num>[-+]?\d+(?:[.,]\d+)?)\s*(?P<unit>Ki?B|Mi?B|Gi?B|Ti?B|bytes?|B)\s*$",
+    re.IGNORECASE,
+)
+_ISSUE_SORT_SIZE_MULT = {
+    "B": 1.0,
+    "BYTE": 1.0,
+    "BYTES": 1.0,
+    "KB": 1024.0,
+    "KIB": 1024.0,
+    "MB": 1024.0**2,
+    "MIB": 1024.0**2,
+    "GB": 1024.0**3,
+    "GIB": 1024.0**3,
+    "TB": 1024.0**4,
+    "TIB": 1024.0**4,
+}
+
+
+def _issue_sort_metric(ans: str) -> float | None:
+    """
+    Numeric value for ordering models within a check (highest first).
+
+    Plain numbers and sizes like ``12.34 MB`` count; labels such as NA / YES do not.
+    """
+    text = (ans or "").strip()
+    if not text:
+        return None
+    if text.upper() in _ISSUE_SORT_NON_NUMERIC:
+        return None
+    try:
+        return float(text.replace(",", ""))
+    except ValueError:
+        pass
+    m = _ISSUE_SORT_SIZE_RE.match(text)
+    if not m:
+        return None
+    try:
+        num = float(m.group("num").replace(",", ""))
+    except ValueError:
+        return None
+    unit = (m.group("unit") or "").upper()
+    mult = _ISSUE_SORT_SIZE_MULT.get(unit)
+    if mult is None:
+        return None
+    return num * mult
+
+
+def _sort_issue_files(files: list[dict]) -> list[dict]:
+    """Highest useful ``ans`` first; rows without a number fall back to display name."""
+
+    def sort_key(row: dict) -> tuple:
+        metric = row.get("sort_metric")
+        if metric is None:
+            metric = _issue_sort_metric(str(row.get("ans") or ""))
+        name = (row.get("display_name") or "").casefold()
+        if metric is None:
+            return (1, 0.0, name)
+        return (0, -float(metric), name)
+
+    return sorted(files, key=sort_key)
+
+
 def _file_size_header_is_zero(size_text: str) -> bool:
     t = (size_text or "").strip()
     if not t:
@@ -438,8 +504,17 @@ def _parse_master_root(root: ET.Element) -> dict:
                 ans_el = _direct_child_ans(check)
                 ans_empty = _ans_element_is_empty(ans_el)
                 ans = _ans_text_from_element(ans_el)
+                sort_metric: float | None = None
                 if name == "FILE_SIZE":
-                    ans = _format_file_size_bytes(ans) or ans
+                    if ans.isdigit():
+                        sort_metric = float(ans)
+                    formatted = _format_file_size_bytes(ans)
+                    if formatted:
+                        ans = formatted
+                    elif sort_metric is None:
+                        sort_metric = _issue_sort_metric(ans)
+                else:
+                    sort_metric = _issue_sort_metric(ans)
                 condensed_msg = f"{msg.strip()} {ans}" if msg and ans else msg.strip()
 
                 check_entry: dict = {
@@ -448,6 +523,7 @@ def _parse_master_root(root: ET.Element) -> dict:
                     "desc": desc,
                     "ans": ans,
                     "ans_empty": ans_empty,
+                    "sort_metric": sort_metric,
                     "condensed_msg": condensed_msg,
                 }
                 duplicate_models = _parse_duplicate_models_check(check)
@@ -1396,6 +1472,8 @@ def create_html_report(
                 {
                     "file_path": file_path,
                     "desc": check["desc"],
+                    "ans": check.get("ans", ""),
+                    "sort_metric": check.get("sort_metric"),
                     "condensed_msg": check["condensed_msg"],
                     "item_details": check.get("item_details", []),
                     "item_details_truncated": check.get("item_details_truncated", False),
@@ -1439,6 +1517,7 @@ def create_html_report(
         if not description_data:
             continue
 
+        sorted_files = _sort_issue_files(files)
         check_sections.append(
             {
                 "class": f"check-section-{check_index}",
@@ -1447,10 +1526,10 @@ def create_html_report(
                 "description": description_data["description"],
                 "category": description_data["category"],
                 "why": description_data["why"],
-                "count": len(files),
-                "entity_word": _section_heading_entity_word(files),
+                "count": len(sorted_files),
+                "entity_word": _section_heading_entity_word(sorted_files),
                 "stat_type": _section_stat_type_from_dict_key(check),
-                "files": files,
+                "files": sorted_files,
             }
         )
 

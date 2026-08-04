@@ -1677,6 +1677,10 @@ HEALTH_CHECKS: list[tuple[str, str]] = [
 
     ("GEN_COMPONENTS", "Generic components placed"),
 
+    ("CHK_ASSEMBLY_CUTS", "Models with Assembly Cuts"),
+
+    ("CHK_RELATION_MP_MASS", "Models with Legacy Relation mp_mass()"),
+
     ("EDGE_REFERENCES", "Edge References"),
 
     ("CIRCULAR_REFS", "Circular References"),

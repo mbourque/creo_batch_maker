@@ -2,6 +2,30 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-04 — v1.12.134
+
+- **Checks**: ``error_checks.mch`` and ``warning_checks.mch`` add ``FLEX_COMPONENTS`` and ``MECH_COMPONENTS`` from ``info_checks.mch``.
+
+## 2026-08-04 — v1.12.133
+
+- **Scan Information**: **Biggest problems** includes **Models with Legacy Relation mp_mass()** when that check finds any.
+
+## 2026-08-04 — v1.12.132
+
+- **Scan Information**: **Biggest problems** includes **Models with Assembly Cuts** when any assemblies have cuts.
+
+## 2026-08-04 — v1.12.131
+
+- **Checks**: ``vda_checks.mch`` includes the checks from ``info_checks.mch`` that were missing (existing VDA rows unchanged).
+
+## 2026-08-04 — v1.12.130
+
+- **Checks**: ``large_assy_checks.mch`` includes the checks from ``info_checks.mch`` that were missing (existing large-assembly rows unchanged).
+
+## 2026-08-04 — v1.12.129
+
+- **Report**: within each error, warning, and information check, models are listed by highest numeric answer first (including file size); names without a useful number stay alphabetical.
+
 ## 2026-08-04 — v1.12.128
 
 - **Scan Information**: CAD Assessment Summary section is renamed to **Advanced Assembly Usage**.
