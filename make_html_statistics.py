@@ -705,6 +705,7 @@ PERFORMANCE_TABLE_SECTIONS: list[tuple[str, list[tuple[str, str | None]]]] = [
             ("Skeleton parts", "_SKELETON_MODELS"),
             ("Bulk parts", "_BULK_PARTS"),
             ("Non solid parts", "_NON_SOLID_PARTS"),
+            ("Non solid/empty assemblies", "_NON_SOLID_ASSEMBLIES"),
         ],
     ),
     (
@@ -727,7 +728,7 @@ PERFORMANCE_TABLE_SECTIONS: list[tuple[str, list[tuple[str, str | None]]]] = [
     (
         "Advanced Assembly Usage",
         [
-            ("Number of created simplified representations", "_SIMPREP_REPRESENTATIONS"),
+            ("Number of simplified representations", "_SIMPREP_REPRESENTATIONS"),
             ("Number of mechanism components", "_MECH_COMPONENTS"),
             ("Inseparable assemblies", "_INSEPARABLE_ASSEMBLIES"),
         ],
@@ -768,6 +769,7 @@ class PerformanceMetrics:
     duplicate_models: int = 0
     bulk_parts: int = 0
     non_solid_parts: int = 0
+    non_solid_assemblies: int = 0
     fixed_components: int = 0
     suppressed_components: int = 0
     files_seen: int = 0
@@ -960,6 +962,22 @@ def _is_non_solid_part(file_element: ET.Element) -> bool:
     return True
 
 
+def _is_non_solid_assembly(file_element: ET.Element) -> bool:
+    """True when ``UNQ_COMPONENTS`` ans is numeric 0 (empty / no unique components)."""
+    check = _find_check(file_element, "UNQ_COMPONENTS")
+    if check is None or _check_hidden_from_report(check):
+        return False
+    ans = ""
+    for child in check:
+        if child.tag == "ans":
+            ans = (child.text or "").strip()
+            break
+    if not ans:
+        return False
+    n = _parse_int_metric(ans)
+    return n is not None and n == 0
+
+
 def _file_size_bytes_from_element(file_element: ET.Element) -> int | None:
     """``FILE_SIZE`` check ``<ans>`` is size in bytes when it is all digits."""
     check = _find_check(file_element, "FILE_SIZE")
@@ -1077,6 +1095,8 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
                 metrics.non_solid_parts += 1
         elif pro_type == "ASM":
             metrics.assembly_count += 1
+            if _is_non_solid_assembly(file_element):
+                metrics.non_solid_assemblies += 1
             metrics.total_num_components += _parse_int_metric(_check_ans_text(file_element, "NUM_COMPONENTS")) or 0
             metrics.mech_components += (
                 _parse_int_metric(_check_ans_text(file_element, "MECH_COMPONENTS")) or 0
@@ -1318,6 +1338,7 @@ def performance_metrics_answers(metrics: PerformanceMetrics) -> dict[str, str]:
         "_DUPLICATE_MODELS": str(metrics.duplicate_models),
         "_BULK_PARTS": str(metrics.bulk_parts),
         "_NON_SOLID_PARTS": str(metrics.non_solid_parts),
+        "_NON_SOLID_ASSEMBLIES": str(metrics.non_solid_assemblies),
         "_TOTAL_SCANNED_SIZE": _format_total_scanned_size(metrics.total_scanned_bytes),
         "_FIXED_COMPONENTS": str(metrics.fixed_components),
         "_SUPPRESSED_COMPONENTS": str(metrics.suppressed_components),
@@ -1405,6 +1426,9 @@ def _resolve_performance_value(answers: dict[str, str], key: str | None) -> tupl
     if key == "_NON_SOLID_PARTS":
         val = answers.get(key)
         return (val if val is not None else "—", "BODY_INFO")
+    if key == "_NON_SOLID_ASSEMBLIES":
+        val = answers.get(key)
+        return (val if val is not None else "—", "UNQ_COMPONENTS")
     if key == "_TOP_LEVEL_FEATURES":
         val = answers.get(key)
         return (val if val is not None else "—", "NUM_COMPONENTS")

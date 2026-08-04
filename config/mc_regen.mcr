@@ -11,14 +11,12 @@
 E:ERROR
 E:Error
 E:error
+
 E:Reference for the section entity no longer exists
 E:Regeneration failed
 E:Reference and its parent feature for the section entity no longer exist
 E:Reference and its parent feature no longer exist
-E:WARNING: CUT is entirely outside the model
-E:WARNING: PROTRUSION is entirely inside the model
 E:currently frozen
-E:WARNING: Model geometry for drawing is missing
 E:The geometry which serves as the origin
 E:Feature references are missing
 E:Cannot intersect part
@@ -27,27 +25,30 @@ E:has reference to generic assembly
 E:circular references found
 E:unattached feature(s)
 E:Invalid external reference for the section entity is encountered
-E:WARNING: External reference not present
-E:WARNING: CUT is entirely outside
+E:Some relations are no longer satisfied
+E:Invalid left side of assignment
+E:entirely outside the model.
 
+W:WARNING
+W:Warning
+W:warning
+
+W:External reference not present
+W:CUT is entirely outside
 W:Design intent is unclear
 W:Model changed since mass props calculated
-W:WARNING: One sided edge found
+W:One sided edge found
 W:has been frozen.
-
 W:Relations have errors/warnings
 W:Cannot update placement of component
-E:Invalid left side of assignment
+W:Model geometry for drawing is missing
+W:CUT is entirely outside the model
+W:PROTRUSION is entirely inside the model
 W:suppressed feature(s) or component(s)
-E:Some relations are no longer satisfied
 W:family table driven and will use pre-Wildfire3 replace functionality
 W:Invalid symbol
 W:Some constraint relations are no longer satisfied
 W:Invalid data type combination at left side of expression
 W:contains obsolete dimension
-
-E:entirely outside the model.
-
 W:External ref. for feature/component not found
-
-W: WARNING: Cannot update placement of component
+W:Cannot update placement of component

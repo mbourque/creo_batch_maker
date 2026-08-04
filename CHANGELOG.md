@@ -2,6 +2,22 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-04 — v1.12.138
+
+- **Scan Information**: **Non solid/empty assemblies** counts assemblies whose ``UNQ_COMPONENTS`` answer is 0.
+
+## 2026-08-04 — v1.12.137
+
+- **Scan Information**: **Non solid assemblies** uses ``OVERALL_SIZE`` (all three dimensions parse as 0); parts still use ``BODY_INFO``.
+
+## 2026-08-04 — v1.12.136
+
+- **Scan Information**: simplified-representations row label is **Number of simplified representations**.
+
+## 2026-08-04 — v1.12.135
+
+- **Scan Information**: CAD Assessment Summary shows **Non solid assemblies** under **Non solid parts** (same ``BODY_INFO`` / No Geometry rule).
+
 ## 2026-08-04 — v1.12.134
 
 - **Checks**: ``error_checks.mch`` and ``warning_checks.mch`` add ``FLEX_COMPONENTS`` and ``MECH_COMPONENTS`` from ``info_checks.mch``.
