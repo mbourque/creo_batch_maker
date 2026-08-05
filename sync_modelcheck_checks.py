@@ -39,6 +39,8 @@ _PRO_SUFFIX_TO_XML = {
     "_DRW": ".d.xml",
 }
 _DOCTYPE_RE = re.compile(r"<!DOCTYPE\b[\s\S]*?\]\s*>", re.IGNORECASE)
+# ModelCHECK sometimes embeds binary junk in <info2> (illegal in XML 1.0).
+_ILLEGAL_XML_CHARS_RE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]")
 
 
 @dataclass(frozen=True)
@@ -165,8 +167,9 @@ def read_xml_text(path: Path) -> str:
 
 
 def parse_mc_xml(text: str) -> ET.Element:
-    """Parse ModelCHECK XML; strip internal DOCTYPE subset that breaks ElementTree."""
+    """Parse ModelCHECK XML; strip DOCTYPE subset and illegal control characters."""
     cleaned = _DOCTYPE_RE.sub("", text, count=1)
+    cleaned = _ILLEGAL_XML_CHARS_RE.sub("", cleaned)
     return ET.fromstring(cleaned)
 
 
@@ -326,7 +329,7 @@ def update_report(xml_path: Path, check: ET.Element, check_name: str) -> bool:
     js_path = xml_path.with_suffix(".js")
 
     if not js_path.is_file():
-        print(f"ERROR     {xml_path.name}: missing {js_path.name}")
+        print(f"ERROR     {xml_path.name}: missing {js_path.name}", file=sys.stderr)
         return False
 
     try:
@@ -334,7 +337,7 @@ def update_report(xml_path: Path, check: ET.Element, check_name: str) -> bool:
         block = find_block(javascript, check_name)
 
         if block is None:
-            print(f"ERROR     {js_path.name}: {check_name} not found")
+            print(f"ERROR     {js_path.name}: {check_name} not found", file=sys.stderr)
             return False
 
         start, end, index, render_type, check_top = block
@@ -345,30 +348,15 @@ def update_report(xml_path: Path, check: ET.Element, check_name: str) -> bool:
             + javascript[end:]
         )
 
-        status = xml_value(check, "stat") or ""
-        result = xml_value(check, "ans") or ""
+        if updated != javascript:
+            temp_path = js_path.with_name(js_path.name + ".tmp")
+            temp_path.write_text(updated, encoding="utf-8", newline="")
+            temp_path.replace(js_path)
 
-        if updated == javascript:
-            print(
-                f"UNCHANGED {js_path.name} "
-                f"(from {xml_path.name}, {check_name}): "
-                f"status={status}, result={result}"
-            )
-            return True
-
-        temp_path = js_path.with_name(js_path.name + ".tmp")
-        temp_path.write_text(updated, encoding="utf-8", newline="")
-        temp_path.replace(js_path)
-
-        print(
-            f"UPDATED   {js_path.name} "
-            f"(from {xml_path.name}, {check_name}): "
-            f"status={status}, result={result}"
-        )
         return True
 
     except (OSError, UnicodeError, ValueError) as exc:
-        print(f"ERROR     {js_path.name}: {exc}")
+        print(f"ERROR     {js_path.name}: {exc}", file=sys.stderr)
         return False
 
 
@@ -392,10 +380,6 @@ def main() -> int:
         print(f"Working directory not found: {report_dir}", file=sys.stderr)
         return 2
 
-    print(f"Working directory:  {report_dir}")
-    print(f"(from {settings_path})")
-    print()
-
     checks_file = custom_checks_path()
     try:
         jobs = load_sync_jobs(checks_file)
@@ -409,11 +393,6 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
-
-    print(f"Custom checks file: {checks_file}")
-    for job in jobs:
-        print(f"Syncing: {job.xml_name}  (*{job.file_suffix})")
-    print()
 
     matched = 0
     synchronized = 0
@@ -434,7 +413,7 @@ def main() -> int:
         try:
             text = read_xml_text(xml_path)
         except OSError as exc:
-            print(f"ERROR     {xml_path.name}: {exc}")
+            print(f"ERROR     {xml_path.name}: {exc}", file=sys.stderr)
             errors += 1
             continue
 
@@ -444,7 +423,7 @@ def main() -> int:
         try:
             root = parse_mc_xml(text)
         except ET.ParseError as exc:
-            print(f"ERROR     {xml_path.name}: invalid XML: {exc}")
+            print(f"ERROR     {xml_path.name}: invalid XML: {exc}", file=sys.stderr)
             errors += 1
             continue
 
@@ -460,12 +439,16 @@ def main() -> int:
             else:
                 errors += 1
 
-    print()
-    print(f"Check occurrences found:   {matched}")
-    print(f"Successfully synchronized: {synchronized}")
-    print(f"Errors:                    {errors}")
+    if errors:
+        print(
+            f"sync_modelcheck_checks: {synchronized} ok, {errors} error(s) "
+            f"({matched} check occurrences).",
+            file=sys.stderr,
+        )
+        return 1
 
-    return 1 if errors else 0
+    print(f"sync_modelcheck_checks: ok ({synchronized} synchronized).")
+    return 0
 
 
 if __name__ == "__main__":

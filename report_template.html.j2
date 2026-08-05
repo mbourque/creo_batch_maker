@@ -2531,7 +2531,7 @@
          data-mq-check-name="{{ section.model_check_name | e }}">
         <div class="check-header">
             <div class="check-title">
-                <h2 id="heading-{{ section.class }}"><span class="bold-text">{% if section.stat_type == 'INFO' %}INFORMATION{% elif section.stat_type == 'ERRORS' %}ERRORS{% else %}WARNINGS{% endif %}:</span> {{ section.count }} {{ section.entity_word }}{% if section.count != 1 %}s{% endif %} with {{ section.name }}</h2>
+                <h2 id="heading-{{ section.class }}"><span class="bold-text">{% if section.stat_type == 'INFO' %}INFORMATION{% elif section.stat_type == 'ERRORS' %}ERRORS{% else %}WARNINGS{% endif %}:</span> {{ section.count }} {{ section.entity_word }}{% if section.count != 1 %}s{% endif %} with {{ section.name }}{% if section.ans_total is not none %} ({{ section.ans_total }} Total){% endif %}</h2>
                 <p><strong>Category:</strong> {{ section.category }}</p>
                 <p>{{ section.description }}</p>
                 <div class="why">{{ section.why | safe }}</div>

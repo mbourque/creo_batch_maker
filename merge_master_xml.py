@@ -18,6 +18,29 @@ def clean_xml(file_path):
     
     return cleaned_file_path
 
+
+_FEATURE_ID_LIST_RE = re.compile(r"^F(?:#\d+)+", re.IGNORECASE)
+
+
+def _scrub_check_item_texts(checks) -> None:
+    """
+    Clear ModelCHECK item ``info#`` values that are feature-id lists (``F#123#456…``).
+
+    Creo sometimes appends binary junk after these lists; after ``clean_xml`` that can
+    remain as trailing letters. The lists are not useful in the Cad Assessment report.
+    """
+    for check in checks:
+        for item in check.findall("item"):
+            for child in list(item):
+                if not re.fullmatch(r"info\d+", child.tag or "", flags=re.IGNORECASE):
+                    continue
+                text = (child.text or "").strip()
+                if not text:
+                    continue
+                if _FEATURE_ID_LIST_RE.match(text):
+                    child.text = ""
+
+
 def _dedupe_identical_checks(checks):
     """Keep the first of each identical check; drop exact duplicates within one model.
 
@@ -41,6 +64,7 @@ def extract_check_content(file_path):
     tree = ET.parse(cleaned_file_path)
     root = tree.getroot()
     checks = _dedupe_identical_checks(root.findall('.//check'))
+    _scrub_check_item_texts(checks)
     
     # Extract additional details
     model = root.find('.//model').text if root.find('.//model') is not None else ''

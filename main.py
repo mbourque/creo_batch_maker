@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from enum import Enum
+from io import StringIO
 from pathlib import Path
 import json
 import os
@@ -492,25 +493,66 @@ def _iter_chk_python_scripts(bundle: Path, def_names: list[str] | None = None) -
     return scripts
 
 
-def _run_sidecar_python_script(script: Path) -> None:
+def _run_sidecar_python_script(script: Path) -> tuple[int, str]:
     """
     Run a sidecar ``.py`` as ``__main__`` (same process; reads app_settings.json).
 
-    Raises ``RuntimeError`` on non-zero exit.
+    Returns ``(exit_code, captured_output)``. Quiet scripts echo a short summary;
+    ERROR lines are kept for Create Report warnings.
     """
     old_argv = sys.argv[:]
+    old_out, old_err = sys.stdout, sys.stderr
+    buf = StringIO()
+    code = 0
     try:
         sys.argv = [str(script)]
-        runpy.run_path(str(script), run_name="__main__")
-    except SystemExit as exc:
-        code = exc.code
-        if code in (None, 0):
-            return
-        if isinstance(code, int):
-            raise RuntimeError(f"{script.name} exited with code {code}") from None
-        raise RuntimeError(f"{script.name} exited: {code}") from None
+        sys.stdout = buf
+        sys.stderr = buf
+        try:
+            runpy.run_path(str(script), run_name="__main__")
+        except SystemExit as exc:
+            raw = exc.code
+            if raw in (None, 0):
+                code = 0
+            elif isinstance(raw, int):
+                code = raw
+            else:
+                code = 1
+                buf.write(f"{raw}\n")
     finally:
         sys.argv = old_argv
+        sys.stdout = old_out
+        sys.stderr = old_err
+
+    text = buf.getvalue()
+    if text:
+        try:
+            old_out.write(text)
+            if not text.endswith("\n"):
+                old_out.write("\n")
+            old_out.flush()
+        except Exception:
+            pass
+    return code, text
+
+
+def _sidecar_failure_detail(script_name: str, code: int, output: str) -> str:
+    """Prefer ERROR / setup lines from quiet sidecar output for the warning dialog."""
+    lines = [ln.strip() for ln in (output or "").splitlines() if ln.strip()]
+    useful = [
+        ln
+        for ln in lines
+        if ln.upper().startswith("ERROR")
+        or ln.casefold().startswith("could not")
+        or ln.casefold().startswith("setup error")
+        or ln.casefold().startswith("no ")
+        or ln.casefold().startswith("working directory not found")
+        or " error(s)" in ln.casefold()
+    ]
+    detail = "\n".join(useful) if useful else "\n".join(lines[-8:])
+    if detail:
+        return f"{script_name} exited with code {code}\n\n{detail}"
+    return f"{script_name} exited with code {code}"
 
 
 def _run_custom_checks_before_master() -> tuple[bool, str | None]:
@@ -519,10 +561,16 @@ def _run_custom_checks_before_master() -> tuple[bool, str | None]:
     when custom_checks.txt has DEF_/CHECK lines that appear uncommented in the
     ``*.mch`` from condition.mcc ``config=``. Skip both when none are active there
     (missing, commented with ``!``/``#``, or no DEF_/CHECK lines).
+
+    Custom-check / sync failures do not block the report (so an older working folder
+    can still regenerate). Exit code ``2`` from a ``chk_*.py`` / sync script means
+    nothing applicable (for example no matching XML) and is ignored quietly.
+    Returns ``(True, warning)`` only for unexpected failures, or ``(True, None)``.
     """
     bundle = _app_bundle_dir()
     config_dir = bundle / "config"
     checks_file = config_dir / "custom_checks.txt"
+    warnings: list[str] = []
     try:
         try:
             def_names = _load_custom_check_def_names(checks_file)
@@ -538,32 +586,45 @@ def _run_custom_checks_before_master() -> tuple[bool, str | None]:
         if not enabled:
             return True, None
 
-        for script in _iter_chk_python_scripts(bundle, enabled):
-            _run_sidecar_python_script(script)
+        try:
+            scripts = _iter_chk_python_scripts(bundle, enabled)
+        except FileNotFoundError as exc:
+            warnings.append(str(exc))
+            scripts = []
+
+        for script in scripts:
+            try:
+                code, output = _run_sidecar_python_script(script)
+            except Exception as exc:
+                warnings.append(f"{script.name}: {exc}")
+                continue
+            # 0 = ok; 2 = nothing to do / setup skip (e.g. no matching XML).
+            if code not in (0, 2):
+                warnings.append(_sidecar_failure_detail(script.name, code, output))
+
         sync_script = bundle / "sync_modelcheck_checks.py"
         if not sync_script.is_file():
-            return False, (
-                "sync_modelcheck_checks.py was not found next to the application.\n\n"
+            warnings.append(
+                "sync_modelcheck_checks.py was not found next to the application.\n"
                 f"Expected:\n  {sync_script}"
             )
-        _run_sidecar_python_script(sync_script)
-    except FileNotFoundError as exc:
-        return False, str(exc)
-    except RuntimeError as exc:
-        return False, (
-            "Custom ModelCHECK check scripts failed before building the report.\n\n"
-            f"{exc}"
-        )
+        else:
+            try:
+                code, output = _run_sidecar_python_script(sync_script)
+            except Exception as exc:
+                warnings.append(f"{sync_script.name}: {exc}")
+            else:
+                if code not in (0, 2):
+                    warnings.append(
+                        _sidecar_failure_detail(sync_script.name, code, output)
+                    )
     except OSError as exc:
-        return False, (
-            "Could not run custom ModelCHECK check scripts before building the report.\n\n"
-            f"{exc}"
-        )
+        warnings.append(f"Could not run custom ModelCHECK check scripts: {exc}")
     except Exception as exc:
-        return False, (
-            "An error occurred while running custom ModelCHECK check scripts.\n\n"
-            f"{exc}"
-        )
+        warnings.append(f"Custom ModelCHECK check scripts: {exc}")
+
+    if warnings:
+        return True, "\n\n".join(warnings)
     return True, None
 
 
@@ -10983,8 +11044,6 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
                 )
             elif kind == "master":
                 messagebox.showerror("Report Failed", str(error))
-            elif kind == "custom_check":
-                messagebox.showerror("Report Failed", str(error))
             elif kind == "notfound":
                 messagebox.showerror("Report Failed", str(error))
             elif kind == "os":
@@ -11000,6 +11059,15 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
             return
 
         written = result.get("written")
+        custom_warn = result.get("custom_check_warning")
+        if custom_warn:
+            self._bring_app_forward()
+            messagebox.showwarning(
+                "Custom checks",
+                "Custom ModelCHECK check scripts had problems; the report was still built "
+                "from the existing ModelCHECK XML.\n\n"
+                f"{custom_warn}",
+            )
         if written and not self._debug_mode:
             wd = (self.working_directory.get() or "").strip()
             if wd and _working_directory_exists_as_dir(wd):
@@ -11051,20 +11119,18 @@ class CreoDistributedBatchMakerApp(ctk.CTk):
         def work() -> None:
             result: dict[str, object] = {"written": None, "error": None, "kind": None}
             try:
-                ok, prep_err = _run_custom_checks_before_master()
+                _ok, prep_msg = _run_custom_checks_before_master()
+                if prep_msg:
+                    result["custom_check_warning"] = prep_msg
+                ok, build_err = self._build_master_xml_silent(working_dir)
                 if not ok:
-                    result["error"] = prep_err or "Custom check scripts failed."
-                    result["kind"] = "custom_check"
+                    result["error"] = build_err or "Could not build master.xml."
+                    result["kind"] = "master"
                 else:
-                    ok, build_err = self._build_master_xml_silent(working_dir)
-                    if not ok:
-                        result["error"] = build_err or "Could not build master.xml."
-                        result["kind"] = "master"
-                    else:
-                        patch.run(settings_path=settings_path, quiet=True)
-                        result["written"] = build_errors_warnings_report.build_errors_warnings_html(
-                            wd
-                        )
+                    patch.run(settings_path=settings_path, quiet=True)
+                    result["written"] = build_errors_warnings_report.build_errors_warnings_html(
+                        wd
+                    )
             except patch.PatchError as exc:
                 result["error"] = str(exc)
                 result["kind"] = "patch"

@@ -871,6 +871,34 @@ def _section_heading_entity_word(files: list[dict]) -> str:
     return "Model"
 
 
+def _section_ans_total(files: list[dict]) -> int | None:
+    """
+    Sum of numeric ModelCHECK ``ans`` values across models in a check section.
+
+    Used in the section heading as ``(N Total)``. Skips non-numeric answers
+    (YES/NA) and size strings (``12 MB``). Returns ``None`` when nothing to sum.
+    """
+    total = 0.0
+    found = False
+    for row in files:
+        ans = str(row.get("ans") or "").strip()
+        if not ans:
+            continue
+        if _ISSUE_SORT_SIZE_RE.match(ans):
+            continue
+        try:
+            value = float(ans.replace(",", ""))
+        except ValueError:
+            continue
+        if value < 0:
+            continue
+        found = True
+        total += value
+    if not found:
+        return None
+    return int(round(total))
+
+
 def get_check_descriptions(model_checks_file: str) -> dict:
     tree = ET.parse(model_checks_file)
     root = tree.getroot()
@@ -1528,6 +1556,7 @@ def create_html_report(
                 "why": description_data["why"],
                 "count": len(sorted_files),
                 "entity_word": _section_heading_entity_word(sorted_files),
+                "ans_total": _section_ans_total(sorted_files),
                 "stat_type": _section_stat_type_from_dict_key(check),
                 "files": sorted_files,
             }

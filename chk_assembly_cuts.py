@@ -391,7 +391,7 @@ def process_xml_file(
     try:
         raw, encoding = read_xml_bytes(xml_path)
     except OSError as exc:
-        print(f"ERROR     {xml_path.name}: {exc}")
+        print(f"ERROR     {xml_path.name}: {exc}", file=sys.stderr)
         return 0, 0, 1
 
     relevant = [
@@ -410,16 +410,14 @@ def process_xml_file(
     for job in relevant:
         try:
             if find_check_span(out, job.xml_name) is None:
-                print(f"ERROR     {xml_path.name}: {job.xml_name} open/close tags not found")
+                print(
+                    f"ERROR     {xml_path.name}: {job.xml_name} open/close tags not found",
+                    file=sys.stderr,
+                )
                 errors += 1
                 continue
 
             items = feature_counts_from_source(out, job.source_check, job.keywords)
-            if find_check_span(out, job.source_check) is None:
-                print(
-                    f"NOTE      {xml_path.name}: {job.source_check} not found; "
-                    f"count=0 for {job.xml_name}"
-                )
 
             count = sum(qty for _typ, qty in items)
             if count <= 0:
@@ -433,28 +431,19 @@ def process_xml_file(
 
             new_out = update_check_block(out, job.xml_name, stat, ans, items)
             if new_out == out:
-                print(
-                    f"OK        {xml_path.name}: {job.xml_name} "
-                    f"already stat={stat} ans={ans} (no write)"
-                )
                 unchanged += 1
             else:
                 out = new_out
-                detail = ",".join(f"{t}={q}" for t, q in items) or "none"
-                print(
-                    f"UPDATED   {xml_path.name}: {job.xml_name} "
-                    f"stat={stat} ans={ans} items={detail} (mch {job.mch_name})"
-                )
                 updated += 1
         except (OSError, ValueError) as exc:
-            print(f"ERROR     {xml_path.name}: {job.xml_name}: {exc}")
+            print(f"ERROR     {xml_path.name}: {job.xml_name}: {exc}", file=sys.stderr)
             errors += 1
 
     if updated and out != raw:
         try:
             write_xml_text(xml_path, out, encoding)
         except OSError as exc:
-            print(f"ERROR     {xml_path.name}: write failed: {exc}")
+            print(f"ERROR     {xml_path.name}: write failed: {exc}", file=sys.stderr)
             return 0, unchanged, errors + 1
 
     return updated, unchanged, errors
@@ -497,21 +486,12 @@ def main() -> int:
         print(f"Setup error: {exc}", file=sys.stderr)
         return 2
 
-    print(f"Working directory: {report_dir}")
-    print(f"XML files:         {len(xml_files)}")
-    for job in jobs:
-        print(
-            f"Job: XML {job.xml_name} ← {job.source_check} "
-            f"({','.join(job.keywords)}); mch {job.mch_name}; "
-            f"files *{job.file_suffix}"
-        )
-    print()
-
     if not xml_files:
         kinds = ", ".join(sorted(f"*{s}" for s in needed))
         print(
             f"No {kinds} in that folder.\n"
-            "Point working_directory at the folder that contains the report XML."
+            "Point working_directory at the folder that contains the report XML.",
+            file=sys.stderr,
         )
         return 2
 
@@ -522,11 +502,15 @@ def main() -> int:
         total_n += n
         total_e += e
 
-    print()
-    print(f"Updated:    {total_u}")
-    print(f"Already OK: {total_n}")
-    print(f"Errors:     {total_e}")
-    return 1 if total_e else 0
+    if total_e:
+        print(
+            f"chk_assembly_cuts: {total_u} updated, {total_n} ok, {total_e} error(s).",
+            file=sys.stderr,
+        )
+        return 1
+
+    print(f"chk_assembly_cuts: ok ({total_u} updated, {total_n} unchanged).")
+    return 0
 
 
 if __name__ == "__main__":

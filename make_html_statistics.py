@@ -230,23 +230,28 @@ def _report_scanned_file_elements(master_root: ET.Element) -> list[ET.Element]:
 
 
 
-def _parse_positive_ans(check_el: ET.Element) -> bool:
+def _health_issue_amount(check_el: ET.Element) -> int:
+    """
+    Number of problems for Biggest problems (sum of check ``ans``), not models.
 
-    ans_el = check_el.find("ans")
-
-    if ans_el is None or not (ans_el.text or "").strip():
-
-        return False
-
-    text = ans_el.text.strip()
-
-    try:
-
-        return float(text) > 0
-
-    except ValueError:
-
-        return False
+    Uses a numeric ``<ans>`` when present; otherwise the number of ``<item>`` rows.
+    """
+    ans_text = ""
+    for child in check_el:
+        if child.tag == "ans":
+            ans_text = (child.text or "").strip()
+            break
+    if ans_text:
+        try:
+            value = float(ans_text.replace(",", ""))
+        except ValueError:
+            value = None
+        else:
+            if value > 0:
+                return int(value)
+            return 0
+    items = len(check_el.findall("item"))
+    return items if items > 0 else 0
 
 
 
@@ -1701,9 +1706,9 @@ HEALTH_CHECKS: list[tuple[str, str]] = [
 
     ("GEN_COMPONENTS", "Generic components placed"),
 
-    ("CHK_ASSEMBLY_CUTS", "Models with Assembly Cuts"),
+    ("CHK_ASSEMBLY_CUTS", "Assembly Cuts"),
 
-    ("CHK_RELATION_MP_MASS", "Models with Legacy Relation mp_mass()"),
+    ("CHK_RELATION_MP_MASS", "Legacy Relation mp_mass()"),
 
     ("EDGE_REFERENCES", "Edge References"),
 
@@ -1836,9 +1841,11 @@ def scan_batch_statistics(master_root: ET.Element, *, master_path: str = "") -> 
 
             check = _find_check(file_element, check_name)
 
-            if check is not None and _parse_positive_ans(check):
+            if check is None:
 
-                health_counts[label] += 1
+                continue
+
+            health_counts[label] += _health_issue_amount(check)
 
 
 
@@ -2631,7 +2638,14 @@ def generate_statistics_html(
 
             continue
 
-        bar_w = (count / health_max * 100) if health_max else 0
+        # Square-root scale so one huge count does not flatten every other bar;
+        # small non-zero rows still get a short visible fill.
+        if health_max > 0:
+            bar_w = (count ** 0.5) / (health_max ** 0.5) * 100.0
+            if count < health_max:
+                bar_w = max(bar_w, 3.0)
+        else:
+            bar_w = 0.0
 
         bar_inner = f"""
           <span class="mq-health-label">{_esc(label)}</span>

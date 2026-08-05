@@ -2,6 +2,46 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-05 — v1.12.148
+
+- **Report**: each check heading also shows the total findings when ModelCHECK answers are numeric (for example `268 Models with … (98117 Total)`).
+
+## 2026-08-05 — v1.12.147
+
+- **Scan Information → Biggest problems**: bars use a compressed scale so mid-range counts still show a clear orange fill when one check dominates.
+
+## 2026-08-05 — v1.12.146
+
+- **Scan Information → Biggest problems**: counts total issues (sum of each check’s answer), not how many models have that issue.
+
+## 2026-08-05 — v1.12.145
+
+- **Create Report**: when building ``master.xml``, clears ModelCHECK ``F#…`` feature-id item text (and leftover junk) so the report shows labels like **Cavity 1** without those id lists.
+
+## 2026-08-05 — v1.12.144
+
+- **Report**: cavity and similar item rows no longer show ModelCHECK ``F#…`` feature-id lists (labels like **Cavity 1** remain).
+
+## 2026-08-05 — v1.12.143
+
+- **Report**: ModelCHECK item details hide corrupt control characters and trailing junk on feature-id lists (for example cavity ``F#…`` rows).
+
+## 2026-08-05 — v1.12.142
+
+- **Create Report**: custom-check sync tolerates ModelCHECK XML that contains illegal control characters (for example corrupted cavity ``info2`` text).
+
+## 2026-08-05 — v1.12.141
+
+- **Create Report**: custom check / sync scripts print only errors and a short OK line; the warning dialog shows the real ERROR text (for example a missing ``.js`` file).
+
+## 2026-08-04 — v1.12.140
+
+- **Create Report**: custom check exit code 2 (nothing to update) no longer shows a warning when regenerating a report.
+
+## 2026-08-04 — v1.12.139
+
+- **Create Report**: if a custom check script fails (for example ``chk_relation_mp_mass.py``), the report still builds from existing ModelCHECK XML and shows a warning instead of stopping.
+
 ## 2026-08-04 — v1.12.138
 
 - **Scan Information**: **Non solid/empty assemblies** counts assemblies whose ``UNQ_COMPONENTS`` answer is 0.
