@@ -803,7 +803,7 @@ When a model has small geometry, the equivalent absolute accuracy should be two 
         <why>Incorrect Y-factor values in sheet metal parts can lead to inaccuracies in bend allowances, resulting in incorrect part dimensions and potential manufacturing errors. Ensuring the Y-factor is correctly defined is crucial for maintaining the precision and functionality of the final product.</why>
     </Check>
     <Check>
-        <Name>Simplified Representation Information</Name>
+        <Name>Simplified Representations</Name>
         <Category>Consistency</Category>
         <Description>Checks and reports information related to simplified representations used within the model or assembly. Simplified representations are commonly used to improve performance, reduce memory usage, simplify large assemblies, and control which components or features are displayed for different design, review, manufacturing, or simulation purposes. Improperly managed simplified representations can lead to missing geometry, incomplete assemblies, incorrect downstream exports, and confusion during collaboration or manufacturing processes. This check helps ensure that simplified representations are properly defined, named, and maintained according to company standards. Simplified representation naming and configuration rules are typically managed in the start.mcs file using PRT_SIMPREP_NAME and related entries, while check behavior and reporting are controlled by the SIMPREP_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>SIMPREP_INFO</ModelCheckName>
