@@ -701,8 +701,9 @@ def name_has_creo_path_ref(display_name: str) -> bool:
     return False
 
 
-# Inseparable assemblies use double angle brackets (``<<>>``).
-# Family-table instances use single brackets (``<>``) / FAMILY_INFO — not handled here.
+# Inseparable assemblies use double angle brackets (``<<>>``), or ``[[]]`` on
+# disk when ``<<>>`` is not a legal filename. Family-table instances use single
+# brackets (``<>``) / FAMILY_INFO — not handled here.
 _CREO_BARE_INSEP_RE = re.compile(
     r"^<<(?P<inner>.+?)>>(?P<ext>\.(?:prt|asm|drw))$",
     re.IGNORECASE,
@@ -713,12 +714,17 @@ _CREO_COMPOUND_INSEP_RE = re.compile(
 )
 
 
+def _normalize_inseparable_brackets(display_name: str) -> str:
+    """Map filesystem ``[[…]]`` inseparable names to session ``<<…>>`` form."""
+    return (display_name or "").replace("[[", "<<").replace("]]", ">>")
+
+
 def creo_angle_file_target(display_name: str) -> str | None:
     """
-    Drag / open basename for an inseparable-assembly ``<<>>`` name.
+    Drag / open basename for an inseparable-assembly ``<<>>`` / ``[[]]`` name.
 
-    - ``parent<<child>>.ext`` → ``child.asm`` (no angle brackets)
-    - ``<<child>>.ext`` → ``child.asm``
+    - ``parent<<child>>.ext`` / ``parent[[child]].ext`` → ``child.asm``
+    - ``<<child>>.ext`` / ``[[child]].ext`` → ``child.asm``
     - otherwise ``None`` (family-table single ``<>`` is not handled here)
     """
     parsed = inseparable_angle_names(display_name)
@@ -727,12 +733,12 @@ def creo_angle_file_target(display_name: str) -> str | None:
 
 def inseparable_angle_names(display_name: str) -> tuple[str, str] | None:
     """
-    ``(label_file, drag_file)`` for inseparable ``<<>>`` names.
+    ``(label_file, drag_file)`` for inseparable ``<<>>`` / ``[[]]`` names.
 
-    - ``parent<<child>>.prt`` → ``(parent.prt, child.asm)``
-    - ``<<child>>.ext`` → ``(child.asm, child.asm)``
+    - ``parent<<child>>.prt`` / ``parent[[child]].prt`` → ``(parent.prt, child.asm)``
+    - ``<<child>>.ext`` / ``[[child]].ext`` → ``(child.asm, child.asm)``
     """
-    raw = (display_name or "").strip()
+    raw = _normalize_inseparable_brackets((display_name or "").strip())
     if not raw:
         return None
     bare = _CREO_BARE_INSEP_RE.match(raw)
@@ -754,11 +760,13 @@ def inseparable_angle_names(display_name: str) -> tuple[str, str] | None:
 
 def split_creo_angle_session_name(display_name: str) -> tuple[str, str] | None:
     """
-    ``parent<<child>>.ext`` → ``(parent.ext, child.ext)``.
+    ``parent<<child>>.ext`` / ``parent[[child]].ext`` → ``(parent.ext, child.ext)``.
 
     Prefer ``inseparable_angle_names`` / ``creo_angle_file_target`` for report links.
     """
-    m = _CREO_COMPOUND_INSEP_RE.match((display_name or "").strip())
+    m = _CREO_COMPOUND_INSEP_RE.match(
+        _normalize_inseparable_brackets((display_name or "").strip())
+    )
     if not m:
         return None
     outer = (m.group("outer") or "").strip()
@@ -810,8 +818,8 @@ def model_file_link_href(display_name: str) -> str | None:
     """
     Relative ``./`` link for drag-into-Creo.
 
-    Inseparable ``<<>>`` names use ``creo_angle_file_target``. Other session-style
-    names (``[[]]``) return ``None``. Family-table single ``<>`` is not mapped here.
+    Inseparable ``<<>>`` / ``[[]]`` names use ``creo_angle_file_target``.
+    Family-table single ``<>`` is not mapped here.
     """
     target = creo_angle_file_target(display_name)
     if target:
@@ -847,6 +855,7 @@ def display_name_link_text(original_display_name: str, drag_image_display_name: 
             and img_ext
             and orig_ext.group(1).lower() != img_ext.group(1).lower()
             and "<<" not in original_display_name
+            and "[[" not in original_display_name
         ):
             return original_display_name
         return f"{original_display_name}<{drag_image_display_name}>"
@@ -1006,9 +1015,7 @@ def thumbnail_src_for_report(
     Return a value suitable for ``<img src="…">`` (relative to the report HTML).
 
     - Inseparable thumbs use ``child.asm`` (same as drag); label text is ``parent.ext``.
-      If a session ``<<>>`` name is passed, lookup uses ``creo_angle_file_target`` /
-      bracket-stripped basenames.
-    - Other session refs (``[[]]``) use the shared placeholder.
+      Session ``<<>>`` / filesystem ``[[]]`` names use ``creo_angle_file_target``.
     - Parts use ``stem.part.jpg``; assemblies ``stem.assembly.jpg``; drawings ``stem.drawing.jpg``.
     - Legacy ``stem.model.jpg`` is used when type-specific files are missing.
     - If no thumbnail exists, use the same shared placeholder so the report always shows a thumb.

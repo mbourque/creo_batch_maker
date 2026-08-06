@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-06 — v1.12.155
+
+- **Models failed**: inseparable assemblies named with ``[[]]`` (same as ``<<>>``) show as ``parent.prt`` and drag as ``child.asm``.
+
 ## 2026-08-06 — v1.12.154
 
 - **Checks catalog**: removed unused ``ModelCheckOptions`` tags from ``model_checks.xml``.

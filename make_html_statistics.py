@@ -2299,15 +2299,25 @@ _CREO_COMPOUND_INSEP_RE = re.compile(
 )
 
 
+def _normalize_inseparable_brackets(display_name: str) -> str:
+    """Map filesystem ``[[…]]`` inseparable names to session ``<<…>>`` form."""
+    return (display_name or "").replace("[[", "<<").replace("]]", ">>")
+
+
 def _creo_angle_file_target(display_name: str) -> str | None:
-    """Inseparable ``<<>>`` drag basename → ``child.asm`` (no brackets)."""
+    """Inseparable ``<<>>`` / ``[[]]`` drag basename → ``child.asm`` (no brackets)."""
     parsed = _inseparable_angle_names(display_name)
     return parsed[1] if parsed else None
 
 
 def _inseparable_angle_names(display_name: str) -> tuple[str, str] | None:
-    """``(label_file, drag_file)``: ``parent<<child>>.prt`` → ``(parent.prt, child.asm)``."""
-    raw = (display_name or "").strip()
+    """
+    ``(label_file, drag_file)`` for inseparable assemblies.
+
+    - ``parent<<child>>.prt`` / ``parent[[child]].prt`` → ``(parent.prt, child.asm)``
+    - ``<<child>>.ext`` / ``[[child]].ext`` → ``(child.asm, child.asm)``
+    """
+    raw = _normalize_inseparable_brackets((display_name or "").strip())
     if not raw:
         return None
     bare = _CREO_BARE_INSEP_RE.match(raw)
@@ -2328,7 +2338,7 @@ def _inseparable_angle_names(display_name: str) -> tuple[str, str] | None:
 
 
 def _skipped_model_name_html(name: str) -> str:
-    """Draggable link for Creo drop (click does nothing); plain span for other session-style names."""
+    """Draggable link for Creo drop; inseparable ``<<>>`` / ``[[]]`` → label parent, drag child.asm."""
     parts = _inseparable_angle_names(name)
     if parts:
         label_file, drag_file = parts
