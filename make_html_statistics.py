@@ -707,7 +707,7 @@ PERFORMANCE_TABLE_SECTIONS: list[tuple[str, list[tuple[str, str | None]]]] = [
             ("Scan date", "_SCAN_DATE"),
             ("Working directory", "_WORKING_DIRECTORY"),
             ("Models scanned", "_FILES_SCANNED"),
-            ("Models failed", "_MODELS_FAILED"),
+            ("Models failed to scan", "_MODELS_FAILED"),
             ("Total size of scanned models", "_TOTAL_SCANNED_SIZE"),
             ("Model checks", "_MODEL_CHECKS"),
             ("Scan duration", "_SCAN_DURATION"),
@@ -2612,7 +2612,7 @@ def _skipped_models_section(skipped_models: list[str]) -> str:
 
   <div class="mq-section">
 
-    <h2>Models failed ({total})</h2>
+    <h2>Models failed to scan ({total})</h2>
 
     <p class="mq-skipped-section-list">{list_html}</p>
 

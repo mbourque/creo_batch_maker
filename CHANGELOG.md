@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-06 — v1.12.157
+
+- **Scan Information**: renamed **Models failed** to **Models failed to scan**.
+
 ## 2026-08-06 — v1.12.156
 
 - **Models failed**: inseparable embedded parts (``parent[[child]].prt`` / ``parent<<child>>.prt``) are omitted when ``child.asm`` was scanned.
