@@ -466,6 +466,10 @@ def scan_skipped_models(
     on disk; any model listed in ``master.xml`` was scanned and is not reported
     as skipped.
 
+    Inseparable assemblies (``parent<<child>>.prt`` / ``parent[[child]].prt``) are
+    not listed when ``child.asm`` itself appears in ``master.xml`` — the embedded
+    part is not a separate failed scan.
+
     Model types turned off in Scan settings are omitted (not listed as failed).
     """
     scan_parts, scan_assemblies, scan_drawings = _resolved_scan_type_flags(
@@ -480,6 +484,11 @@ def scan_skipped_models(
 
     skipped: dict[str, str] = {}
 
+    def _mark_failed(display: str) -> None:
+        if _inseparable_covered_by_scanned_asm(display, scanned):
+            return
+        skipped[display.casefold()] = display
+
     for display_cf in sorted(models_on_disk.keys(), key=lambda k: models_on_disk[k].casefold()):
         display = models_on_disk[display_cf]
         if not _model_type_in_scan_scope(
@@ -493,10 +502,10 @@ def scan_skipped_models(
         if not xml_base:
             continue
         if xml_base.casefold() not in xml_on_disk:
-            skipped[display_cf] = display
+            _mark_failed(display)
             continue
         if display_cf not in scanned:
-            skipped[display_cf] = display
+            _mark_failed(display)
 
     # Orphan check XML at the working-folder top level only (never templates\\).
     for pattern in ("*.p.xml", "*.a.xml", "*.d.xml"):
@@ -516,9 +525,21 @@ def scan_skipped_models(
             if display_cf in skipped or display_cf in scanned:
                 continue
             if display_cf not in models_on_disk:
-                skipped[display_cf] = display
+                _mark_failed(display)
 
     return [skipped[k] for k in sorted(skipped.keys(), key=lambda k: skipped[k].casefold())]
+
+
+def _inseparable_covered_by_scanned_asm(display: str, scanned: set[str]) -> bool:
+    """
+    True when ``display`` is an inseparable embedded part and its child ``.asm``
+    was scanned (so this is not a failed model).
+    """
+    parts = _inseparable_angle_names(display)
+    if not parts:
+        return False
+    _label, drag_asm = parts
+    return drag_asm.casefold() in scanned
 
 
 

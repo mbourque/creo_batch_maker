@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-06 — v1.12.156
+
+- **Models failed**: inseparable embedded parts (``parent[[child]].prt`` / ``parent<<child>>.prt``) are omitted when ``child.asm`` was scanned.
+
 ## 2026-08-06 — v1.12.155
 
 - **Models failed**: inseparable assemblies named with ``[[]]`` (same as ``<<>>``) show as ``parent.prt`` and drag as ``child.asm``.
