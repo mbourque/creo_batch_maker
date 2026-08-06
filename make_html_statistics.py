@@ -1317,6 +1317,113 @@ def _model_checks_mch_from_condition_mcc() -> str:
     return match.group(1)
 
 
+_CONFIG_MCH_RE = re.compile(
+    r"<config>\s*([^<\s,]+\.mch)",
+    re.IGNORECASE,
+)
+_HDRCONFIG_RE = re.compile(r"<hdrconfig>\s*([^<]+?)\s*</hdrconfig>", re.IGNORECASE)
+_MCH_TOKEN_RE = re.compile(r"([^,\s()]+\.mch)", re.IGNORECASE)
+
+
+def _mch_basename_from_config_text(text: str) -> str:
+    """First ``*.mch`` token from a ModelCHECK config string."""
+    match = _MCH_TOKEN_RE.search(text or "")
+    return match.group(1).strip() if match else ""
+
+
+def _decode_modelcheck_xml_head(raw: bytes) -> str:
+    """Decode a short head of a ModelCHECK detail XML (UTF-8 or UTF-16)."""
+    if raw.startswith(b"\xff\xfe") or raw.startswith(b"\xfe\xff"):
+        return raw.decode("utf-16", errors="replace")
+    # UTF-16 without BOM often has many NULs in the first bytes.
+    sample = raw[:96]
+    if sample and sample.count(0) >= max(8, len(sample) // 4):
+        return raw.decode("utf-16-le", errors="replace")
+    return raw.decode("utf-8", errors="replace")
+
+
+def _mch_from_modelcheck_xml_head(path: str) -> str:
+    """
+    ``*.mch`` from a ModelCHECK ``*.p.xml`` / ``*.a.xml`` / ``*.d.xml``.
+
+    Prefers ``<config>….mch`` (Creo check XML); falls back to ``<hdrconfig>``.
+    """
+    try:
+        with open(path, "rb") as f:
+            raw = f.read(65536)
+    except OSError:
+        return ""
+    head = _decode_modelcheck_xml_head(raw)
+    match = _CONFIG_MCH_RE.search(head)
+    if match:
+        return match.group(1).strip()
+    match = _HDRCONFIG_RE.search(head)
+    if not match:
+        return ""
+    return _mch_basename_from_config_text(match.group(1))
+
+
+def _model_checks_mch_from_working_dir(working_dir: str) -> str:
+    """
+    ``*.mch`` used for the scan, from ``<config>`` in working-folder ModelCHECK XMLs.
+
+    Reads top-level ``*.p.xml`` / ``*.a.xml`` / ``*.d.xml`` only (newest first).
+    """
+    if not working_dir:
+        return ""
+    try:
+        root = Path(working_dir).expanduser()
+        if not root.is_dir():
+            return ""
+    except OSError:
+        return ""
+    dated: list[tuple[float, str]] = []
+    try:
+        with os.scandir(root) as it:
+            for entry in it:
+                low = entry.name.lower()
+                if not (
+                    low.endswith(".p.xml")
+                    or low.endswith(".a.xml")
+                    or low.endswith(".d.xml")
+                ):
+                    continue
+                try:
+                    if not entry.is_file(follow_symlinks=False):
+                        continue
+                    mtime = entry.stat(follow_symlinks=False).st_mtime
+                except OSError:
+                    continue
+                dated.append((mtime, entry.path))
+    except OSError:
+        return ""
+    if not dated:
+        return ""
+    # Newest first so a re-scan with a different .mch wins over older leftovers.
+    dated.sort(key=lambda item: (-item[0], item[1].casefold()))
+    counts: dict[str, int] = {}
+    display_for: dict[str, str] = {}
+    checked = 0
+    for _, path in dated:
+        if checked >= 40:
+            break
+        mch = _mch_from_modelcheck_xml_head(path)
+        checked += 1
+        if not mch:
+            continue
+        cf = mch.casefold()
+        display_for.setdefault(cf, mch)
+        counts[cf] = counts.get(cf, 0) + 1
+        # Enough agreement from recent files — stop early.
+        if counts[cf] >= 5 and counts[cf] == max(counts.values()):
+            if sum(1 for n in counts.values() if n == counts[cf]) == 1:
+                return display_for[cf]
+    if not counts:
+        return ""
+    best_cf = max(counts.items(), key=lambda kv: (kv[1], -len(kv[0])))[0]
+    return display_for[best_cf]
+
+
 def performance_metrics_answers(metrics: PerformanceMetrics) -> dict[str, str]:
     answers: dict[str, str] = {
         "_SCAN_DATE": metrics.scan_date or "—",
@@ -1547,7 +1654,10 @@ def _apply_performance_report_meta(
         except OSError:
             wd = str(Path(master_path).parent)
     metrics.scan_date = _scan_date_for_report(master_path)
-    metrics.model_checks_mch = _model_checks_mch_from_condition_mcc()
+    metrics.model_checks_mch = (
+        _model_checks_mch_from_working_dir(wd)
+        or _model_checks_mch_from_condition_mcc()
+    )
     metrics.working_directory = wd
     metrics.scan_duration = _scan_duration_from_modelcheck_xml(wd)
 

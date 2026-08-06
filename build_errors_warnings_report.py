@@ -929,23 +929,6 @@ def get_check_descriptions(model_checks_file: str) -> dict:
     return descriptions
 
 
-def get_info_check_names(model_checks_file: str) -> frozenset[str]:
-    """ModelCheckName values marked ``<info_check>Y</info_check>`` in model_checks.xml."""
-    tree = ET.parse(model_checks_file)
-    names: set[str] = set()
-    for check in tree.getroot().findall("Check"):
-        hide_from_report = check.find("hideFromReport")
-        if hide_from_report is not None and (hide_from_report.text or "").strip() == "Y":
-            continue
-        info_el = check.find("info_check")
-        if info_el is None or (info_el.text or "").strip().upper() != "Y":
-            continue
-        mcn = check.find("ModelCheckName")
-        if mcn is not None and (mcn.text or "").strip():
-            names.add(mcn.text.strip())
-    return frozenset(names)
-
-
 def _section_stat_type_from_dict_key(check_key: str) -> str:
     if check_key.startswith("INFO:"):
         return "INFO"
@@ -1451,7 +1434,6 @@ def create_html_report(
 
     check_sections: list = []
     check_dict: dict = defaultdict(list)
-    info_check_names = get_info_check_names(model_checks_path)
     more_info_index = build_more_info_name_index(working_dir)
     ensure_shared_placeholder_jpeg(report_assets_dir)
     thumbnail_cache: dict[str, str] = {}
@@ -1469,7 +1451,7 @@ def create_html_report(
 
             stat = check["stat"]
             is_issue = stat in ("ERROR", "WARNING")
-            is_info = stat == "INFO" and check_name in info_check_names
+            is_info = stat == "INFO"
             if is_info and not _info_ans_is_reportable(
                 check.get("ans", ""), ans_empty=check.get("ans_empty", False)
             ):

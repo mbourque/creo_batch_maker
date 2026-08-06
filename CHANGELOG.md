@@ -2,6 +2,30 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-06 — v1.12.154
+
+- **Checks catalog**: removed unused ``ModelCheckOptions`` tags from ``model_checks.xml``.
+
+## 2026-08-06 — v1.12.153
+
+- **Checks catalog**: removed unused ``display`` and ``enabled`` tags from ``model_checks.xml``.
+
+## 2026-08-06 — v1.12.152
+
+- **Report → Show information**: uses ModelCHECK ``<stat>INFO</stat>`` only (``info_check`` removed from ``model_checks.xml``).
+
+## 2026-08-06 — v1.12.151
+
+- **Scan Information → Model checks**: reads the ``.mch`` from ``<config>`` in working-folder ``*.p.xml`` / ``*.a.xml`` / ``*.d.xml`` (that was the line ModelCHECK actually stores).
+
+## 2026-08-06 — v1.12.150
+
+- **Scan Information → Model checks**: reads ``hdrconfig`` from the newest ModelCHECK XMLs in the working folder (not the smallest), so an older leftover scan is less likely to hide the checks file you just used.
+
+## 2026-08-05 — v1.12.149
+
+- **Scan Information → Model checks**: shows the ``.mch`` from ModelCHECK XML ``hdrconfig`` in the working folder (not the current ``condition.mcc``), so rebuild-only reports match the scan.
+
 ## 2026-08-05 — v1.12.148
 
 - **Report**: each check heading also shows the total findings when ModelCHECK answers are numeric (for example `268 Models with … (98117 Total)`).
