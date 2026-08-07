@@ -2,6 +2,38 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-07 — v1.12.165
+
+- **Scan Information**: reordered **Advanced Assembly Usage** (skeleton parts, copy/publish geometry, mechanism components, simplified representations).
+
+## 2026-08-07 — v1.12.164
+
+- **Scan Information**: copy-geometry row label is **Number of copy/publish geometry features**.
+
+## 2026-08-07 — v1.12.163
+
+- **Scan Information**: skeleton-usage row label is **Number of models using skeleton parts**.
+
+## 2026-08-07 — v1.12.162
+
+- **Scan Information**: **Number of models using skeleton** counts ``ASM_BOM`` items whose name contains ``_SKEL``.
+
+## 2026-08-07 — v1.12.161
+
+- **Scan Information**: copy-geometry row label is **Number of copy geometry features**.
+
+## 2026-08-07 — v1.12.160
+
+- **Scan Information**: **Number of copy geom features** sums ``GEOM_COPY`` counts from ``FEATURE_INFO`` across scanned models.
+
+## 2026-08-07 — v1.12.159
+
+- **Scan Information**: **Total number of packaged components** sums packaged-component counts across assemblies (was **Models using packaged components**, a model count).
+
+## 2026-08-07 — v1.12.158
+
+- **Scan Information**: **Number of flexible components** counts unique part names (the same flexible part in several assemblies counts once).
+
 ## 2026-08-06 — v1.12.157
 
 - **Scan Information**: renamed **Models failed** to **Models failed to scan**.

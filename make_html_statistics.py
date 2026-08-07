@@ -746,7 +746,7 @@ PERFORMANCE_TABLE_SECTIONS: list[tuple[str, list[tuple[str, str | None]]]] = [
         "Assembly State / Placement Health",
         [
             ("Total number of suppressed components", "_SUPPRESSED_COMPONENTS"),
-            ("Models using packaged components", "_PACKAGED_COMPONENTS"),
+            ("Total number of packaged components", "_PACKAGED_COMPONENTS"),
             ("Total number of fixed components", "_FIXED_COMPONENTS"),
             ("Number of flexible components", "_FLEXIBLE_COMPONENTS"),
         ],
@@ -754,8 +754,10 @@ PERFORMANCE_TABLE_SECTIONS: list[tuple[str, list[tuple[str, str | None]]]] = [
     (
         "Advanced Assembly Usage",
         [
-            ("Number of simplified representations", "_SIMPREP_REPRESENTATIONS"),
+            ("Number of models using skeleton parts", "_MODELS_USING_SKELETON"),
+            ("Number of copy/publish geometry features", "_COPY_GEOM_FEATURES"),
             ("Number of mechanism components", "_MECH_COMPONENTS"),
+            ("Number of simplified representations", "_SIMPREP_REPRESENTATIONS"),
             ("Inseparable assemblies", "_INSEPARABLE_ASSEMBLIES"),
         ],
     ),
@@ -788,6 +790,8 @@ class PerformanceMetrics:
     flexible_components: int = 0
     simprep_unique_count: int = 0
     inseparable_assemblies: int = 0
+    copy_geom_features: int = 0
+    models_using_skeleton: int = 0
     sheetmetal_parts: int = 0
     multibody_parts: int = 0
     freeform_parts: int = 0
@@ -930,6 +934,47 @@ def _simprep_names_from(file_element: ET.Element) -> list[str]:
     ]
 
 
+def _flex_component_names_from(file_element: ET.Element) -> list[str]:
+    """Model names from ``FLEX_COMPONENTS`` item ``info1`` (e.g. ``T178948.PRT``)."""
+    check = _find_check(file_element, "FLEX_COMPONENTS")
+    if check is None:
+        return []
+    return [
+        (item.findtext("info1") or "").strip()
+        for item in check.findall("item")
+        if (item.findtext("info1") or "").strip()
+    ]
+
+
+def _geom_copy_feature_count(file_element: ET.Element) -> int:
+    """Sum of ``GEOM_COPY`` counts from ``FEATURE_INFO`` item ``info2`` values."""
+    check = _find_check(file_element, "FEATURE_INFO")
+    if check is None:
+        return 0
+    total = 0
+    for item in check.findall("item"):
+        kind = (item.findtext("info1") or "").strip()
+        if kind.casefold() != "geom_copy":
+            continue
+        n = _parse_int_metric(item.findtext("info2"))
+        if n is not None and n > 0:
+            total += n
+    return total
+
+
+def _asm_bom_skeleton_item_count(file_element: ET.Element) -> int:
+    """How many ``ASM_BOM`` items have ``_SKEL`` in ``info1`` (e.g. ``18321_SKEL.PRT``)."""
+    check = _find_check(file_element, "ASM_BOM")
+    if check is None:
+        return 0
+    total = 0
+    for item in check.findall("item"):
+        name = (item.findtext("info1") or "").strip()
+        if name and _is_skeleton_name(name):
+            total += 1
+    return total
+
+
 def _is_multibody_part(file_element: ET.Element) -> bool:
     """True when MULTIBODY_MODEL / BODY_INFO shows more than one body (includes INFO)."""
     mb = _find_check(file_element, "MULTIBODY_MODEL")
@@ -1056,6 +1101,7 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
     metrics = PerformanceMetrics()
     unique_models: set[str] = set()
     simprep_names: set[str] = set()
+    flex_component_names: set[str] = set()
     inseparable_keys: set[str] = set()
     skeleton_keys: set[str] = set()
     bulk_part_keys: set[str] = set()
@@ -1098,6 +1144,9 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
         for simp_name in _simprep_names_from(file_element):
             simprep_names.add(simp_name.casefold())
 
+        metrics.copy_geom_features += _geom_copy_feature_count(file_element)
+        metrics.models_using_skeleton += _asm_bom_skeleton_item_count(file_element)
+
         skel_instances = _family_skel_instance_names(file_element)
         for skel_name in skel_instances:
             skeleton_keys.add(_skeleton_identity_key(skel_name))
@@ -1127,11 +1176,12 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
             metrics.mech_components += (
                 _parse_int_metric(_check_ans_text(file_element, "MECH_COMPONENTS")) or 0
             )
-            metrics.flexible_components += (
-                _parse_int_metric(_check_ans_text(file_element, "FLEX_COMPONENTS")) or 0
-            )
+            for flex_name in _flex_component_names_from(file_element):
+                flex_component_names.add(flex_name.casefold())
             for row_key, check_name in PERFORMANCE_REPORT_ISSUE_ROW_CHECKS.items():
-                metrics.report_issue_counts[row_key] += _counts_as_report_issue(file_element, check_name)
+                metrics.report_issue_counts[row_key] += (
+                    _parse_int_metric(_check_ans_text(file_element, check_name)) or 0
+                )
             asm_children = _unq_asm_children(file_element)
             asm_subassemblies[_assembly_name_key(model, path)] = [
                 child.casefold() for child in asm_children
@@ -1142,6 +1192,7 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
     metrics.unique_model_count = len(unique_models)
     metrics.max_assembly_depth = _batch_max_assembly_depth(asm_subassemblies)
     metrics.simprep_unique_count = len(simprep_names)
+    metrics.flexible_components = len(flex_component_names)
     metrics.inseparable_assemblies = len(inseparable_keys)
     metrics.skeleton_models = len(skeleton_keys)
     metrics.bulk_parts = len(bulk_part_keys)
@@ -1464,6 +1515,8 @@ def performance_metrics_answers(metrics: PerformanceMetrics) -> dict[str, str]:
         "_FAMILY_INSTANCE_COUNT": str(metrics.family_instance_count),
         "_SIMPREP_REPRESENTATIONS": str(metrics.simprep_unique_count),
         "_INSEPARABLE_ASSEMBLIES": str(metrics.inseparable_assemblies),
+        "_COPY_GEOM_FEATURES": str(metrics.copy_geom_features),
+        "_MODELS_USING_SKELETON": str(metrics.models_using_skeleton),
         "_SHEETMETAL_PARTS": str(metrics.sheetmetal_parts),
         "_MULTIBODY_PARTS": str(metrics.multibody_parts),
         "_FREEFORM_PARTS": str(metrics.freeform_parts),
@@ -1535,6 +1588,12 @@ def _resolve_performance_value(answers: dict[str, str], key: str | None) -> tupl
     if key == "_INSEPARABLE_ASSEMBLIES":
         val = answers.get(key)
         return (val if val is not None else "—", None)
+    if key == "_COPY_GEOM_FEATURES":
+        val = answers.get(key)
+        return (val if val is not None else "—", "FEATURE_INFO")
+    if key == "_MODELS_USING_SKELETON":
+        val = answers.get(key)
+        return (val if val is not None else "—", "ASM_BOM")
     if key == "_FLEXIBLE_COMPONENTS":
         val = answers.get(key)
         return (val if val is not None else "—", "FLEX_COMPONENTS")
