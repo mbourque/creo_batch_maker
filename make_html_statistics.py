@@ -756,9 +756,12 @@ PERFORMANCE_TABLE_SECTIONS: list[tuple[str, list[tuple[str, str | None]]]] = [
         [
             ("Number of models using skeleton parts", "_MODELS_USING_SKELETON"),
             ("Number of copy/publish geometry features", "_COPY_GEOM_FEATURES"),
+            ("Number of merge/inheritance features", "_MERGE_FEATURES"),
             ("Number of mechanism components", "_MECH_COMPONENTS"),
             ("Number of simplified representations", "_SIMPREP_REPRESENTATIONS"),
             ("Inseparable assemblies", "_INSEPARABLE_ASSEMBLIES"),
+            ("Intelligent fastener parts", "_INTELLIGENT_FASTENER_PARTS"),
+            ("Advanced framework assemblies", "_ADVANCED_FRAMEWORK_ASSEMBLIES"),
         ],
     ),
     (
@@ -791,7 +794,10 @@ class PerformanceMetrics:
     simprep_unique_count: int = 0
     inseparable_assemblies: int = 0
     copy_geom_features: int = 0
+    merge_features: int = 0
     models_using_skeleton: int = 0
+    intelligent_fastener_parts: int = 0
+    advanced_framework_assemblies: int = 0
     sheetmetal_parts: int = 0
     multibody_parts: int = 0
     freeform_parts: int = 0
@@ -948,13 +954,26 @@ def _flex_component_names_from(file_element: ET.Element) -> list[str]:
 
 def _geom_copy_feature_count(file_element: ET.Element) -> int:
     """Sum of ``GEOM_COPY`` counts from ``FEATURE_INFO`` item ``info2`` values."""
+    return _feature_info_type_count(file_element, "GEOM_COPY")
+
+
+def _merge_feature_count(file_element: ET.Element) -> int:
+    """Sum of ``MERGE`` counts from ``FEATURE_INFO`` item ``info2`` values."""
+    return _feature_info_type_count(file_element, "MERGE")
+
+
+def _feature_info_type_count(file_element: ET.Element, feature_type: str) -> int:
+    """Sum ``info2`` for ``FEATURE_INFO`` items whose ``info1`` matches ``feature_type``."""
     check = _find_check(file_element, "FEATURE_INFO")
     if check is None:
+        return 0
+    want = (feature_type or "").strip().casefold()
+    if not want:
         return 0
     total = 0
     for item in check.findall("item"):
         kind = (item.findtext("info1") or "").strip()
-        if kind.casefold() != "geom_copy":
+        if kind.casefold() != want:
             continue
         n = _parse_int_metric(item.findtext("info2"))
         if n is not None and n > 0:
@@ -973,6 +992,43 @@ def _asm_bom_skeleton_item_count(file_element: ET.Element) -> int:
         if name and _is_skeleton_name(name):
             total += 1
     return total
+
+
+def _param_info_has_name(file_element: ET.Element, param_name: str) -> bool:
+    """True when ``PARAM_INFO`` lists a parameter whose ``info1`` matches ``param_name``."""
+    check = _find_check(file_element, "PARAM_INFO")
+    if check is None:
+        return False
+    want = (param_name or "").strip().casefold()
+    if not want:
+        return False
+    for item in check.findall("item"):
+        name = (item.findtext("info1") or "").strip()
+        if name.casefold() == want:
+            return True
+    return False
+
+
+def _is_intelligent_fastener_part(file_element: ET.Element) -> bool:
+    """
+    Intelligent fasteners have exactly ``BUW_NAME``, ``BUW_TYPE``, and ``BUW_SIZE``
+    among ``PARAM_INFO`` names that contain ``BUW``.
+
+    Any extra ``BUW…`` parameter (framework parts) means it is not counted.
+    """
+    check = _find_check(file_element, "PARAM_INFO")
+    if check is None:
+        return False
+    required = {"buw_name", "buw_type", "buw_size"}
+    buw_names: set[str] = set()
+    for item in check.findall("item"):
+        name = (item.findtext("info1") or "").strip()
+        if not name:
+            continue
+        key = name.casefold()
+        if "buw" in key:
+            buw_names.add(key)
+    return buw_names == required
 
 
 def _is_multibody_part(file_element: ET.Element) -> bool:
@@ -1145,6 +1201,7 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
             simprep_names.add(simp_name.casefold())
 
         metrics.copy_geom_features += _geom_copy_feature_count(file_element)
+        metrics.merge_features += _merge_feature_count(file_element)
         metrics.models_using_skeleton += _asm_bom_skeleton_item_count(file_element)
 
         skel_instances = _family_skel_instance_names(file_element)
@@ -1168,10 +1225,14 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
                 metrics.freeform_parts += 1
             if _is_non_solid_part(file_element):
                 metrics.non_solid_parts += 1
+            if _is_intelligent_fastener_part(file_element):
+                metrics.intelligent_fastener_parts += 1
         elif pro_type == "ASM":
             metrics.assembly_count += 1
             if _is_non_solid_assembly(file_element):
                 metrics.non_solid_assemblies += 1
+            if _param_info_has_name(file_element, "PROJECT_SHORT"):
+                metrics.advanced_framework_assemblies += 1
             metrics.total_num_components += _parse_int_metric(_check_ans_text(file_element, "NUM_COMPONENTS")) or 0
             metrics.mech_components += (
                 _parse_int_metric(_check_ans_text(file_element, "MECH_COMPONENTS")) or 0
@@ -1516,7 +1577,10 @@ def performance_metrics_answers(metrics: PerformanceMetrics) -> dict[str, str]:
         "_SIMPREP_REPRESENTATIONS": str(metrics.simprep_unique_count),
         "_INSEPARABLE_ASSEMBLIES": str(metrics.inseparable_assemblies),
         "_COPY_GEOM_FEATURES": str(metrics.copy_geom_features),
+        "_MERGE_FEATURES": str(metrics.merge_features),
         "_MODELS_USING_SKELETON": str(metrics.models_using_skeleton),
+        "_INTELLIGENT_FASTENER_PARTS": str(metrics.intelligent_fastener_parts),
+        "_ADVANCED_FRAMEWORK_ASSEMBLIES": str(metrics.advanced_framework_assemblies),
         "_SHEETMETAL_PARTS": str(metrics.sheetmetal_parts),
         "_MULTIBODY_PARTS": str(metrics.multibody_parts),
         "_FREEFORM_PARTS": str(metrics.freeform_parts),
@@ -1591,9 +1655,18 @@ def _resolve_performance_value(answers: dict[str, str], key: str | None) -> tupl
     if key == "_COPY_GEOM_FEATURES":
         val = answers.get(key)
         return (val if val is not None else "—", "FEATURE_INFO")
+    if key == "_MERGE_FEATURES":
+        val = answers.get(key)
+        return (val if val is not None else "—", "FEATURE_INFO")
     if key == "_MODELS_USING_SKELETON":
         val = answers.get(key)
         return (val if val is not None else "—", "ASM_BOM")
+    if key == "_INTELLIGENT_FASTENER_PARTS":
+        val = answers.get(key)
+        return (val if val is not None else "—", "PARAM_INFO")
+    if key == "_ADVANCED_FRAMEWORK_ASSEMBLIES":
+        val = answers.get(key)
+        return (val if val is not None else "—", "PARAM_INFO")
     if key == "_FLEXIBLE_COMPONENTS":
         val = answers.get(key)
         return (val if val is not None else "—", "FLEX_COMPONENTS")

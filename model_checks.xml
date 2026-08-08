@@ -281,7 +281,7 @@ Layers can only organize view items such as datums, surface quilts, and componen
         </why>
     </Check>
     <Check>
-        <Name>Family Table Information</Name>
+        <Name>Family Table not Verified</Name>
         <Category>Model Complexity</Category>
         <Description>Checks and reports information related to family tables used within the model. Family tables are commonly used to create configurable variations of parts or assemblies from a single generic model by controlling dimensions, parameters, features, materials, and other design options. Properly managed family tables improve standardization, reuse, automation, and design efficiency while reducing duplicate models and maintenance effort. Poorly structured or inconsistent family tables can create configuration errors, incorrect BOM data, regeneration problems, and downstream manufacturing or data management issues. This check helps ensure that family table information is properly defined and maintained according to company standards. Family table requirements and related standards are typically configured in the start.mcs file using PRT_FT_PARAMETER and related entries, while check behavior and reporting are controlled by the FAMILY_INFO settings in the check.mch configuration file.</Description>
         <ModelCheckName>FAMILY_INFO</ModelCheckName>

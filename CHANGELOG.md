@@ -2,6 +2,30 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-08 — v1.12.171
+
+- **Thumbnails**: batch ``.dxc`` files use ``config\config.pro`` again (reverted ``config.sup``).
+
+## 2026-08-08 — v1.12.170
+
+- **Thumbnails**: batch ``.dxc`` files use ``config\config.sup`` instead of ``config.pro``.
+
+## 2026-08-07 — v1.12.169
+
+- **Scan Information**: **Intelligent fastener parts** requires exactly ``BUW_NAME``, ``BUW_TYPE``, and ``BUW_SIZE`` (any other ``BUW…`` parameter excludes the part).
+
+## 2026-08-07 — v1.12.168
+
+- **Scan Information**: **Intelligent fastener parts** only counts parts that have all three ``PARAM_INFO`` parameters ``BUW_NAME``, ``BUW_TYPE``, and ``BUW_SIZE``.
+
+## 2026-08-07 — v1.12.167
+
+- **Scan Information**: **Intelligent fastener parts** (parts with ``BUW_TYPE``) and **Advanced framework assemblies** (assemblies with ``PROJECT_SHORT``) from ``PARAM_INFO``.
+
+## 2026-08-07 — v1.12.166
+
+- **Scan Information**: **Number of merge/inheritance features** sums ``MERGE`` counts from ``FEATURE_INFO`` (under copy/publish geometry).
+
 ## 2026-08-07 — v1.12.165
 
 - **Scan Information**: reordered **Advanced Assembly Usage** (skeleton parts, copy/publish geometry, mechanism components, simplified representations).
