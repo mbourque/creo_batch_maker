@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-09 — v1.12.185
+
+- **Nested Family Table**: count includes the root generic plus each nested generic (depth shown on nested rows).
+
 ## 2026-08-09 — v1.12.184
 
 - **Nested Family Table**: custom check stub uses ``FEATURE_INFO`` / ``CND_FEATURE_INFO GTE 0`` so ModelCHECK can emit the CUSTOM check.
