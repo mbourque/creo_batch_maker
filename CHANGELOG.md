@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-09 — v1.12.187
+
+- **Report**: Score, Scan Information, and Model Gallery stay in the sidebar when Filter view is not Show all.
+
 ## 2026-08-09 — v1.12.186
 
 - **Nested Family Table**: count is unique nested generics only (does not include the top-level generic).
