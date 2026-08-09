@@ -27,7 +27,7 @@ Matching is fixed in this script (not in custom_checks.txt):
 - Nested family tables appear as pipe-separated instance paths in ``info1``,
   for example ``INST2|INST2_CHILD`` or ``INST2||INST2_CHILD|LEAF``
 - Non-empty segments before the leaf are nested generics
-- Found → ``ans`` = root generic + unique nested generics, severity from ``*.mch``;
+- Found → ``ans`` = unique nested generic count and severity from ``*.mch``;
   not found → PASS / ``ans=0``
 - If ModelCHECK omitted the CUSTOM placeholder, this script inserts one before
   ``</mc_checks>``.
@@ -252,25 +252,6 @@ def find_check_span(raw_xml: str, check_name: str) -> tuple[int, int, int, int] 
     return None
 
 
-MODEL_TAG_RE = re.compile(
-    r"<model\b[^>]*>\s*([^<]+?)\s*</model\s*>",
-    re.IGNORECASE,
-)
-
-
-def model_stem_from_xml(raw_xml: str) -> str:
-    """Generic model name without ``.prt`` / ``.asm`` / ``.drw`` (from ``<model>``)."""
-    m = MODEL_TAG_RE.search(raw_xml)
-    if m is None:
-        return ""
-    name = m.group(1).strip()
-    lower = name.casefold()
-    for suf in (".prt", ".asm", ".drw"):
-        if lower.endswith(suf):
-            return name[: -len(suf)]
-    return name
-
-
 def nested_generics_from_instance_labels(instance_names: list[str]) -> list[tuple[str, int]]:
     """
     Nested family-table generics from FAMILY_INFO instance ``info1`` paths.
@@ -474,14 +455,11 @@ def process_xml_file(
             else:
                 sev = severity_from_mch(mch_path, job.mch_name)
                 stat = "PASS" if sev == "PASS" else sev
-                root = model_stem_from_xml(out) or "GENERIC"
-                # Root + each nested generic (e.g. root, INST2, INST2_INST3 → 3).
-                ans = str(len(nested) + 1)
-                items = [(root, "Root family table")]
-                items.extend(
+                ans = str(len(nested))
+                items = [
                     (name, f"Nested family table (depth {depth})")
                     for name, depth in nested
-                )
+                ]
 
             new_out = update_check_block(out, job.xml_name, stat, ans, items)
             if new_out == out:

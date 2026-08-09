@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-09 — v1.12.186
+
+- **Nested Family Table**: count is unique nested generics only (does not include the top-level generic).
+
 ## 2026-08-09 — v1.12.185
 
 - **Nested Family Table**: count includes the root generic plus each nested generic (depth shown on nested rows).
