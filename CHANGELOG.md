@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-09 — v1.12.188
+
+- **Report**: when every warning and error check is removed, Score is removed from the sidebar and page (Scan Information / Model Gallery stay).
+
 ## 2026-08-09 — v1.12.187
 
 - **Report**: Score, Scan Information, and Model Gallery stay in the sidebar when Filter view is not Show all.

@@ -1299,12 +1299,70 @@
         function mqBrowseHome() {
             if (mqPendingSectionId) { return; }
             if (!mqInitFinished && mqActiveSectionId && mqGetSection(mqActiveSectionId)) { return; }
+            if (!document.querySelector('.sidebar-top-nav[data-mq-panel="score"]')) {
+                if (document.querySelector('.sidebar-top-nav[data-mq-panel="statistics"]')) {
+                    mqShowSummaryPanel('statistics', { scroll: false });
+                    return;
+                }
+                if (document.querySelector('.sidebar-top-nav[data-mq-panel="gallery"]')) {
+                    mqShowSummaryPanel('gallery', { scroll: false });
+                    return;
+                }
+                mqClearSummaryPanel();
+                return;
+            }
             mqShowSummaryPanel('score', { scroll: false });
+        }
+
+        function mqHasScoredChecksLeft() {
+            var navs = document.querySelectorAll('.sidebar-check-nav');
+            for (var i = 0; i < navs.length; i++) {
+                var st = (navs[i].getAttribute('data-mq-sidebar-stat') || '').toUpperCase();
+                if (st === 'WARNING' || st === 'ERROR') { return true; }
+            }
+            return false;
+        }
+
+        function mqRemoveScoreFromDom() {
+            var onScore = document.body.getAttribute('data-mq-summary-panel') === 'score';
+            var scoreNav = document.querySelector('.sidebar-top-nav[data-mq-panel="score"]');
+            if (scoreNav && scoreNav.parentNode) { scoreNav.parentNode.removeChild(scoreNav); }
+            var scorePanel = document.querySelector('.mq-summary-panel[data-mq-panel="score"]');
+            if (scorePanel && scorePanel.parentNode) { scorePanel.parentNode.removeChild(scorePanel); }
+            var summaryAnchor = document.getElementById('summary');
+            if (summaryAnchor && summaryAnchor.parentNode && summaryAnchor.tagName === 'A') {
+                summaryAnchor.parentNode.removeChild(summaryAnchor);
+            }
+            if (onScore || (!document.body.getAttribute('data-mq-summary-panel')
+                    && !document.body.getAttribute('data-mq-active-section'))) {
+                if (document.querySelector('.sidebar-top-nav[data-mq-panel="statistics"]')) {
+                    mqShowSummaryPanel('statistics', { scroll: false });
+                } else if (document.querySelector('.sidebar-top-nav[data-mq-panel="gallery"]')) {
+                    mqShowSummaryPanel('gallery', { scroll: false });
+                } else {
+                    mqClearSummaryPanel();
+                }
+            }
+        }
+
+        function mqSyncScoreAvailability() {
+            if (mqHasScoredChecksLeft()) { return; }
+            mqRemoveScoreFromDom();
         }
 
         function mqShowSummaryPanel(panel, opts) {
             opts = opts || {};
             panel = panel || 'score';
+            if (panel === 'score' && !document.querySelector('.mq-summary-panel[data-mq-panel="score"]')) {
+                if (document.querySelector('.sidebar-top-nav[data-mq-panel="statistics"]')) {
+                    panel = 'statistics';
+                } else if (document.querySelector('.sidebar-top-nav[data-mq-panel="gallery"]')) {
+                    panel = 'gallery';
+                } else {
+                    mqClearSummaryPanel();
+                    return;
+                }
+            }
             mqParkAllSections();
             mqActiveSectionId = '';
             document.body.removeAttribute('data-mq-active-section');
@@ -1855,7 +1913,7 @@
             }
             var hasSummary = !!document.body.getAttribute('data-mq-summary-panel');
             // After Remove this / Remove all like this, the open check may already be
-            // gone from the registry — recover the next check (or Score), same as filters.
+            // gone from the registry — recover the next check (or home), same as filters.
             if (!hasOpenCheck && !hasSummary) {
                 mqPendingSectionId = '';
             }
@@ -1864,6 +1922,7 @@
             } else if (!hasOpenCheck && !hasSummary) {
                 mqEnsureFilteredSection(mode, false);
             }
+            mqSyncScoreAvailability();
         }
 
         function toggleFlag(id) {
