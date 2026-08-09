@@ -2,6 +2,14 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-09 — v1.12.194
+
+- **Docs**: How to use this report links to the Checks reference (``checks.html``) in a window named ``checks``.
+
+## 2026-08-09 — v1.12.193
+
+- **Docs**: ``checks.html`` lists each check’s Description and How from ``model_checks.xml`` (A–Z, with search); Create Report copies it next to ``index.html``.
+
 ## 2026-08-09 — v1.12.192
 
 - **Report / Save**: Save no longer writes live-session listener flags into ``index.html``, so Score, Scan Information, Model Gallery, and checks work again after reload.

@@ -1573,6 +1573,12 @@ def create_html_report(
             shutil.copy2(how_to_src, os.path.join(out_dir, "report_how_to.html"))
         except OSError:
             pass
+    checks_src = os.path.join(bundle_dir, "checks.html")
+    if out_dir and os.path.isfile(checks_src):
+        try:
+            shutil.copy2(checks_src, os.path.join(out_dir, "checks.html"))
+        except OSError:
+            pass
     _remove_legacy_hash_placeholders(report_assets_dir)
     wd_norm = os.path.normcase(os.path.normpath(working_dir))
     if os.path.normcase(os.path.normpath(report_assets_dir)) != wd_norm:

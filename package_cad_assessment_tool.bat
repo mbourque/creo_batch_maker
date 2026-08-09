@@ -41,6 +41,7 @@ call :require model_checks.xml || exit /b 1
 call :require score_weights.txt || exit /b 1
 call :require report_template.html.j2 || exit /b 1
 call :require report_how_to.html || exit /b 1
+call :require checks.html || exit /b 1
 call :require version || exit /b 1
 call :require CHANGELOG.md || exit /b 1
 call :require README.md || exit /b 1
@@ -78,7 +79,7 @@ if exist "%ZIP%" (
 )
 
 echo Creating %ZIP%...
-tar -a -cf "%ZIP%" main.exe kill.bat purge_cache.ps1 model_checks.xml score_weights.txt report_template.html.j2 report_how_to.html version CHANGELOG.md README.md sync_modelcheck_checks.py!CHK_LIST! config
+tar -a -cf "%ZIP%" main.exe kill.bat purge_cache.ps1 model_checks.xml score_weights.txt report_template.html.j2 report_how_to.html checks.html version CHANGELOG.md README.md sync_modelcheck_checks.py!CHK_LIST! config
 if errorlevel 1 (
     echo ERROR: Failed to create zip.
     exit /b 1
