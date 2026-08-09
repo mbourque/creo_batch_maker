@@ -5,14 +5,17 @@ Update custom ModelCHECK placeholder checks in report XML from RELATION_INFO.
 Reads ``config/custom_checks.txt`` for the ``DEF_RELATION_MP_MASS`` section::
 
     DEF_RELATION_MP_MASS RELATION_INFO
-    CND_RELATION_MP_MASS GTE 0
+    CND_RELATION_INFO GTE 0
     CHECK CHK_RELATION_MP_MASS_PRT
+    CHECK CHK_RELATION_MP_MASS_ASM
     MSG_RELATION_MP_MASS Legacy relation setting for mp_mass("")
 
-``CHECK`` is the ``*.mch`` row name (4th column W/E). The report XML check is
-without the ``_PRT`` suffix (``CHK_RELATION_MP_MASS``).
+Each ``CHECK`` is the ``*.mch`` row name (4th column W/E). The report XML check
+is without the type suffix (``CHK_RELATION_MP_MASS``).
 
-Only part reports are updated (``_PRT`` → ``*.p.xml``).
+- ``_PRT`` → ``*.p.xml``
+- ``_ASM`` → ``*.a.xml``
+- ``_DRW`` → ``*.d.xml`` (supported if added later)
 
 Matching is fixed in this script (not in custom_checks.txt):
 
@@ -39,7 +42,12 @@ ROOT = Path(__file__).resolve().parent
 THIS_DEF = "RELATION_MP_MASS"
 SOURCE_CHECK = "RELATION_INFO"
 SEARCH_TOKEN = "mp_mass"
-FILE_SUFFIX = ".p.xml"
+
+_PRO_SUFFIX_TO_XML = {
+    "_ASM": ".a.xml",
+    "_PRT": ".p.xml",
+    "_DRW": ".d.xml",
+}
 
 CHECK_OPEN_RE = re.compile(
     r"<check\b[^>]*\bname\s*=\s*(?P<q>['\"])(?P<name>[^'\"]+)(?P=q)[^>]*>",
@@ -61,11 +69,11 @@ TITLE_BLOCK_RE = re.compile(
 
 @dataclass(frozen=True)
 class CustomJob:
-    """CHECK line is CHK_…_PRT (MCH row); XML check is without the type suffix."""
+    """CHECK line is CHK_…_PRT/_ASM/_DRW (MCH row); XML check is without the type suffix."""
 
     mch_name: str
     xml_name: str
-    file_suffix: str  # .p.xml
+    file_suffix: str  # .p.xml / .a.xml / .d.xml
     source_check: str
 
 
@@ -74,15 +82,16 @@ def split_check_names(check_token: str) -> tuple[str, str, str]:
     CHECK token → (mch_name, xml_name, file_suffix).
 
     ``CHK_RELATION_MP_MASS_PRT`` → mch that name, XML ``CHK_RELATION_MP_MASS``,
-    files ``*.p.xml`` only.
+    files ``*.p.xml``. ``_ASM`` → ``*.a.xml``, ``_DRW`` → ``*.d.xml``.
     """
     mch_name = check_token.strip()
     upper = mch_name.upper()
-    if not upper.endswith("_PRT"):
-        raise ValueError(
-            f"CHECK name must end with _PRT for this script (got {check_token!r})"
-        )
-    return mch_name, mch_name[:-4], FILE_SUFFIX
+    for suf, file_suffix in _PRO_SUFFIX_TO_XML.items():
+        if upper.endswith(suf):
+            return mch_name, mch_name[: -len(suf)], file_suffix
+    raise ValueError(
+        f"CHECK name must end with _ASM, _PRT, or _DRW (got {check_token!r})"
+    )
 
 
 def app_settings_path() -> Path:
@@ -110,12 +119,13 @@ def load_working_directory(path: Path) -> Path:
 
 
 def load_custom_jobs(path: Path) -> list[CustomJob]:
-    """Load the CHECK name from the ``DEF_RELATION_MP_MASS`` section."""
+    """Load all CHECK names from the ``DEF_RELATION_MP_MASS`` section."""
     if not path.is_file():
         raise FileNotFoundError(f"custom checks file not found: {path}")
 
     in_section = False
-    check_token: str | None = None
+    check_tokens: list[str] = []
+    seen: set[str] = set()
     want_def = THIS_DEF.casefold()
 
     for raw in path.read_text(encoding="utf-8-sig").splitlines():
@@ -136,23 +146,32 @@ def load_custom_jobs(path: Path) -> list[CustomJob]:
             continue
 
         if head_u == "CHECK" and len(parts) >= 2:
-            check_token = parts[1].strip()
-            continue
+            token = parts[1].strip()
+            if not token:
+                continue
+            key = token.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            check_tokens.append(token)
 
-    if not check_token:
+    if not check_tokens:
         raise ValueError(
             f"No CHECK line in DEF_{THIS_DEF} section of {path}"
         )
 
-    mch_name, xml_name, file_suffix = split_check_names(check_token)
-    return [
-        CustomJob(
-            mch_name=mch_name,
-            xml_name=xml_name,
-            file_suffix=file_suffix,
-            source_check=SOURCE_CHECK,
+    jobs: list[CustomJob] = []
+    for check_token in check_tokens:
+        mch_name, xml_name, file_suffix = split_check_names(check_token)
+        jobs.append(
+            CustomJob(
+                mch_name=mch_name,
+                xml_name=xml_name,
+                file_suffix=file_suffix,
+                source_check=SOURCE_CHECK,
+            )
         )
-    ]
+    return jobs
 
 
 def resolve_mch_path(condition_path: Path) -> Path:
@@ -302,7 +321,7 @@ def iter_report_xml_files(
     report_dir: Path, suffixes: set[str] | None = None
 ) -> list[Path]:
     """List ModelCHECK report XML in report_dir (not recursive)."""
-    allowed = suffixes or {FILE_SUFFIX}
+    allowed = suffixes or set(_PRO_SUFFIX_TO_XML.values())
     found: dict[str, Path] = {}
     try:
         entries = list(report_dir.iterdir())

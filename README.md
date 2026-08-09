@@ -104,7 +104,7 @@ Same ideas as ModelCHECK: **Waiting…**, **Failed (N)** (part + assembly + draw
 
 ### Create Report
 
-Click **Create Report**. Before building ``master.xml``, if ``config/custom_checks.txt`` has active ``DEF_`` / ``CHECK`` lines that also appear uncommented in the ``*.mch`` from ``condition.mcc``, the app runs matching ``chk_<name>.py`` scripts then ``sync_modelcheck_checks.py``; otherwise those steps are skipped. If a custom check script fails with exit code 2 (nothing applicable, for example no matching XML when regenerating an older report), Create Report continues quietly. Other custom-check failures still show a warning, then the report finishes as usual. A **Processing, please wait…** dialog stays open while the report builds. When finished, choose whether to open `index.html` in your browser.
+Click **Create Report**. Before building ``master.xml``, if ``config/custom_checks.txt`` has active ``DEF_`` / ``CHECK`` lines that also appear uncommented in the ``*.mch`` from ``condition.mcc``, the app runs matching ``chk_<name>.py`` scripts then ``sync_modelcheck_checks.py``; otherwise those steps are skipped. Legacy ``mp_mass`` relation checks cover parts and assemblies when both ``CHECK`` lines are present. If a custom check script fails with exit code 2 (nothing applicable, for example no matching XML when regenerating an older report), Create Report continues quietly. Other custom-check failures still show a warning, then the report finishes as usual. A **Processing, please wait…** dialog stays open while the report builds. When finished, choose whether to open `index.html` in your browser.
 
 If the report already exists, **Open Report** opens it without rebuilding.
 

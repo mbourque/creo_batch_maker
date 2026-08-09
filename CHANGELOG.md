@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-09 — v1.12.172
+
+- **Create Report**: legacy ``mp_mass`` relation check also runs on assemblies (``*.a.xml``), not only parts.
+
 ## 2026-08-08 — v1.12.171
 
 - **Thumbnails**: batch ``.dxc`` files use ``config\config.pro`` again (reverted ``config.sup``).
