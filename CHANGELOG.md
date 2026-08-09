@@ -2,6 +2,22 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-09 — v1.12.192
+
+- **Report / Save**: Save no longer writes live-session listener flags into ``index.html``, so Score, Scan Information, Model Gallery, and checks work again after reload.
+
+## 2026-08-09 — v1.12.191
+
+- **Report / Save**: Save keeps Score, checks, Scan Information, and Model Gallery working in the live report and in the saved ``index.html`` (template content is written into the file explicitly; the page is restored right after Save).
+
+## 2026-08-09 — v1.12.190
+
+- **Report / Save**: remaining check sections are frozen into their ``<template>`` stores on Save (same fix as Model Gallery / Scan Information), so reloaded reports keep check cards.
+
+## 2026-08-09 — v1.12.189
+
+- **Report / Save**: Model Gallery and Scan Information are kept in the saved ``index.html`` (lazy ``<template>`` content was previously dropped on save/reload).
+
 ## 2026-08-09 — v1.12.188
 
 - **Report**: when every warning and error check is removed, Score is removed from the sidebar and page (Scan Information / Model Gallery stay).
