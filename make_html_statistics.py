@@ -769,6 +769,7 @@ PERFORMANCE_TABLE_SECTIONS: list[tuple[str, list[tuple[str, str | None]]]] = [
         [
             ("Total number of family table generics used", "_FAMILY_GENERIC_PART_COUNT"),
             ("Total number of family table instances", "_FAMILY_INSTANCE_COUNT"),
+            ("Nested family tables", "_NESTED_FAMILY_TABLES"),
         ],
     ),
     ("Metadata", [("Last saved by", "_USERS")]),
@@ -783,6 +784,7 @@ PERFORMANCE_TABLE_SECTIONS: list[tuple[str, list[tuple[str, str | None]]]] = [
 class PerformanceMetrics:
     family_generic_part_count: int = 0
     family_instance_count: int = 0
+    nested_family_tables: int = 0
     total_num_components: int = 0
     unique_model_count: int = 0
     max_assembly_depth: int = 0
@@ -1185,6 +1187,9 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
             bulk_part_keys.add(bulk_name.casefold())
         metrics.fixed_components += _parse_int_metric(_check_ans_text(file_element, "FIXED_COMPONENTS")) or 0
         metrics.suppressed_components += _parse_int_metric(_check_ans_text(file_element, "SUP_COMPONENTS")) or 0
+        metrics.nested_family_tables += (
+            _parse_int_metric(_check_ans_text(file_element, "CHK_NESTED_FAMILY_TABLE")) or 0
+        )
 
         for unq_name in _unq_model_names_from(file_element):
             unique_models.add(unq_name.casefold())
@@ -1574,6 +1579,7 @@ def performance_metrics_answers(metrics: PerformanceMetrics) -> dict[str, str]:
         "_MAX_ASSEMBLY_DEPTH": str(metrics.max_assembly_depth),
         "_FAMILY_GENERIC_PART_COUNT": str(metrics.family_generic_part_count),
         "_FAMILY_INSTANCE_COUNT": str(metrics.family_instance_count),
+        "_NESTED_FAMILY_TABLES": str(metrics.nested_family_tables),
         "_SIMPREP_REPRESENTATIONS": str(metrics.simprep_unique_count),
         "_INSEPARABLE_ASSEMBLIES": str(metrics.inseparable_assemblies),
         "_COPY_GEOM_FEATURES": str(metrics.copy_geom_features),
@@ -1614,6 +1620,9 @@ def _resolve_performance_value(answers: dict[str, str], key: str | None) -> tupl
     if key == "_FAMILY_INSTANCE_COUNT":
         val = answers.get(key)
         return (val if val is not None else "—", "FAMILY_INFO")
+    if key == "_NESTED_FAMILY_TABLES":
+        val = answers.get(key)
+        return (val if val is not None else "—", "CHK_NESTED_FAMILY_TABLE")
     if key in (
         "_SCAN_DATE",
         "_MODEL_CHECKS",
@@ -1973,6 +1982,8 @@ HEALTH_CHECKS: list[tuple[str, str]] = [
 
     ("CHK_RELATION_MP_MASS", "Legacy Relation mp_mass()"),
 
+    ("CHK_NESTED_FAMILY_TABLE", "Nested Family Table"),
+
     ("EDGE_REFERENCES", "Edge References"),
 
     ("CIRCULAR_REFS", "Circular References"),
@@ -2231,7 +2242,9 @@ _MQ_STATS_CSS = """
 
   box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 16px; }
 
-.mq-section-note { font-size: 0.85rem; color: #475569; margin: 0 0 14px 0; line-height: 1.45; }
+.mq-section-note { font-size: 0.92rem; color: #334155; margin: 0 0 14px 0; line-height: 1.35; }
+
+.mq-skipped-section-note { margin: -6px 0 4px 0; font-size: 0.92rem; line-height: 1.35; color: #334155; }
 
 .mq-template-categories { margin: 0; }
 .mq-template-category { margin: 0 0 14px 0; }
@@ -2740,11 +2753,19 @@ def _skipped_models_section(skipped_models: list[str]) -> str:
         span_class="mq-skipped-names",
         item_html=_skipped_model_name_html,
     )
+    note = (
+        "Models that may fail to scan include bulk parts, harness and cabling models, "
+        "manufacturing models, models with missing dependencies or components, and very "
+        "large or resource-intensive assemblies. Also included are models that require "
+        "interactive input, are corrupt or unstable, or cause Creo to hang or crash."
+    )
     return f"""
 
   <div class="mq-section">
 
     <h2>Models failed to scan ({total})</h2>
+
+    <p class="mq-skipped-section-note">{_esc(note)}</p>
 
     <p class="mq-skipped-section-list">{list_html}</p>
 

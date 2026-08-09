@@ -2,6 +2,55 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-09 — v1.12.184
+
+- **Nested Family Table**: custom check stub uses ``FEATURE_INFO`` / ``CND_FEATURE_INFO GTE 0`` so ModelCHECK can emit the CUSTOM check.
+
+## 2026-08-09 — v1.12.183
+
+- **Nested Family Table**: custom check condition is ``CND_FILE_SIZE GTE 0`` (source check name), matching the working relation-check pattern.
+
+## 2026-08-09 — v1.12.182
+
+- **Nested Family Table**: ModelCHECK stub is driven from ``FILE_SIZE`` (numeric) so the CUSTOM check is emitted; Create Report still scores nested tables from ``FAMILY_INFO``.
+
+## 2026-08-09 — v1.12.181
+
+- **Create Report**: Nested Family Table is written into report XML even when ModelCHECK left no CUSTOM placeholder (for example when ``FAMILY_INFO`` is text like GENERIC).
+
+## 2026-08-09 — v1.12.180
+
+- **Scan Information**: **Nested family tables** uses the Nested Family Table check totals (same source as Biggest problems).
+
+## 2026-08-09 — v1.12.179
+
+- **Create Report**: nested family tables are detected from pipe-separated ``FAMILY_INFO`` instance paths and reported as **Nested Family Table** warnings (parts and assemblies).
+- **Scan Information**: **Nested family tables** count now recognizes Creo nested instance paths (for example ``INST2|INST2_CHILD``), not only separate scanned generics.
+
+## 2026-08-09 — v1.12.178
+
+- **Scan Information**: **Family Table Usage** includes **Nested family tables** (generics that are also instances of another family table).
+
+## 2026-08-09 — v1.12.177
+
+- **Scan Information**: section notes (including **Top level assembly information**) use the same body text size and color as **Models failed to scan**.
+
+## 2026-08-09 — v1.12.176
+
+- **Scan Information**: tighter spacing around the **Models failed to scan** note.
+
+## 2026-08-09 — v1.12.175
+
+- **Scan Information**: **Models failed to scan** note uses the same body text style as the model name list.
+
+## 2026-08-09 — v1.12.174
+
+- **Help**: **Models failed to scan** in the report how-to matches the Scan Information note on common failure reasons.
+
+## 2026-08-09 — v1.12.173
+
+- **Scan Information**: **Models failed to scan** includes a short note on common reasons models fail.
+
 ## 2026-08-09 — v1.12.172
 
 - **Create Report**: legacy ``mp_mass`` relation check also runs on assemblies (``*.a.xml``), not only parts.
