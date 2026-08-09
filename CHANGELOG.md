@@ -12,336 +12,500 @@ Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. 
 
 ## 2026-08-09 — v1.12.184
 
-- **Nested Family Table**: custom check stub uses ``FEATURE_INFO`` / ``CND_FEATURE_INFO GTE 0`` so ModelCHECK can emit the CUSTOM check.
+- **Nested Family Table**: custom check stub uses `FEATURE_INFO` / `CND_FEATURE_INFO GTE 0` so ModelCHECK can emit the CUSTOM check.
 
 ## 2026-08-09 — v1.12.183
 
-- **Nested Family Table**: custom check condition is ``CND_FILE_SIZE GTE 0`` (source check name), matching the working relation-check pattern.
+- **Nested Family Table**: custom check condition is `CND_FILE_SIZE GTE 0` (source check name), matching the working relation-check pattern.
+
+
 
 ## 2026-08-09 — v1.12.182
 
-- **Nested Family Table**: ModelCHECK stub is driven from ``FILE_SIZE`` (numeric) so the CUSTOM check is emitted; Create Report still scores nested tables from ``FAMILY_INFO``.
+- **Nested Family Table**: ModelCHECK stub is driven from `FILE_SIZE` (numeric) so the CUSTOM check is emitted; Create Report still scores nested tables from `FAMILY_INFO`.
+
+
 
 ## 2026-08-09 — v1.12.181
 
-- **Create Report**: Nested Family Table is written into report XML even when ModelCHECK left no CUSTOM placeholder (for example when ``FAMILY_INFO`` is text like GENERIC).
+- **Create Report**: Nested Family Table is written into report XML even when ModelCHECK left no CUSTOM placeholder (for example when `FAMILY_INFO` is text like GENERIC).
+
+
 
 ## 2026-08-09 — v1.12.180
 
 - **Scan Information**: **Nested family tables** uses the Nested Family Table check totals (same source as Biggest problems).
 
+
+
 ## 2026-08-09 — v1.12.179
 
-- **Create Report**: nested family tables are detected from pipe-separated ``FAMILY_INFO`` instance paths and reported as **Nested Family Table** warnings (parts and assemblies).
-- **Scan Information**: **Nested family tables** count now recognizes Creo nested instance paths (for example ``INST2|INST2_CHILD``), not only separate scanned generics.
+- **Create Report**: nested family tables are detected from pipe-separated `FAMILY_INFO` instance paths and reported as **Nested Family Table** warnings (parts and assemblies).
+- **Scan Information**: **Nested family tables** count now recognizes Creo nested instance paths (for example `INST2|INST2_CHILD`), not only separate scanned generics.
+
+
 
 ## 2026-08-09 — v1.12.178
 
 - **Scan Information**: **Family Table Usage** includes **Nested family tables** (generics that are also instances of another family table).
 
+
+
 ## 2026-08-09 — v1.12.177
 
 - **Scan Information**: section notes (including **Top level assembly information**) use the same body text size and color as **Models failed to scan**.
+
+
 
 ## 2026-08-09 — v1.12.176
 
 - **Scan Information**: tighter spacing around the **Models failed to scan** note.
 
+
+
 ## 2026-08-09 — v1.12.175
 
 - **Scan Information**: **Models failed to scan** note uses the same body text style as the model name list.
+
+
 
 ## 2026-08-09 — v1.12.174
 
 - **Help**: **Models failed to scan** in the report how-to matches the Scan Information note on common failure reasons.
 
+
+
 ## 2026-08-09 — v1.12.173
 
 - **Scan Information**: **Models failed to scan** includes a short note on common reasons models fail.
 
+
+
 ## 2026-08-09 — v1.12.172
 
-- **Create Report**: legacy ``mp_mass`` relation check also runs on assemblies (``*.a.xml``), not only parts.
+- **Create Report**: legacy `mp_mass` relation check also runs on assemblies (`*.a.xml`), not only parts.
+
+
 
 ## 2026-08-08 — v1.12.171
 
-- **Thumbnails**: batch ``.dxc`` files use ``config\config.pro`` again (reverted ``config.sup``).
+- **Thumbnails**: batch `.dxc` files use `config\config.pro` again (reverted `config.sup`).
+
+
 
 ## 2026-08-08 — v1.12.170
 
-- **Thumbnails**: batch ``.dxc`` files use ``config\config.sup`` instead of ``config.pro``.
+- **Thumbnails**: batch `.dxc` files use `config\config.sup` instead of `config.pro`.
+
+
 
 ## 2026-08-07 — v1.12.169
 
-- **Scan Information**: **Intelligent fastener parts** requires exactly ``BUW_NAME``, ``BUW_TYPE``, and ``BUW_SIZE`` (any other ``BUW…`` parameter excludes the part).
+- **Scan Information**: **Intelligent fastener parts** requires exactly `BUW_NAME`, `BUW_TYPE`, and `BUW_SIZE` (any other `BUW…` parameter excludes the part).
+
+
 
 ## 2026-08-07 — v1.12.168
 
-- **Scan Information**: **Intelligent fastener parts** only counts parts that have all three ``PARAM_INFO`` parameters ``BUW_NAME``, ``BUW_TYPE``, and ``BUW_SIZE``.
+- **Scan Information**: **Intelligent fastener parts** only counts parts that have all three `PARAM_INFO` parameters `BUW_NAME`, `BUW_TYPE`, and `BUW_SIZE`.
+
+
 
 ## 2026-08-07 — v1.12.167
 
-- **Scan Information**: **Intelligent fastener parts** (parts with ``BUW_TYPE``) and **Advanced framework assemblies** (assemblies with ``PROJECT_SHORT``) from ``PARAM_INFO``.
+- **Scan Information**: **Intelligent fastener parts** (parts with `BUW_TYPE`) and **Advanced framework assemblies** (assemblies with `PROJECT_SHORT`) from `PARAM_INFO`.
+
+
 
 ## 2026-08-07 — v1.12.166
 
-- **Scan Information**: **Number of merge/inheritance features** sums ``MERGE`` counts from ``FEATURE_INFO`` (under copy/publish geometry).
+- **Scan Information**: **Number of merge/inheritance features** sums `MERGE` counts from `FEATURE_INFO` (under copy/publish geometry).
+
+
 
 ## 2026-08-07 — v1.12.165
 
 - **Scan Information**: reordered **Advanced Assembly Usage** (skeleton parts, copy/publish geometry, mechanism components, simplified representations).
 
+
+
 ## 2026-08-07 — v1.12.164
 
 - **Scan Information**: copy-geometry row label is **Number of copy/publish geometry features**.
+
+
 
 ## 2026-08-07 — v1.12.163
 
 - **Scan Information**: skeleton-usage row label is **Number of models using skeleton parts**.
 
+
+
 ## 2026-08-07 — v1.12.162
 
-- **Scan Information**: **Number of models using skeleton** counts ``ASM_BOM`` items whose name contains ``_SKEL``.
+- **Scan Information**: **Number of models using skeleton** counts `ASM_BOM` items whose name contains `_SKEL`.
+
+
 
 ## 2026-08-07 — v1.12.161
 
 - **Scan Information**: copy-geometry row label is **Number of copy geometry features**.
 
+
+
 ## 2026-08-07 — v1.12.160
 
-- **Scan Information**: **Number of copy geom features** sums ``GEOM_COPY`` counts from ``FEATURE_INFO`` across scanned models.
+- **Scan Information**: **Number of copy geom features** sums `GEOM_COPY` counts from `FEATURE_INFO` across scanned models.
+
+
 
 ## 2026-08-07 — v1.12.159
 
 - **Scan Information**: **Total number of packaged components** sums packaged-component counts across assemblies (was **Models using packaged components**, a model count).
 
+
+
 ## 2026-08-07 — v1.12.158
 
 - **Scan Information**: **Number of flexible components** counts unique part names (the same flexible part in several assemblies counts once).
+
+
 
 ## 2026-08-06 — v1.12.157
 
 - **Scan Information**: renamed **Models failed** to **Models failed to scan**.
 
+
+
 ## 2026-08-06 — v1.12.156
 
-- **Models failed**: inseparable embedded parts (``parent[[child]].prt`` / ``parent<<child>>.prt``) are omitted when ``child.asm`` was scanned.
+- **Models failed**: inseparable embedded parts (`parent[[child]].prt` / `parent<<child>>.prt`) are omitted when `child.asm` was scanned.
+
+
 
 ## 2026-08-06 — v1.12.155
 
-- **Models failed**: inseparable assemblies named with ``[[]]`` (same as ``<<>>``) show as ``parent.prt`` and drag as ``child.asm``.
+- **Models failed**: inseparable assemblies named with `[[]]` (same as `<<>>`) show as `parent.prt` and drag as `child.asm`.
+
+
 
 ## 2026-08-06 — v1.12.154
 
-- **Checks catalog**: removed unused ``ModelCheckOptions`` tags from ``model_checks.xml``.
+- **Checks catalog**: removed unused `ModelCheckOptions` tags from `model_checks.xml`.
+
+
 
 ## 2026-08-06 — v1.12.153
 
-- **Checks catalog**: removed unused ``display`` and ``enabled`` tags from ``model_checks.xml``.
+- **Checks catalog**: removed unused `display` and `enabled` tags from `model_checks.xml`.
+
+
 
 ## 2026-08-06 — v1.12.152
 
-- **Report → Show information**: uses ModelCHECK ``<stat>INFO</stat>`` only (``info_check`` removed from ``model_checks.xml``).
+- **Report → Show information**: uses ModelCHECK `<stat>INFO</stat>` only (`info_check` removed from `model_checks.xml`).
+
+
 
 ## 2026-08-06 — v1.12.151
 
-- **Scan Information → Model checks**: reads the ``.mch`` from ``<config>`` in working-folder ``*.p.xml`` / ``*.a.xml`` / ``*.d.xml`` (that was the line ModelCHECK actually stores).
+- **Scan Information → Model checks**: reads the `.mch` from `<config>` in working-folder `*.p.xml` / `*.a.xml` / `*.d.xml` (that was the line ModelCHECK actually stores).
+
+
 
 ## 2026-08-06 — v1.12.150
 
-- **Scan Information → Model checks**: reads ``hdrconfig`` from the newest ModelCHECK XMLs in the working folder (not the smallest), so an older leftover scan is less likely to hide the checks file you just used.
+- **Scan Information → Model checks**: reads `hdrconfig` from the newest ModelCHECK XMLs in the working folder (not the smallest), so an older leftover scan is less likely to hide the checks file you just used.
+
+
 
 ## 2026-08-05 — v1.12.149
 
-- **Scan Information → Model checks**: shows the ``.mch`` from ModelCHECK XML ``hdrconfig`` in the working folder (not the current ``condition.mcc``), so rebuild-only reports match the scan.
+- **Scan Information → Model checks**: shows the `.mch` from ModelCHECK XML `hdrconfig` in the working folder (not the current `condition.mcc`), so rebuild-only reports match the scan.
+
+
 
 ## 2026-08-05 — v1.12.148
 
 - **Report**: each check heading also shows the total findings when ModelCHECK answers are numeric (for example `268 Models with … (98117 Total)`).
 
+
+
 ## 2026-08-05 — v1.12.147
 
 - **Scan Information → Biggest problems**: bars use a compressed scale so mid-range counts still show a clear orange fill when one check dominates.
+
+
 
 ## 2026-08-05 — v1.12.146
 
 - **Scan Information → Biggest problems**: counts total issues (sum of each check’s answer), not how many models have that issue.
 
+
+
 ## 2026-08-05 — v1.12.145
 
-- **Create Report**: when building ``master.xml``, clears ModelCHECK ``F#…`` feature-id item text (and leftover junk) so the report shows labels like **Cavity 1** without those id lists.
+- **Create Report**: when building `master.xml`, clears ModelCHECK `F#…` feature-id item text (and leftover junk) so the report shows labels like **Cavity 1** without those id lists.
+
+
 
 ## 2026-08-05 — v1.12.144
 
-- **Report**: cavity and similar item rows no longer show ModelCHECK ``F#…`` feature-id lists (labels like **Cavity 1** remain).
+- **Report**: cavity and similar item rows no longer show ModelCHECK `F#…` feature-id lists (labels like **Cavity 1** remain).
+
+
 
 ## 2026-08-05 — v1.12.143
 
-- **Report**: ModelCHECK item details hide corrupt control characters and trailing junk on feature-id lists (for example cavity ``F#…`` rows).
+- **Report**: ModelCHECK item details hide corrupt control characters and trailing junk on feature-id lists (for example cavity `F#…` rows).
+
+
 
 ## 2026-08-05 — v1.12.142
 
-- **Create Report**: custom-check sync tolerates ModelCHECK XML that contains illegal control characters (for example corrupted cavity ``info2`` text).
+- **Create Report**: custom-check sync tolerates ModelCHECK XML that contains illegal control characters (for example corrupted cavity `info2` text).
+
+
 
 ## 2026-08-05 — v1.12.141
 
-- **Create Report**: custom check / sync scripts print only errors and a short OK line; the warning dialog shows the real ERROR text (for example a missing ``.js`` file).
+- **Create Report**: custom check / sync scripts print only errors and a short OK line; the warning dialog shows the real ERROR text (for example a missing `.js` file).
+
+
 
 ## 2026-08-04 — v1.12.140
 
 - **Create Report**: custom check exit code 2 (nothing to update) no longer shows a warning when regenerating a report.
 
+
+
 ## 2026-08-04 — v1.12.139
 
-- **Create Report**: if a custom check script fails (for example ``chk_relation_mp_mass.py``), the report still builds from existing ModelCHECK XML and shows a warning instead of stopping.
+- **Create Report**: if a custom check script fails (for example `chk_relation_mp_mass.py`), the report still builds from existing ModelCHECK XML and shows a warning instead of stopping.
+
+
 
 ## 2026-08-04 — v1.12.138
 
-- **Scan Information**: **Non solid/empty assemblies** counts assemblies whose ``UNQ_COMPONENTS`` answer is 0.
+- **Scan Information**: **Non solid/empty assemblies** counts assemblies whose `UNQ_COMPONENTS` answer is 0.
+
+
 
 ## 2026-08-04 — v1.12.137
 
-- **Scan Information**: **Non solid assemblies** uses ``OVERALL_SIZE`` (all three dimensions parse as 0); parts still use ``BODY_INFO``.
+- **Scan Information**: **Non solid assemblies** uses `OVERALL_SIZE` (all three dimensions parse as 0); parts still use `BODY_INFO`.
+
+
 
 ## 2026-08-04 — v1.12.136
 
 - **Scan Information**: simplified-representations row label is **Number of simplified representations**.
 
+
+
 ## 2026-08-04 — v1.12.135
 
-- **Scan Information**: CAD Assessment Summary shows **Non solid assemblies** under **Non solid parts** (same ``BODY_INFO`` / No Geometry rule).
+- **Scan Information**: CAD Assessment Summary shows **Non solid assemblies** under **Non solid parts** (same `BODY_INFO` / No Geometry rule).
+
+
 
 ## 2026-08-04 — v1.12.134
 
-- **Checks**: ``error_checks.mch`` and ``warning_checks.mch`` add ``FLEX_COMPONENTS`` and ``MECH_COMPONENTS`` from ``info_checks.mch``.
+- **Checks**: `error_checks.mch` and `warning_checks.mch` add `FLEX_COMPONENTS` and `MECH_COMPONENTS` from `info_checks.mch`.
+
+
 
 ## 2026-08-04 — v1.12.133
 
 - **Scan Information**: **Biggest problems** includes **Models with Legacy Relation mp_mass()** when that check finds any.
 
+
+
 ## 2026-08-04 — v1.12.132
 
 - **Scan Information**: **Biggest problems** includes **Models with Assembly Cuts** when any assemblies have cuts.
 
+
+
 ## 2026-08-04 — v1.12.131
 
-- **Checks**: ``vda_checks.mch`` includes the checks from ``info_checks.mch`` that were missing (existing VDA rows unchanged).
+- **Checks**: `vda_checks.mch` includes the checks from `info_checks.mch` that were missing (existing VDA rows unchanged).
+
+
 
 ## 2026-08-04 — v1.12.130
 
-- **Checks**: ``large_assy_checks.mch`` includes the checks from ``info_checks.mch`` that were missing (existing large-assembly rows unchanged).
+- **Checks**: `large_assy_checks.mch` includes the checks from `info_checks.mch` that were missing (existing large-assembly rows unchanged).
+
+
 
 ## 2026-08-04 — v1.12.129
 
 - **Report**: within each error, warning, and information check, models are listed by highest numeric answer first (including file size); names without a useful number stay alphabetical.
 
+
+
 ## 2026-08-04 — v1.12.128
 
 - **Scan Information**: CAD Assessment Summary section is renamed to **Advanced Assembly Usage**.
+
+
 
 ## 2026-08-04 — v1.12.127
 
 - **Scan Information**: CAD Assessment Summary shows **Inseparable assemblies** under Representations and Advanced Assembly Usage when any are found.
 
+
+
 ## 2026-08-04 — v1.12.126
 
-- **Report / Gallery**: inseparable ``parent<<child>>.prt`` shows as ``parent.prt``; drag and thumb stay on ``child.asm``.
+- **Report / Gallery**: inseparable `parent<<child>>.prt` shows as `parent.prt`; drag and thumb stay on `child.asm`.
+
+
 
 ## 2026-08-04 — v1.12.125
 
-- **Report / Gallery**: inseparable ``parent<<child>>.prt`` shows and thumbs as ``parent.prt``; drag uses ``child.asm`` (no ``<<>>`` in the link).
+- **Report / Gallery**: inseparable `parent<<child>>.prt` shows and thumbs as `parent.prt`; drag uses `child.asm` (no `<<>>` in the link).
+
+
 
 ## 2026-08-04 — v1.12.124
 
-- **Report / Gallery**: only inseparable ``<<>>`` names are remapped (``parent<<child>>.…`` → ``<<child>>.asm`` for drag and thumb); family tables stay on the existing generic fallback.
+- **Report / Gallery**: only inseparable `<<>>` names are remapped (`parent<<child>>.…` → `<<child>>.asm` for drag and thumb); family tables stay on the existing generic fallback.
+
+
 
 ## 2026-08-04 — v1.12.123
 
-- **Report / Gallery**: inseparable names ``parent<<child>>.prt`` drag and thumb as ``<<child>>.asm``; bare ``<<name>>.ext`` stays a family-table session link.
+- **Report / Gallery**: inseparable names `parent<<child>>.prt` drag and thumb as `<<child>>.asm`; bare `<<name>>.ext` stays a family-table session link.
+
+
 
 ## 2026-08-04 — v1.12.122
 
-- **Model Gallery** / report: family-table names like ``outer<<inner>>.prt`` are draggable again (thumb from outer file, drag opens inner name).
+- **Model Gallery** / report: family-table names like `outer<<inner>>.prt` are draggable again (thumb from outer file, drag opens inner name).
+
+
 
 ## 2026-08-04 — v1.12.121
 
-- **Checks**: ``REG_FEATURES`` is present in every ``.mch`` (including ``vda_checks`` and Scan Templates).
+- **Checks**: `REG_FEATURES` is present in every `.mch` (including `vda_checks` and Scan Templates).
+
+
 
 ## 2026-08-04 — v1.12.120
 
-- **Checks / Model Complexity**: ``large_assy_checks.mch`` includes ``REG_FEATURES`` so **Top parts by features** can show real counts again.
+- **Checks / Model Complexity**: `large_assy_checks.mch` includes `REG_FEATURES` so **Top parts by features** can show real counts again.
+
+
 
 ## 2026-08-04 — v1.12.119
 
 - **Scan Information**: top-level feature count label is **Total number of features in Top level assembly** … (with assembly name).
 
+
+
 ## 2026-08-04 — v1.12.118
 
 - **Scan Information**: CAD Assessment Summary shows **Models failed** (count) under **Models scanned** when any models failed.
+
+
 
 ## 2026-08-04 — v1.12.117
 
 - **Scan Information**: family-table-instances row label is **Total number of family table instances**.
 
+
+
 ## 2026-08-04 — v1.12.116
 
 - **Scan Information**: packaged-components row label is **Models using packaged components**.
+
+
 
 ## 2026-08-04 — v1.12.115
 
 - **Scan Information**: renamed packaged-components and family-table-generics rows to **Total number of…** labels.
 
+
+
 ## 2026-08-04 — v1.12.114
 
-- **Setup → Next**: if ModelCHECK checks are not ``default_checks.mch``, warn with **OK** (keep) or **Use default** (restore).
+- **Setup → Next**: if ModelCHECK checks are not `default_checks.mch`, warn with **OK** (keep) or **Use default** (restore).
+
+
 
 ## 2026-08-03 — v1.12.113
 
-- **Package**: deploy zip requires ``chk_relation_mp_mass.py`` (with other ``chk_*.py`` custom check scripts).
+- **Package**: deploy zip requires `chk_relation_mp_mass.py` (with other `chk_*.py` custom check scripts).
+
+
 
 ## 2026-08-03 — v1.12.112
 
-- **Custom checks**: added part check for legacy ``mp_mass`` relations (``RELATION_INFO``; PASS when not found).
+- **Custom checks**: added part check for legacy `mp_mass` relations (`RELATION_INFO`; PASS when not found).
+
+
 
 ## 2026-08-03 — v1.12.111
 
 - **Scan Information**: removed the **Number of components in master representation** row.
 
+
+
 ## 2026-08-02 — v1.12.110
 
-- **Config**: VDA-style checks in ``all_checks.mch`` (M1 through SO27) use Warning (W) for Interactive and Batch.
+- **Config**: VDA-style checks in `all_checks.mch` (M1 through SO27) use Warning (W) for Interactive and Batch.
+
+
 
 ## 2026-08-02 — v1.12.109
 
-- **Config**: ``all_checks.mch`` no longer lists ``T20_KNIFE_EDGES``, ``SO24_EXTRA_GEOM``, and ``SO25_CAVITIES`` twice (keeps the Error severity rows).
+- **Config**: `all_checks.mch` no longer lists `T20_KNIFE_EDGES`, `SO24_EXTRA_GEOM`, and `SO25_CAVITIES` twice (keeps the Error severity rows).
+
+
 
 ## 2026-08-02 — v1.12.108
 
 - **Custom checks**: assembly-cuts count now includes PATTERN along with CUT and HOLE.
 
+
+
 ## 2026-08-02 — v1.12.107
 
-- **Create Report**: skips custom check scripts and sync when the CHECK name is missing or commented out in the ``*.mch`` from ``condition.mcc``.
+- **Create Report**: skips custom check scripts and sync when the CHECK name is missing or commented out in the `*.mch` from `condition.mcc`.
+
+
 
 ## 2026-08-02 — v1.12.106
 
-- **Tools**: ``sync_modelcheck_checks.py`` uses CHECK ``_ASM`` / ``_PRT`` / ``_DRW`` to choose ``*.a.xml`` / ``*.p.xml`` / ``*.d.xml`` (same as assembly-cuts).
+- **Tools**: `sync_modelcheck_checks.py` uses CHECK `_ASM` / `_PRT` / `_DRW` to choose `*.a.xml` / `*.p.xml` / `*.d.xml` (same as assembly-cuts).
+
+
 
 ## 2026-08-02 — v1.12.82
 
 - **Added**: support for custom python checks.
 
+
+
 ## 2026-08-01 — v1.12.81
 
 - **Pause**: runs **kill.bat** before the “safe to use Creo” dialog so leftover **xtop** does not block Resume.
+
+
 
 ## 2026-08-01 — v1.12.80
 
 - **Score weights**: added score weighting file
 
+
+
 ## 2026-07-31 — v1.12.79
 
 - **Docs**: report how-to expands the **Models Failed** description (bulk parts, harnesses, Creo crashes).
+
+
 
 ## 2026-07-31 — v1.12.78
 
