@@ -19,6 +19,8 @@ The report folder is ``working_directory`` from ``app_settings.json`` next to th
 - Scans ``*.a.xml`` / ``*.p.xml`` / ``*.d.xml`` per CHECK type suffix (no recurse).
 - Ignores XML files that do not contain any configured check.
 - Updates only the companion ``.js`` file (e.g. ``model.a.xml`` → ``model.a.js``).
+- If the companion ``.js`` has no block for that check (ModelCHECK never emitted the
+  CUSTOM stub), skips quietly — common when Python inserted the check into XML only.
 - Does not modify XML or HTML.
 - Does not create backups.
 """
@@ -324,21 +326,27 @@ def build_block(
     )
 
 
-def update_report(xml_path: Path, check: ET.Element, check_name: str) -> bool:
+def update_report(xml_path: Path, check: ET.Element, check_name: str) -> str:
+    """
+    Sync one check from XML into companion JS.
+
+    Returns ``"ok"``, ``"skip"`` (no JS block to update), or ``"error"``.
+    """
     # model.a.xml → model.a.js (with_suffix replaces only the final .xml)
     js_path = xml_path.with_suffix(".js")
 
     if not js_path.is_file():
         print(f"ERROR     {xml_path.name}: missing {js_path.name}", file=sys.stderr)
-        return False
+        return "error"
 
     try:
         javascript = js_path.read_text(encoding="utf-8-sig")
         block = find_block(javascript, check_name)
 
         if block is None:
-            print(f"ERROR     {js_path.name}: {check_name} not found", file=sys.stderr)
-            return False
+            # XML has the check (often inserted by chk_*.py) but ModelCHECK never
+            # wrote a matching CUSTOM block into the .js — nothing to sync.
+            return "skip"
 
         start, end, index, render_type, check_top = block
 
@@ -353,11 +361,11 @@ def update_report(xml_path: Path, check: ET.Element, check_name: str) -> bool:
             temp_path.write_text(updated, encoding="utf-8", newline="")
             temp_path.replace(js_path)
 
-        return True
+        return "ok"
 
     except (OSError, UnicodeError, ValueError) as exc:
         print(f"ERROR     {js_path.name}: {exc}", file=sys.stderr)
-        return False
+        return "error"
 
 
 def main() -> int:
@@ -396,6 +404,7 @@ def main() -> int:
 
     matched = 0
     synchronized = 0
+    skipped = 0
     errors = 0
 
     try:
@@ -433,21 +442,29 @@ def main() -> int:
                 continue
 
             matched += 1
-
-            if update_report(xml_path, check, job.xml_name):
+            result = update_report(xml_path, check, job.xml_name)
+            if result == "ok":
                 synchronized += 1
+            elif result == "skip":
+                skipped += 1
             else:
                 errors += 1
 
     if errors:
         print(
-            f"sync_modelcheck_checks: {synchronized} ok, {errors} error(s) "
-            f"({matched} check occurrences).",
+            f"sync_modelcheck_checks: {synchronized} ok, {skipped} skipped, "
+            f"{errors} error(s) ({matched} check occurrences).",
             file=sys.stderr,
         )
         return 1
 
-    print(f"sync_modelcheck_checks: ok ({synchronized} synchronized).")
+    if skipped:
+        print(
+            f"sync_modelcheck_checks: ok "
+            f"({synchronized} synchronized, {skipped} skipped — no JS block)."
+        )
+    else:
+        print(f"sync_modelcheck_checks: ok ({synchronized} synchronized).")
     return 0
 
 
