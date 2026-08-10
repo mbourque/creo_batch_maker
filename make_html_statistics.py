@@ -767,9 +767,10 @@ PERFORMANCE_TABLE_SECTIONS: list[tuple[str, list[tuple[str, str | None]]]] = [
     (
         "Family Table Usage",
         [
-            ("Total number of family table generics used", "_FAMILY_GENERIC_PART_COUNT"),
-            ("Total number of family table instances", "_FAMILY_INSTANCE_COUNT"),
+            ("Number of generic family tables", "_FAMILY_GENERIC_PART_COUNT"),
+            ("Number of family table instances", "_FAMILY_INSTANCE_COUNT"),
             ("Nested family table instances", "_NESTED_FAMILY_TABLES"),
+            ("Missing family table accelerators", "_MISSING_FT_ACCELERATORS"),
         ],
     ),
     ("Metadata", [("Last saved by", "_USERS")]),
@@ -785,6 +786,7 @@ class PerformanceMetrics:
     family_generic_part_count: int = 0
     family_instance_count: int = 0
     nested_family_tables: int = 0
+    missing_ft_accelerators: int = 0
     total_num_components: int = 0
     unique_model_count: int = 0
     max_assembly_depth: int = 0
@@ -1190,6 +1192,9 @@ def scan_performance_metrics(master_root: ET.Element) -> PerformanceMetrics:
         metrics.nested_family_tables += (
             _parse_int_metric(_check_ans_text(file_element, "CHK_NESTED_FAMILY_TABLE")) or 0
         )
+        metrics.missing_ft_accelerators += (
+            _parse_int_metric(_check_ans_text(file_element, "CHK_FT_ACCELERATOR")) or 0
+        )
 
         for unq_name in _unq_model_names_from(file_element):
             unique_models.add(unq_name.casefold())
@@ -1580,6 +1585,7 @@ def performance_metrics_answers(metrics: PerformanceMetrics) -> dict[str, str]:
         "_FAMILY_GENERIC_PART_COUNT": str(metrics.family_generic_part_count),
         "_FAMILY_INSTANCE_COUNT": str(metrics.family_instance_count),
         "_NESTED_FAMILY_TABLES": str(metrics.nested_family_tables),
+        "_MISSING_FT_ACCELERATORS": str(metrics.missing_ft_accelerators),
         "_SIMPREP_REPRESENTATIONS": str(metrics.simprep_unique_count),
         "_INSEPARABLE_ASSEMBLIES": str(metrics.inseparable_assemblies),
         "_COPY_GEOM_FEATURES": str(metrics.copy_geom_features),
@@ -1623,6 +1629,9 @@ def _resolve_performance_value(answers: dict[str, str], key: str | None) -> tupl
     if key == "_NESTED_FAMILY_TABLES":
         val = answers.get(key)
         return (val if val is not None else "—", "CHK_NESTED_FAMILY_TABLE")
+    if key == "_MISSING_FT_ACCELERATORS":
+        val = answers.get(key)
+        return (val if val is not None else "—", "CHK_FT_ACCELERATOR")
     if key in (
         "_SCAN_DATE",
         "_MODEL_CHECKS",
@@ -1983,6 +1992,8 @@ HEALTH_CHECKS: list[tuple[str, str]] = [
     ("CHK_RELATION_MP_MASS", "Legacy Relation mp_mass()"),
 
     ("CHK_NESTED_FAMILY_TABLE", "Nested Family Table Instances"),
+
+    ("CHK_FT_ACCELERATOR", "Missing Family Table Accelerators"),
 
     ("EDGE_REFERENCES", "Edge References"),
 

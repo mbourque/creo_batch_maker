@@ -2,6 +2,42 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-10 — v1.12.207
+
+- **Scan Information**: **Family Table Usage** row renamed to **Number of family table instances**.
+
+## 2026-08-10 — v1.12.206
+
+- **Scan Information**: **Family Table Usage** row renamed to **Number of generic family tables**.
+
+## 2026-08-10 — v1.12.205
+
+- **Scan Information**: **Family Table Usage** row renamed to **Total number of family tables** (same count as Family table detail; not ``GEN_COMPONENTS``).
+
+## 2026-08-10 — v1.12.204
+
+- **Scan Information**: **Family Table Usage** again omits rows with a value of **0**, same as the rest of CAD Assessment Summary.
+
+## 2026-08-10 — v1.12.203
+
+- **Scan Information**: **Family Table Usage** always shows all four rows (including **Missing family table accelerators** at **0**) whenever that section appears.
+
+## 2026-08-10 — v1.12.202
+
+- **Scan Information**: **Family Table Usage** includes **Missing family table accelerators** (total missing ``.xpr`` / ``.xas`` count).
+
+## 2026-08-10 — v1.12.201
+
+- **Scan Information**: **Biggest problems** includes Missing Family Table Accelerators.
+
+## 2026-08-10 — v1.12.200
+
+- **Docs**: Missing Family Table Accelerators description now says it only applies to GENERIC models.
+
+## 2026-08-10 — v1.12.199
+
+- **Create Report**: new **Missing Family Table Accelerators** check (parts ``.xpr``, assemblies ``.xas``) warns when a family-table generic is missing instance accelerator files in the working folder.
+
 ## 2026-08-10 — v1.12.198
 
 - **Docs**: Nested Family Table Instances description no longer mentions pipe-separated ``FAMILY_INFO`` paths.
