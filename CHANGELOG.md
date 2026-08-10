@@ -2,6 +2,14 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-10 — v1.12.210
+
+- **Checks reference**: search field dropdown adds **Title** (display name) and **Check name** matches the ModelCHECK code (for example ``ADD_CHK_PARAM``).
+
+## 2026-08-10 — v1.12.209
+
+- **Checks reference**: search has a field dropdown (**All fields**, **Check name**, **Category**, **Description**) that limits what is matched.
+
 ## 2026-08-10 — v1.12.208
 
 - **Checks reference**: search filters against the visible card text (no duplicated search attribute in the HTML).

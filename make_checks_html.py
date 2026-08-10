@@ -82,7 +82,7 @@ def render_html(checks: list[dict]) -> str:
             )
         cards.append(
             f'<article class="check-card" id="{cid}">'
-            f"<header><h2>{name}</h2>"
+            f'<header><h2 class="check-name">{name}</h2>'
             f'{f"<p class=meta>{meta}</p>" if meta else ""}'
             "</header>"
             f"{desc_block}"
@@ -179,9 +179,16 @@ def render_html(checks: list[dict]) -> str:
       color: var(--muted);
       margin-bottom: 0.35rem;
     }}
+    .search-controls {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: stretch;
+      max-width: 40rem;
+    }}
     .mq-gallery-search {{
-      width: 100%;
-      max-width: 28rem;
+      flex: 1 1 14rem;
+      min-width: 0;
       padding: 0.55rem 0.75rem;
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -190,6 +197,20 @@ def render_html(checks: list[dict]) -> str:
       box-shadow: var(--shadow);
     }}
     .mq-gallery-search:focus {{
+      outline: 2px solid #2563eb;
+      outline-offset: 1px;
+    }}
+    .mq-checks-field {{
+      flex: 0 0 auto;
+      padding: 0.55rem 0.75rem;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font: inherit;
+      background: var(--card);
+      box-shadow: var(--shadow);
+      color: var(--ink);
+    }}
+    .mq-checks-field:focus {{
       outline: 2px solid #2563eb;
       outline-offset: 1px;
     }}
@@ -219,7 +240,8 @@ def render_html(checks: list[dict]) -> str:
       scroll-margin-top: 5.5rem;
     }}
     .check-card[hidden] {{ display: none !important; }}
-    .check-card header h2 {{
+    .check-card header h2,
+    .check-card .check-name {{
       margin: 0 0 0.35rem;
       font-size: 1.2rem;
       letter-spacing: -0.015em;
@@ -301,9 +323,18 @@ def render_html(checks: list[dict]) -> str:
 
     <div class="search-bar">
       <label for="mq-checks-search">Search checks</label>
-      <input type="search" id="mq-checks-search" class="mq-gallery-search"
-             placeholder="Filter by name, category, ModelCHECK name, or description…"
-             autocomplete="off" spellcheck="false">
+      <div class="search-controls">
+        <input type="search" id="mq-checks-search" class="mq-gallery-search"
+               placeholder="Filter checks…"
+               autocomplete="off" spellcheck="false">
+        <select id="mq-checks-field" class="mq-checks-field" aria-label="Search in">
+          <option value="all" selected>All fields</option>
+          <option value="title">Title</option>
+          <option value="name">Check name</option>
+          <option value="category">Category</option>
+          <option value="description">Description</option>
+        </select>
+      </div>
       <p class="search-meta" id="mq-checks-count">{count} checks</p>
       <p class="search-empty" id="mq-checks-empty">No checks match this search.</p>
     </div>
@@ -322,6 +353,7 @@ def render_html(checks: list[dict]) -> str:
   <script>
     (function () {{
       var input = document.getElementById('mq-checks-search');
+      var fieldSel = document.getElementById('mq-checks-field');
       var list = document.getElementById('mq-checks-list');
       var countEl = document.getElementById('mq-checks-count');
       var emptyEl = document.getElementById('mq-checks-empty');
@@ -329,12 +361,33 @@ def render_html(checks: list[dict]) -> str:
       var cards = list.querySelectorAll('.check-card');
       var total = cards.length;
 
+      function fieldText(card, field) {{
+        if (field === 'title') {{
+          var titleEl = card.querySelector('.check-name');
+          return titleEl ? (titleEl.textContent || '') : '';
+        }}
+        if (field === 'name') {{
+          var mcnEl = card.querySelector('header .meta-mcn');
+          return mcnEl ? (mcnEl.textContent || '') : '';
+        }}
+        if (field === 'category') {{
+          var catEl = card.querySelector('.meta-cat');
+          return catEl ? (catEl.textContent || '') : '';
+        }}
+        if (field === 'description') {{
+          var descEl = card.querySelector('.description p');
+          return descEl ? (descEl.textContent || '') : '';
+        }}
+        return card.textContent || '';
+      }}
+
       function applyFilter() {{
         var q = (input.value || '').trim().toLowerCase();
+        var field = fieldSel ? (fieldSel.value || 'all') : 'all';
         var visible = 0;
         for (var i = 0; i < cards.length; i++) {{
           var card = cards[i];
-          var blob = (card.textContent || '').toLowerCase();
+          var blob = fieldText(card, field).toLowerCase();
           var show = !q || blob.indexOf(q) !== -1;
           card.hidden = !show;
           if (show) {{ visible++; }}
@@ -352,6 +405,7 @@ def render_html(checks: list[dict]) -> str:
 
       input.addEventListener('input', applyFilter);
       input.addEventListener('search', applyFilter);
+      if (fieldSel) {{ fieldSel.addEventListener('change', applyFilter); }}
     }})();
   </script>
 </body>
