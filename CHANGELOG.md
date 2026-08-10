@@ -2,6 +2,10 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-10 — v1.12.208
+
+- **Checks reference**: search filters against the visible card text (no duplicated search attribute in the HTML).
+
 ## 2026-08-10 — v1.12.207
 
 - **Scan Information**: **Family Table Usage** row renamed to **Number of family table instances**.

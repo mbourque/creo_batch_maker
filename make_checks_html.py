@@ -44,23 +44,10 @@ def load_checks(xml_path: str) -> list[dict]:
                 "mcn": _child_text(check, "ModelCheckName"),
                 "description": _child_text(check, "Description"),
                 "how_html": markdown.markdown(why_raw) if why_raw else "",
-                "how_raw": why_raw,
             }
         )
     checks.sort(key=lambda c: c["name"].casefold())
     return checks
-
-
-def _search_blob(check: dict) -> str:
-    return " ".join(
-        [
-            check["name"],
-            check["category"],
-            check["mcn"],
-            check["description"],
-            check["how_raw"],
-        ]
-    ).casefold()
 
 
 def render_html(checks: list[dict]) -> str:
@@ -94,8 +81,7 @@ def render_html(checks: list[dict]) -> str:
                 "</div>"
             )
         cards.append(
-            f'<article class="check-card" id="{cid}" '
-            f'data-mq-check-search="{html.escape(_search_blob(c), quote=True)}">'
+            f'<article class="check-card" id="{cid}">'
             f"<header><h2>{name}</h2>"
             f'{f"<p class=meta>{meta}</p>" if meta else ""}'
             "</header>"
@@ -316,7 +302,7 @@ def render_html(checks: list[dict]) -> str:
     <div class="search-bar">
       <label for="mq-checks-search">Search checks</label>
       <input type="search" id="mq-checks-search" class="mq-gallery-search"
-             placeholder="Filter by name, category, or ModelCHECK name…"
+             placeholder="Filter by name, category, ModelCHECK name, or description…"
              autocomplete="off" spellcheck="false">
       <p class="search-meta" id="mq-checks-count">{count} checks</p>
       <p class="search-empty" id="mq-checks-empty">No checks match this search.</p>
@@ -348,7 +334,7 @@ def render_html(checks: list[dict]) -> str:
         var visible = 0;
         for (var i = 0; i < cards.length; i++) {{
           var card = cards[i];
-          var blob = (card.getAttribute('data-mq-check-search') || '');
+          var blob = (card.textContent || '').toLowerCase();
           var show = !q || blob.indexOf(q) !== -1;
           card.hidden = !show;
           if (show) {{ visible++; }}
