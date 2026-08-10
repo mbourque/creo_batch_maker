@@ -1717,7 +1717,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
 
     <Check>
-        <Name>Duplicate Models</Name>
+        <Name>Search Duplicate Models</Name>
         <Category>Consistency</Category>
         <Description>Checks the active model against existing models in the database by comparing geometry, topology, and key model properties to identify potential duplicates or near-duplicates. Duplicate models can lead to redundant data, confusion in design ownership, incorrect reuse of parts, and inefficiencies in data management systems such as Windchill or PLM databases. By identifying models that are geometrically or structurally similar, this check helps prevent unnecessary duplication, improves reuse of existing designs, and supports cleaner, more efficient model libraries. Duplicate detection rules and search behavior are typically configured through ModelCHECK database connectivity settings and company PLM integration standards, while check behavior and reporting are controlled by the SEARCH_DUP_MODELS settings in the check.mch configuration file.</Description>
         <ModelCheckName>SEARCH_DUP_MODELS</ModelCheckName>
