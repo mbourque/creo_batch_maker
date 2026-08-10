@@ -8,7 +8,7 @@ Reads ``config/custom_checks.txt`` for the ``DEF_NESTED_FAMILY_TABLE`` section::
     CND_FEATURE_INFO GTE 0
     CHECK CHK_NESTED_FAMILY_TABLE_PRT
     CHECK CHK_NESTED_FAMILY_TABLE_ASM
-    MSG_NESTED_FAMILY_TABLE Nested family table
+    MSG_NESTED_FAMILY_TABLE Nested family table instances
 
 ``FEATURE_INFO`` is only so ModelCHECK emits a CUSTOM stub (``FAMILY_INFO`` ``ans``
 is text like GENERIC, so a ``GTE`` condition on it does not work). Scoring still
@@ -24,10 +24,11 @@ is without the type suffix (``CHK_NESTED_FAMILY_TABLE``).
 Matching is fixed in this script (not in custom_checks.txt):
 
 - Score from: FAMILY_INFO
-- Nested family tables appear as pipe-separated instance paths in ``info1``,
+- Nested family table instances appear as pipe-separated instance paths in ``info1``,
   for example ``INST2|INST2_CHILD`` or ``INST2||INST2_CHILD|LEAF``
-- Non-empty segments before the leaf are nested generics
-- Found → ``ans`` = unique nested generic count and severity from ``*.mch``;
+- Count = unique nested generics (segments before the leaf) plus every nested
+  instance path (paths with more than one non-empty segment)
+- Found → ``ans`` = that total and severity from ``*.mch``;
   not found → PASS / ``ans=0``
 - If ModelCHECK omitted the CUSTOM placeholder, this script inserts one before
   ``</mc_checks>``.
@@ -83,7 +84,7 @@ class CustomJob:
     msg: str
 
 
-DEFAULT_MSG = "Nested family table"
+DEFAULT_MSG = "Nested family table instances"
 MC_CHECKS_CLOSE_RE = re.compile(r"</mc_checks\s*>", re.IGNORECASE)
 
 
@@ -252,42 +253,60 @@ def find_check_span(raw_xml: str, check_name: str) -> tuple[int, int, int, int] 
     return None
 
 
-def nested_generics_from_instance_labels(instance_names: list[str]) -> list[tuple[str, int]]:
+def nested_ft_findings_from_instance_labels(
+    instance_names: list[str],
+) -> list[tuple[str, str]]:
     """
-    Nested family-table generics from FAMILY_INFO instance ``info1`` paths.
+    Nested family-table findings from FAMILY_INFO instance ``info1`` paths.
 
     Creo lists nested instances as ``parent|child`` (empty segments from ``||``
-    are ignored). Every non-empty segment before the leaf is a nested generic.
-    Returns ``(name, depth)`` with depth 1 = first nesting under the root.
+    are ignored). Returns ``(label, detail)`` rows:
+
+    - one row per unique nested generic (non-empty segments before the leaf)
+    - one row per nested instance path (two or more non-empty segments)
+
+    ``ans`` is ``len`` of this list (generics + instance paths).
     """
-    found: list[tuple[str, int]] = []
-    seen: set[str] = set()
+    rows: list[tuple[str, str]] = []
+    seen_generics: set[str] = set()
+    generic_rows: list[tuple[str, str]] = []
+    instance_rows: list[tuple[str, str]] = []
+
     for name in instance_names:
-        parts = [segment.strip() for segment in (name or "").split("|") if segment.strip()]
+        raw = (name or "").strip()
+        parts = [segment.strip() for segment in raw.split("|") if segment.strip()]
         if len(parts) < 2:
             continue
         for depth, parent in enumerate(parts[:-1], start=1):
             key = parent.casefold()
-            if key in seen:
+            if key in seen_generics:
                 continue
-            seen.add(key)
-            found.append((parent, depth))
-    return found
+            seen_generics.add(key)
+            generic_rows.append(
+                (parent, f"Nested family table generic (depth {depth})")
+            )
+        instance_rows.append(
+            (raw, f"Nested family table instance (depth {len(parts) - 1})")
+        )
+
+    rows.extend(generic_rows)
+    rows.extend(instance_rows)
+    return rows
 
 
-def nested_generics_in_check_inner(inner: str) -> list[tuple[str, int]]:
+def nested_ft_findings_in_check_inner(inner: str) -> list[tuple[str, str]]:
     names: list[str] = []
     for m in ITEM_RE.finditer(inner):
         names.append(m.group(1).strip())
-    return nested_generics_from_instance_labels(names)
+    return nested_ft_findings_from_instance_labels(names)
 
 
-def nested_generics_from_source(raw_xml: str, source_check: str) -> list[tuple[str, int]]:
+def nested_ft_findings_from_source(raw_xml: str, source_check: str) -> list[tuple[str, str]]:
     span = find_check_span(raw_xml, source_check)
     if span is None:
         return []
     _bs, inner_start, inner_end, _be = span
-    return nested_generics_in_check_inner(raw_xml[inner_start:inner_end])
+    return nested_ft_findings_in_check_inner(raw_xml[inner_start:inner_end])
 
 
 def ensure_check_placeholder(raw_xml: str, check_name: str, msg: str) -> str:
@@ -351,7 +370,7 @@ def update_check_block(
     extra = ""
     if items:
         extra += (
-            f"\n{indent}<title1>Nested generic</title1>"
+            f"\n{indent}<title1>Name</title1>"
             f"\n{indent}<title2>Detail</title2>"
         )
         extra += "".join(
@@ -446,20 +465,17 @@ def process_xml_file(
                     continue
                 out = ensure_check_placeholder(out, job.xml_name, job.msg)
 
-            nested = nested_generics_from_source(out, job.source_check)
+            findings = nested_ft_findings_from_source(out, job.source_check)
 
-            if not nested:
+            if not findings:
                 stat = "PASS"
                 ans = "0"
                 items: list[tuple[str, str]] = []
             else:
                 sev = severity_from_mch(mch_path, job.mch_name)
                 stat = "PASS" if sev == "PASS" else sev
-                ans = str(len(nested))
-                items = [
-                    (name, f"Nested family table (depth {depth})")
-                    for name, depth in nested
-                ]
+                ans = str(len(findings))
+                items = findings
 
             new_out = update_check_block(out, job.xml_name, stat, ans, items)
             if new_out == out:

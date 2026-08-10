@@ -769,7 +769,7 @@ PERFORMANCE_TABLE_SECTIONS: list[tuple[str, list[tuple[str, str | None]]]] = [
         [
             ("Total number of family table generics used", "_FAMILY_GENERIC_PART_COUNT"),
             ("Total number of family table instances", "_FAMILY_INSTANCE_COUNT"),
-            ("Nested family tables", "_NESTED_FAMILY_TABLES"),
+            ("Nested family table instances", "_NESTED_FAMILY_TABLES"),
         ],
     ),
     ("Metadata", [("Last saved by", "_USERS")]),
@@ -1982,7 +1982,7 @@ HEALTH_CHECKS: list[tuple[str, str]] = [
 
     ("CHK_RELATION_MP_MASS", "Legacy Relation mp_mass()"),
 
-    ("CHK_NESTED_FAMILY_TABLE", "Nested Family Table"),
+    ("CHK_NESTED_FAMILY_TABLE", "Nested Family Table Instances"),
 
     ("EDGE_REFERENCES", "Edge References"),
 

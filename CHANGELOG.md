@@ -2,6 +2,18 @@
 
 Short, user-facing notes for what changed in the PDSVISION Cad Assessment Tool. Newest entries at the top.
 
+## 2026-08-10 — v1.12.198
+
+- **Docs**: Nested Family Table Instances description no longer mentions pipe-separated ``FAMILY_INFO`` paths.
+
+## 2026-08-10 — v1.12.197
+
+- **Nested Family Table Instances**: count is unique nested generics plus every nested instance path (for example 2 generics + 8 paths = 10).
+
+## 2026-08-10 — v1.12.196
+
+- **Nested Family Table Instances**: check and Scan Information count every nested family-table instance (pipe paths in ``FAMILY_INFO``), not unique nested generics.
+
 ## 2026-08-09 — v1.12.195
 
 - **Create Report**: sync no longer reports an error for each model where ModelCHECK left no JS block for a custom check (for example Nested Family Table); those are skipped quietly.

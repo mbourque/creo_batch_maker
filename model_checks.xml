@@ -1987,9 +1987,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
 
     <Check>
-        <Name>Nested Family Table</Name>
+        <Name>Nested Family Table Instances</Name>
         <Category>Model Integrity</Category>
-        <Description>Checks for nested family tables (generics that are also instances of another family table). Nested family tables can cause regeneration to take longer and can cause performance issues. They may also not work well with Windchill.</Description>
+        <Description>Checks for nested family table instances and the nested generics that own them. Nested family tables can cause regeneration to take longer and can cause performance issues. They may also not work well with Windchill. The answer is the total of unique nested generics plus nested instance paths.</Description>
         <ModelCheckName>CHK_NESTED_FAMILY_TABLE</ModelCheckName>
     </Check>
 
