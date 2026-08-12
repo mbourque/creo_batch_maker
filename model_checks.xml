@@ -1989,7 +1989,7 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     <Check>
         <Name>Missing family table accelerators</Name>
         <Category>Model Integrity</Category>
-        <Description>Checks family-table generics for missing instance accelerator files (.xpr for parts, .xas for assemblies). Accelerator files speed family-table instance retrieval; missing ones may mean instances have not been regenerated or accelerators were deleted. The answer is the count of instance names without a matching accelerator file in the working folder.</Description>
+        <Description>Checks family-table generics for missing instance accelerator files (.xpr for parts, .xas for assemblies). Accelerator files (.xpr and .xas files) speed family-table instance retrieval; missing ones may mean instances have not been regenerated or accelerators were deleted. The answer is the count of instance names without a matching accelerator file in the working folder. Recommended to fix this issue is to set config option save_instance_accelerator to Always.</Description>
         <ModelCheckName>CHK_FT_ACCELERATOR</ModelCheckName>
     </Check>
 
