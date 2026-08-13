@@ -16,7 +16,7 @@ main.exe
 *.dxc
 models/
 push_settings_to_creo.bat
-developer_notes.md
+# developer_notes.md
 # config/start.mcs
 config/detail.dtl
 .cursor/
