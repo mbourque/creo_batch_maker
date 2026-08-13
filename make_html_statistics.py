@@ -530,6 +530,70 @@ def scan_skipped_models(
     return [skipped[k] for k in sorted(skipped.keys(), key=lambda k: skipped[k].casefold())]
 
 
+def _jpg_basenames_in_folder(working_dir: str) -> set[str]:
+    """Top-level ``*.jpg`` basenames (casefolded)."""
+    basenames: set[str] = set()
+    for path in glob.glob(os.path.join(working_dir, "*.jpg")):
+        basenames.add(os.path.basename(path).casefold())
+    return basenames
+
+
+def _thumbnail_candidates_for_display(display: str) -> tuple[str, ...]:
+    """Expected thumbnail basenames for ``name.prt`` / ``.asm`` / ``.drw`` (plain + renamed)."""
+    m = re.match(r"^(?P<stem>.+)\.(?P<ext>prt|asm|drw)$", (display or "").strip(), re.IGNORECASE)
+    if not m:
+        return ()
+    stem, ext = m.group("stem"), m.group("ext").lower()
+    if ext == "prt":
+        return (f"{stem}.jpg", f"{stem}.part.jpg", f"{stem}.model.jpg")
+    if ext == "asm":
+        return (f"{stem}.jpg", f"{stem}.assembly.jpg", f"{stem}.model.jpg")
+    return (f"{stem}.jpg", f"{stem}.drawing.jpg")
+
+
+def scan_thumbnail_failed_count(
+    working_dir: str,
+    *,
+    scan_parts: bool | None = None,
+    scan_assemblies: bool | None = None,
+    scan_drawings: bool | None = None,
+) -> int:
+    """
+    Count models that have ModelCHECK XML but no matching thumbnail ``.jpg``.
+
+    Same eligibility idea as the Thumbnails step (XML present, then expect a jpg).
+    Types turned off in Scan settings are omitted.
+    """
+    scan_parts, scan_assemblies, scan_drawings = _resolved_scan_type_flags(
+        scan_parts=scan_parts,
+        scan_assemblies=scan_assemblies,
+        scan_drawings=scan_drawings,
+    )
+    wd = os.path.normpath(os.path.abspath(working_dir))
+    xml_on_disk = _check_xml_basenames_in_folder(wd)
+    jpg_on_disk = _jpg_basenames_in_folder(wd)
+    models_on_disk = _latest_logical_models_on_disk(wd)
+    failed = 0
+    for display_cf, display in models_on_disk.items():
+        if not _model_type_in_scan_scope(
+            display,
+            scan_parts=scan_parts,
+            scan_assemblies=scan_assemblies,
+            scan_drawings=scan_drawings,
+        ):
+            continue
+        xml_base = _check_xml_basename_for_display(display)
+        if not xml_base or xml_base.casefold() not in xml_on_disk:
+            continue
+        candidates = _thumbnail_candidates_for_display(display)
+        if not candidates:
+            continue
+        if any(name.casefold() in jpg_on_disk for name in candidates):
+            continue
+        failed += 1
+    return failed
+
+
 def _inseparable_covered_by_scanned_asm(display: str, scanned: set[str]) -> bool:
     """
     True when ``display`` is an inseparable embedded part and its child ``.asm``
@@ -705,12 +769,14 @@ PERFORMANCE_TABLE_SECTIONS: list[tuple[str, list[tuple[str, str | None]]]] = [
         "Scan Summary",
         [
             ("Scan date", "_SCAN_DATE"),
+            ("Scan duration", "_SCAN_DURATION"),
             ("Working directory", "_WORKING_DIRECTORY"),
+            ("Models given", "_MODELS_GIVEN"),
             ("Models scanned", "_FILES_SCANNED"),
             ("Models failed to scan", "_MODELS_FAILED"),
+            ("Thumbnails failed to scan", "_THUMBNAILS_FAILED"),
             ("Total size of scanned models", "_TOTAL_SCANNED_SIZE"),
             ("Model checks", "_MODEL_CHECKS"),
-            ("Scan duration", "_SCAN_DURATION"),
         ],
     ),
     (
@@ -814,7 +880,9 @@ class PerformanceMetrics:
     suppressed_components: int = 0
     files_seen: int = 0
     files_scanned: int = 0
+    models_given: int = 0
     models_failed: int = 0
+    thumbnails_failed: int = 0
     part_count: int = 0
     assembly_count: int = 0
     drawing_count: int = 0
@@ -1574,8 +1642,10 @@ def performance_metrics_answers(metrics: PerformanceMetrics) -> dict[str, str]:
         "_WORKING_DIRECTORY": metrics.working_directory or "—",
         "_SCAN_DURATION": metrics.scan_duration or "—",
         "_USERS": ", ".join(metrics.users) if metrics.users else "—",
+        "_MODELS_GIVEN": str(metrics.models_given),
         "_FILES_SCANNED": str(metrics.files_scanned),
         "_MODELS_FAILED": str(metrics.models_failed),
+        "_THUMBNAILS_FAILED": str(metrics.thumbnails_failed),
         "_PART_COUNT": str(metrics.part_count),
         "_ASSEMBLY_COUNT": str(metrics.assembly_count),
         "_DRAWING_COUNT": str(metrics.drawing_count),
@@ -1638,8 +1708,10 @@ def _resolve_performance_value(answers: dict[str, str], key: str | None) -> tupl
         "_WORKING_DIRECTORY",
         "_SCAN_DURATION",
         "_USERS",
+        "_MODELS_GIVEN",
         "_FILES_SCANNED",
         "_MODELS_FAILED",
+        "_THUMBNAILS_FAILED",
         "_PART_COUNT",
         "_ASSEMBLY_COUNT",
         "_DRAWING_COUNT",
@@ -3103,6 +3175,13 @@ def generate_statistics_fragment(
     stats.skipped_models = scan_skipped_models(working_dir, master_root)
     if stats.performance_metrics is not None:
         stats.performance_metrics.models_failed = len(stats.skipped_models)
+        stats.performance_metrics.models_given = (
+            stats.performance_metrics.files_scanned
+            + stats.performance_metrics.models_failed
+        )
+        stats.performance_metrics.thumbnails_failed = scan_thumbnail_failed_count(
+            working_dir
+        )
     if stats.top_level_assembly:
         stats.top_level_assembly_bom = load_top_level_assembly_bom(
             working_dir,
@@ -3136,6 +3215,13 @@ def write_statistics_html_file(master_xml_path: str, output_path: str) -> str:
     stats.skipped_models = scan_skipped_models(working_dir, root)
     if stats.performance_metrics is not None:
         stats.performance_metrics.models_failed = len(stats.skipped_models)
+        stats.performance_metrics.models_given = (
+            stats.performance_metrics.files_scanned
+            + stats.performance_metrics.models_failed
+        )
+        stats.performance_metrics.thumbnails_failed = scan_thumbnail_failed_count(
+            working_dir
+        )
     if stats.top_level_assembly:
         stats.top_level_assembly_bom = load_top_level_assembly_bom(
             working_dir,

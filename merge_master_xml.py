@@ -8,14 +8,14 @@ import re
 def clean_xml(file_path):
     with open(file_path, 'rb') as f:
         content = f.read().decode('utf-8', errors='ignore')
-    
+
     # Remove non-printable characters
     cleaned_content = re.sub(r'[^\x20-\x7E\n\r\t]', '', content)
-    
+
     cleaned_file_path = file_path + '.cleaned'
     with open(cleaned_file_path, 'w', encoding='utf-8') as f:
         f.write(cleaned_content)
-    
+
     return cleaned_file_path
 
 
@@ -65,14 +65,14 @@ def extract_check_content(file_path):
     root = tree.getroot()
     checks = _dedupe_identical_checks(root.findall('.//check'))
     _scrub_check_item_texts(checks)
-    
+
     # Extract additional details
     model = root.find('.//model').text if root.find('.//model') is not None else ''
     pro_type = root.find('.//pro_type').text if root.find('.//pro_type') is not None else ''
     date = root.find('.//date').text if root.find('.//date') is not None else ''
     last_saved = root.find('.//last_saved').text if root.find('.//last_saved') is not None else ''
     created = root.find('.//created').text if root.find('.//created') is not None else ''
-    
+
     file_size = 0
     num_features = 0
     overall_size = 'Unknown'
@@ -136,45 +136,45 @@ def indent(elem, level=0):
 
 def write_master_xml(checks_dict, output_file, folder_path):
     root = ET.Element("MasterXML")
-    
+
     for file_path, (checks, model, pro_type, date, last_saved, created, file_size, num_features, overall_size, units_length) in checks_dict.items():
         file_element = ET.SubElement(root, "File")
-        
+
         # Path = scan folder (same as working directory / CLI directory) + model name
         path_element = ET.SubElement(file_element, "Path")
         path_element.text = os.path.join(folder_path, model)
-        
+
         model_element = ET.SubElement(file_element, "Model")
         model_element.text = model
-        
+
         pro_type_element = ET.SubElement(file_element, "ProType")
         pro_type_element.text = pro_type
-        
+
         date_element = ET.SubElement(file_element, "Date")
         date_element.text = date
-        
+
         last_saved_element = ET.SubElement(file_element, "LastSaved")
         last_saved_element.text = last_saved
-        
+
         created_element = ET.SubElement(file_element, "Created")
         created_element.text = created
 
         file_size_element = ET.SubElement(file_element, "FileSize")
         file_size_element.text = str(file_size) + ' MB'
-        
+
         num_features_element = ET.SubElement(file_element, "NumFeatures")
         num_features_element.text = str(num_features)
-        
+
         overall_size_element = ET.SubElement(file_element, "OverallSize")
         overall_size_element.text = overall_size
-        
+
         units_length_element = ET.SubElement(file_element, "UnitsLength")
         units_length_element.text = units_length
-        
+
         checks_element = ET.SubElement(file_element, "Checks")
         for check in checks:
             checks_element.append(check)
-    
+
     indent(root)
     tree = ET.ElementTree(root)
     tree.write(output_file, encoding='utf-8', xml_declaration=True)

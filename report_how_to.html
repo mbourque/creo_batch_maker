@@ -365,7 +365,8 @@
           Open it from the sidebar link.
         </p>
         <ul>
-          <li><strong>CAD Assessment Summary</strong> — working folder, scan duration, model counts,
+          <li><strong>CAD Assessment Summary</strong> — working folder, scan duration, model counts
+            (<strong>Models given</strong> = scanned + failed),
             sizes, assembly structure metrics (for example maximum assembly depth), and related totals.
             Rows with a value of <strong>0</strong> are omitted.</li>
           <li><strong>Biggest problems</strong> — ranked health-style bars; click a bar to jump to
@@ -376,6 +377,9 @@
             with missing dependencies or components, and very large or resource-intensive assemblies.
             Also included are models that require interactive input, are corrupt or unstable, or cause
             Creo to hang or crash. Drag a model name into Creo to try opening it.</li>
+          <li><strong>Thumbnails failed to scan</strong> — Count of models that have ModelCHECK XML but
+            still lack a matching thumbnail image (shown in CAD Assessment Summary under Models failed
+            to scan when greater than zero).</li>
           <li><strong>Family table detail</strong> and related sections — when the scan found them.
             CAD Assessment Summary also reports nested family table instances from the
             Nested Family Table Instances check. Long lists use
