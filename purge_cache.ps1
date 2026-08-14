@@ -129,4 +129,16 @@ foreach ($name in $mcTempFolders) {
 }
 
 Write-Step ''
+Write-Step "[6] Removing dbatch* under $localTemp..."
+$tempDbatch = @(Get-ChildItem -LiteralPath $localTemp -Force -Filter 'dbatch*' -ErrorAction SilentlyContinue)
+if ($tempDbatch.Count -eq 0) {
+    Write-Host '  (none found)'
+} else {
+    foreach ($item in $tempDbatch) {
+        Write-Host "  removing $($item.FullName)"
+        Remove-Item -LiteralPath $item.FullName -Recurse -Force
+    }
+}
+
+Write-Step ''
 Write-Step 'Done.'
