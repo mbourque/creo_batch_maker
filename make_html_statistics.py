@@ -33,6 +33,7 @@ import os
 import re
 
 import sys
+import time
 
 import xml.etree.ElementTree as ET
 
@@ -1388,8 +1389,68 @@ def _scan_timing_path(working_dir: str) -> Path:
     return Path(working_dir).expanduser() / SCAN_TIMING_BASENAME
 
 
+def _load_scan_timing(path: Path) -> dict[str, object]:
+    phases: dict[str, float] = {}
+    started: float | None = None
+    last_at: float | None = None
+    if path.is_file():
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError, TypeError, ValueError):
+            raw = None
+        if isinstance(raw, dict):
+            existing = raw.get("phases")
+            if isinstance(existing, dict):
+                for name, value in existing.items():
+                    if name in _SCAN_DURATION_PHASE_KEYS and isinstance(value, (int, float)):
+                        phases[name] = float(value)
+            raw_started = raw.get("scan_started_at")
+            if isinstance(raw_started, (int, float)) and raw_started > 0:
+                started = float(raw_started)
+            raw_last = raw.get("scan_ended_at")
+            if not isinstance(raw_last, (int, float)) or raw_last <= 0:
+                raw_last = raw.get("last_activity_at")
+            if isinstance(raw_last, (int, float)) and raw_last > 0:
+                last_at = float(raw_last)
+    return {"phases": phases, "scan_started_at": started, "scan_ended_at": last_at}
+
+
+def _write_scan_timing(path: Path, data: dict[str, object]) -> None:
+    phases = data.get("phases")
+    payload: dict[str, object] = {
+        "phases": phases if isinstance(phases, dict) else {},
+    }
+    started = data.get("scan_started_at")
+    ended = data.get("scan_ended_at")
+    if isinstance(started, (int, float)) and started > 0:
+        payload["scan_started_at"] = float(started)
+    if isinstance(ended, (int, float)) and ended > 0:
+        payload["scan_ended_at"] = float(ended)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    except OSError:
+        pass
+
+
+def ensure_scan_started_at(working_dir: str) -> None:
+    """Write scan_started_at on first GO; never overwrite if the timing file already has it."""
+    wd = (working_dir or "").strip()
+    if not wd:
+        return
+    path = _scan_timing_path(wd)
+    data = _load_scan_timing(path)
+    if isinstance(data.get("scan_started_at"), (int, float)):
+        return
+    now = time.time()
+    data["scan_started_at"] = now
+    if not isinstance(data.get("scan_ended_at"), (int, float)):
+        data["scan_ended_at"] = now
+    _write_scan_timing(path, data)
+
+
 def record_scan_phase_duration(working_dir: str, phase_key: str, seconds: float) -> None:
-    """Store one active batch phase duration (ModelCHECK or a thumbnail pass)."""
+    """Keep first start; overwrite scan_ended_at. Phase seconds are still stored."""
     key = (phase_key or "").strip()
     if key not in _SCAN_DURATION_PHASE_KEYS:
         return
@@ -1397,59 +1458,62 @@ def record_scan_phase_duration(working_dir: str, phase_key: str, seconds: float)
     if not wd:
         return
     path = _scan_timing_path(wd)
-    phases: dict[str, float] = {}
-    if path.is_file():
-        try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
-            existing = raw.get("phases") if isinstance(raw, dict) else None
-            if isinstance(existing, dict):
-                for name, value in existing.items():
-                    if name in _SCAN_DURATION_PHASE_KEYS and isinstance(value, (int, float)):
-                        phases[name] = float(value)
-        except (OSError, json.JSONDecodeError, TypeError, ValueError):
-            phases = {}
-    phases[key] = max(0.0, float(seconds))
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            json.dumps({"phases": phases}, indent=2) + "\n",
-            encoding="utf-8",
-        )
-    except OSError:
-        pass
+    data = _load_scan_timing(path)
+    phases = data.get("phases")
+    if not isinstance(phases, dict):
+        phases = {}
+        data["phases"] = phases
+    add = max(0.0, float(seconds))
+    prev = phases.get(key)
+    prior = float(prev) if isinstance(prev, (int, float)) else 0.0
+    phases[key] = prior + add
+    now = time.time()
+    started = data.get("scan_started_at")
+    if not isinstance(started, (int, float)) or started <= 0:
+        data["scan_started_at"] = now - add if add > 0 else now
+    data["scan_ended_at"] = now
+    _write_scan_timing(path, data)
 
 
 def _scan_duration_from_timing_file(working_dir: str) -> str:
-    """Sum ModelCHECK + thumbnail phase durations when the timing file exists."""
+    """First GO start to last Stop/finish (end is overwritten; start is not)."""
     wd = (working_dir or "").strip()
     if not wd:
         return ""
     path = _scan_timing_path(wd)
     if not path.is_file():
         return ""
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, TypeError, ValueError):
-        return ""
-    phases = raw.get("phases") if isinstance(raw, dict) else None
-    if not isinstance(phases, dict):
-        return ""
-    total = 0.0
-    any_phase = False
-    for key in _SCAN_DURATION_PHASE_KEYS:
-        value = phases.get(key)
-        if isinstance(value, (int, float)) and value > 0:
-            total += float(value)
-            any_phase = True
-    if not any_phase or total < 1:
-        return ""
-    return _format_scan_duration(total)
+    data = _load_scan_timing(path)
+    started = data.get("scan_started_at")
+    ended = data.get("scan_ended_at")
+    if (
+        isinstance(started, (int, float))
+        and isinstance(ended, (int, float))
+        and ended > started
+        and (ended - started) >= 1
+    ):
+        return _format_scan_duration(ended - started)
+    return ""
 
 
-def _scan_date_for_report(master_path: str = "") -> str:
-    """Prefer master.xml write time (scan merge); otherwise report build time."""
+def _scan_date_for_report(master_path: str = "", working_dir: str = "") -> str:
+    """Prefer first GO start from the timing file; else master.xml mtime; else now."""
     dt: datetime | None = None
-    if master_path:
+    wd = (working_dir or "").strip()
+    if not wd and master_path:
+        try:
+            wd = str(Path(master_path).expanduser().resolve().parent)
+        except OSError:
+            wd = str(Path(master_path).parent)
+    if wd:
+        data = _load_scan_timing(_scan_timing_path(wd))
+        started = data.get("scan_started_at")
+        if isinstance(started, (int, float)) and started > 0:
+            try:
+                dt = datetime.fromtimestamp(float(started))
+            except (OSError, OverflowError, ValueError):
+                dt = None
+    if dt is None and master_path:
         try:
             path = Path(master_path)
             if path.is_file():
@@ -1462,11 +1526,10 @@ def _scan_date_for_report(master_path: str = "") -> str:
 
 
 def _scan_duration_from_modelcheck_xml(working_dir: str) -> str:
-    """Prefer timed ModelCHECK + thumbnail phases; else earliest/latest ModelCHECK XML span.
+    """Prefer first-start / last-end from the timing file; else XML mtime span.
 
-    Timing file: ``creo-batch-scan-timing.json`` (written by the wizard after each batch pass).
-    Fallback uses one ``scandir`` of the working folder: non-XML names are skipped without
-    ``stat``; only matching XML files contribute min/max mtime.
+    Timing file: ``creo-batch-scan-timing.json``. Fallback uses ModelCHECK ``.p.xml`` /
+    ``.a.xml`` / ``.d.xml`` earliest vs latest write time.
     """
     from_timing = _scan_duration_from_timing_file(working_dir)
     if from_timing:
@@ -1896,7 +1959,7 @@ def _apply_performance_report_meta(
             wd = str(Path(master_path).expanduser().resolve().parent)
         except OSError:
             wd = str(Path(master_path).parent)
-    metrics.scan_date = _scan_date_for_report(master_path)
+    metrics.scan_date = _scan_date_for_report(master_path, wd)
     metrics.model_checks_mch = (
         _model_checks_mch_from_working_dir(wd)
         or _model_checks_mch_from_condition_mcc()
