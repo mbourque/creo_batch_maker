@@ -92,10 +92,10 @@ DIR_MC_DUP_READ_U	/tmp/mc_dup_read
 DIR_MC_DUP_READ	$TEMP/mc_dup_read
 
 # Directory ModelCHECK will write shape indexing files on NT
-#DIR_MC_DUP_WRITE_NT	$TEMP/mc_dup_write
+DIR_MC_DUP_WRITE_NT	$TEMP/mc_dup_write
 
 # Directory ModelCHECK will write shape indexing files on UNIX
-# DIR_MC_DUP_WRITE_U	/tmp/mc_dup_write
+DIR_MC_DUP_WRITE_U	/tmp/mc_dup_write
 
 # Directory ModelCHECK will write shape indexing files
 DIR_MC_DUP_WRITE	$TEMP/mc_dup_write
@@ -188,7 +188,7 @@ MU_REGENERATE	YN	N
 #   N - Never add model info
 #   D - add model info but Don't overwrite existing info
 #   A - always Ask the user whether to add AND whether to overwrite
-ADD_DUP_INFO_AUTO	YNDA	N	N	N	N
+ADD_DUP_INFO_AUTO	YNDA	D	D	N	N
 
 # Temporary directory for preview files storage
 #DIR_MC_PREVIEW_NT	$TEMP/mc_preview
