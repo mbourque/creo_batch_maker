@@ -1282,7 +1282,7 @@ def _gallery_card_html(row: dict) -> str:
         quote=True,
     )
     img = (
-        f'<img loading="lazy" decoding="async" draggable="false" '
+        f'<img draggable="false" '
         f'title="{tip_attr}" src="{src_esc}" alt="">'
     )
     name_html = f'<span class="mq-gallery-name">{name_esc}</span>'
