@@ -1640,9 +1640,9 @@ Weak sketcher dimensions, also known as non-driving dimensions, are automaticall
     </Check>
 
     <Check>
-        <Name>Feature without surfaces that may be buried</Name>
+        <Name>Buried features with children</Name>
         <Category>Model Integrity</Category>
-        <Description>Checks for suspect buried features in the model that may have no exposed or accessible surfaces and are potentially hidden within surrounding geometry, which can indicate modeling errors, incomplete feature definition, or unintended internal geometry. Buried features can cause issues in manufacturing, assembly interpretation, interference detection, and downstream processes such as CAM programming and simulation because they may not be visible or easily accessible for validation or modification. This check helps identify features that may be fully or partially enclosed so they can be reviewed and corrected to ensure model integrity and manufacturability. Buried feature detection rules and geometry validation standards are typically governed by Creo modeling practices and ModelCHECK configuration files, while check behavior and reporting are controlled by the BURIED_SUSPECT settings in the check.mch configuration file.</Description>
+        <Description>Reports the child features of buried features in the model.</Description>
         <ModelCheckName>BURIED_SUSPECT</ModelCheckName>
         <why>A buried feature has geometry that is entirely surrounded (or enclosed) by another feature’s geometry. For example, a cut feature may be completely filled by one or more features. Or a solid feature, such as a protrusion, may be completely surrounded by geometry from one or more other features.
         The design intent of a buried feature should be questioned since it is being replaced by geometry from other features.
